@@ -8,7 +8,7 @@ the F-phase experiments).
 ## Checklist
 1. [x] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a v5 save
 2. [x] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
-3. [ ] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
+3. [x] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
 4. [ ] M1c Load a v5 save in Rust; state hash at step 0 equals Python's
 5. [ ] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [ ] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
@@ -90,5 +90,13 @@ that point (`SAVE_VERSION` in `engine-rs/src/lib.rs`).
   interleave calls `random()` while a cached gauss value is pending, so the Rust port must keep `gauss_next`.
 - **M1a** (2026-11-10): crate `worldsim-core` in `engine-rs/` (no dependencies yet), `cargo test` checks the
   golden files are present and well formed; CI job `rust-core` runs fmt, clippy and tests. Local: rustc 1.98.1.
+- **M1b** (2026-11-10, Windows 11, rustc 1.98.1 `x86_64-pc-windows-msvc`): `cd engine-rs && cargo test`
+  → `tests/golden_rng.rs` passes on both golden sets: 1000 `random()`, 200 `randrange` (n up to 2^32+5, so
+  `getrandbits(33)`), 3 shuffles of 50, 50 `choice`, 750 `gauss` + 250 `random()` interleaved (the pending
+  `gauss_next` survives `random()`), and `end_state`, all bit-for-bit. Floats are compared by bits with no
+  tolerance (a 2-ULP perturbation of `gauss` makes the test fail: checked). A save/restore round trip with
+  a pending gauss value continues identically. Linux is unverified until the `rust-core` CI job runs: integer
+  draws and `end_state` cannot differ there, `gauss` (libm log/cos/sin) may. If it does, record it here and
+  decide with the M2 open question below; the comparison stays strict.
 - Open question for M2: Linux CI cannot compare stepped hashes made on Windows (maths library). Options: make
   the golden files on Linux in CI, or keep one set per OS. Decide when M2 starts.
