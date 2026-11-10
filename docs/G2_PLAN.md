@@ -62,6 +62,15 @@ which are recomputed and would only hide where a difference started.
 - **M3**: ≥ 1.8×10⁶ cell-updates/s single-threaded (30k cells × 60 steps/s); fast-forward
   target recorded, not required.
 
+## Coordination with F5b (plasticity, ADR-0009, on main)
+F5b moves the save format to **v6** (per-cell plastic values, present only with `cfg.plasticity`) and adds
+a flagged block to `step()`. With plasticity off the default world stays bit-identical to `c3e1c43` (the
+engine of this branch's base, `d0e0a3d`), so the default-flags target of M0–M2 is unchanged. But
+`load_world` rejects old versions: once F5b is on main, rebasing this branch makes `tests/test_g2_golden.py`
+fail on the v5 `start.json.gz`. Fix then: regenerate the golden sets (the hashes should not change, since
+the hash excludes the version; check that they don't) and have the Rust loader read the version current at
+that point (`SAVE_VERSION` in `engine-rs/src/lib.rs`).
+
 ## Rules for the port
 - No global RNG, no `HashMap` iteration in the dynamics (use `Vec` + ids, or an
   insertion-ordered map for bonds); no `-ffast-math` equivalents, no `mul_add`.
