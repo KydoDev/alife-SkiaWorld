@@ -6,8 +6,8 @@ reference lab. This file is the G2 working plan (kept apart from `PLAN.md`, whic
 the F-phase experiments).
 
 ## Checklist
-1. [ ] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a v5 save
-2. [ ] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
+1. [x] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a v5 save
+2. [x] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
 3. [ ] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
 4. [ ] M1c Load a v5 save in Rust; state hash at step 0 equals Python's
 5. [ ] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
@@ -71,4 +71,11 @@ which are recomputed and would only hide where a difference started.
   as tracking an older commit, explicitly).
 
 ## Results log
-(Empty — record each milestone's outcome here, with the command and seed.)
+- **M0** (2026-11-10, Windows 11, Python 3.12.10): `python scripts/g2_golden.py --seed 1 --warmup 200
+  --steps 1000 --out engine-rs/tests/golden/default` → start step 200 (225 cells), final population 711;
+  ~3 s; 265 KB of golden files. Regenerating gives identical hashes. `tests/test_g2_golden.py` (5 tests) checks
+  them; stepped hashes are compared on Windows only (the other OS skips with a reason).
+- **M1a** (2026-11-10): crate `worldsim-core` in `engine-rs/` (no dependencies yet), `cargo test` checks the
+  golden files are present and well formed; CI job `rust-core` runs fmt, clippy and tests. Local: rustc 1.98.1.
+- Open question for M2: Linux CI cannot compare stepped hashes made on Windows (maths library). Options: make
+  the golden files on Linux in CI, or keep one set per OS. Decide when M2 starts.

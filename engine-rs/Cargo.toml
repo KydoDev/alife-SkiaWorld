@@ -1,0 +1,16 @@
+[package]
+name = "worldsim-core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust reference kernel of the WorldSim engine (G2 port, ADR-0008)"
+publish = false
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+
+[profile.release]
+# No fast-math exists in Rust; keep codegen conservative for reproducible floats.
+lto = true
+codegen-units = 1

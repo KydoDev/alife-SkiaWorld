@@ -34,3 +34,15 @@ jobs:
           python run.py --resume runs/ci/world_000150.json.gz --steps 150 --out runs/ci-resume --snap-every 150
           python run.py --planet examples/volcanic.json --steps 200 --out runs/ci-planet --snap-every 200
           python run.py --planet examples/planet.png --steps 200 --out runs/ci-photo --snap-every 200
+
+  rust-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine-rs
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

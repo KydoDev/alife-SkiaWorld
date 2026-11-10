@@ -56,6 +56,12 @@ Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter 
 pytest                                   # full suite, coverage gate from pyproject.toml
 pytest tests/test_world.py::test_name    # single test
 ruff check .                             # lint
+
+# Rust core (G2, engine-rs/): needs a stable Rust toolchain
+cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+
+# regenerate the G2 golden vectors after any change to the default dynamics
+python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/default
 ```
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).

@@ -1,0 +1,69 @@
+"""The G2 golden vectors (engine-rs/tests/golden/) still describe the Python reference engine.
+
+The portable parts (integer RNG paths, random(), and the state hash of a loaded save) are checked on every
+platform. Stepping uses gauss/pow/sin from the platform's maths library, so it is compared only on the OS
+the golden files were made on (see ADR-0008, "Determinism and cross-engine verification").
+"""
+import csv
+import importlib.util
+import json
+import platform
+import random
+from pathlib import Path
+
+import pytest
+
+from worldsim.persistence import load_world
+
+ROOT = Path(__file__).resolve().parent.parent
+GOLDEN = ROOT / "engine-rs" / "tests" / "golden" / "default"
+
+_spec = importlib.util.spec_from_file_location("g2_golden", ROOT / "scripts" / "g2_golden.py")
+g2 = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(g2)
+
+
+@pytest.fixture(scope="module")
+def rng_golden():
+    return json.loads((GOLDEN / "rng.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def hashes():
+    with open(GOLDEN / "hashes.csv", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def test_loaded_save_hash_matches_golden_start(hashes):
+    world = load_world(GOLDEN / "start.json.gz")
+    assert world.step_count == int(hashes[0]["step"])
+    assert g2.state_hash(world) == hashes[0]["hash"]
+
+
+def test_integer_rng_paths_match_golden(rng_golden):
+    fresh = g2.rng_vectors(rng_golden["seed"])
+    for key in ("start_state", "random", "randrange", "shuffle_50", "choice_9"):
+        assert fresh[key] == rng_golden[key], key
+
+
+def test_rng_vectors_cover_the_seeded_state(rng_golden):
+    rng = random.Random(rng_golden["seed"])
+    assert list(rng.getstate()[1]) == rng_golden["start_state"]
+
+
+def test_state_hash_changes_with_the_state(hashes):
+    world = load_world(GOLDEN / "start.json.gz")
+    before = g2.state_hash(world)
+    world.cells[0].energy += 1e-12
+    assert g2.state_hash(world) != before
+
+
+def test_stepping_matches_golden_on_the_same_os(rng_golden, hashes):
+    if platform.system() != rng_golden["meta"]["system"]:
+        pytest.skip(f"golden steps were made on {rng_golden['meta']['system']}; float maths may differ here")
+    assert rng_golden["mixed_gauss_random"] == g2.rng_vectors(rng_golden["seed"])["mixed_gauss_random"]
+    world = load_world(GOLDEN / "start.json.gz")
+    for row in hashes[1:31]:
+        world.step()
+        got = (world.step_count, g2.state_hash(world))
+        assert got == (int(row["step"]), row["hash"]), "regenerate the golden files"
