@@ -11,7 +11,8 @@ All notable changes to this project are documented here. Format based on
   chose a Rust core (`engine-rs/`) called from Unity, in this repository. Milestone
   plan in `docs/G2_PLAN.md`.
 - **G2 milestones M0–M1a**: `scripts/g2_golden.py` writes golden vectors (a v5 save,
-  CPython RNG draws, per-step state hashes) to `engine-rs/tests/golden/default/`, checked by
+  CPython RNG draws, per-step state hashes; flat default world and `volcanic.json`) to
+  `engine-rs/tests/golden/`, checked by
   `tests/test_g2_golden.py`; Rust crate skeleton `worldsim-core` in `engine-rs/` with a
   `rust-core` CI job (fmt, clippy, test).
 - **F5a Two parents** (first of the four F5 mechanisms, ADR-0007): `--set sex=1` gives

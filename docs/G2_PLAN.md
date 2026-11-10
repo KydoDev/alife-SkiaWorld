@@ -25,13 +25,14 @@ Out of scope until M2 passes: rendering, interventions, planet loading from form
 images (the Rust side only reads saves, which already contain the terrain maps).
 
 ## Golden data (M0)
-`scripts/g2_golden.py --seed S --steps N --out engine-rs/tests/golden/<name>/` writes:
+`scripts/g2_golden.py [--planet FILE] --seed S --warmup W --steps N --out engine-rs/tests/golden/<name>/`
+writes (sets committed: `default`, flat world; `volcanic`, `examples/volcanic.json`):
 - `start.json.gz` — a v5 save at step 0 (or after a warm-up, so colonies and organic
   matter exist);
 - `rng.json` — from a fixed state: 1000 × `random()`, `randrange(n)` for several `n`
   (including non-powers of two), `shuffle` of `range(50)`, `choice`, 1000 × `gauss(0, σ)`
   starting with and without a cached `gauss_next`;
-- `hashes.csv` — `step,hash` for every step 1..N.
+- `hashes.csv` — `step,population,hash`: the start row, then every step 1..N after it.
 
 The script lives under `scripts/` (outside the coverage gate's `worldsim/` source) and
 does not change the engine. Golden files are small (a save is ~280 KB gzip; keep N ≤ 1000)
@@ -53,8 +54,9 @@ which are recomputed and would only hide where a difference started.
 ## Verification criteria
 - **M1b**: every golden RNG draw equal bit-for-bit.
 - **M1c**: hash at step 0 equal.
-- **M2**: first divergent step = none in 1000 steps on both golden cases, on the owner's
-  Windows machine and on the Linux CI runner. If transcendentals (`gauss`, `powf`, `sin`,
+- **M2**: first divergent step = none in 1000 steps on both golden cases, on the OS that made
+  the golden set (Windows). Linux is unknown until measured: pytest runs the stepped check there
+  as a non-strict xfail, so the first CI run says whether the hashes match. If transcendentals (`gauss`, `powf`, `sin`,
   `exp`) break it, report the step and the field that differs first, then fall back to the
   statistical test (ADR-0008) and ask the owner whether to make the Python maths portable.
 - **M3**: ≥ 1.8×10⁶ cell-updates/s single-threaded (30k cells × 60 steps/s); fast-forward
@@ -73,8 +75,10 @@ which are recomputed and would only hide where a difference started.
 ## Results log
 - **M0** (2026-11-10, Windows 11, Python 3.12.10): `python scripts/g2_golden.py --seed 1 --warmup 200
   --steps 1000 --out engine-rs/tests/golden/default` → start step 200 (225 cells), final population 711;
-  ~3 s; 265 KB of golden files. Regenerating gives identical hashes. `tests/test_g2_golden.py` (5 tests) checks
-  them; stepped hashes are compared on Windows only (the other OS skips with a reason).
+  ~3 s; 265 KB. Second set: `--planet examples/volcanic.json`, same seed/steps → start 19a6704614f8, final
+  population 447; 370 KB. Regenerating gives identical hashes. `tests/test_g2_golden.py` (5 tests × 2 sets)
+  checks them; stepped hashes are compared on Windows (non-strict xfail on other OSes). The gauss/random
+  interleave calls `random()` while a cached gauss value is pending, so the Rust port must keep `gauss_next`.
 - **M1a** (2026-11-10): crate `worldsim-core` in `engine-rs/` (no dependencies yet), `cargo test` checks the
   golden files are present and well formed; CI job `rust-core` runs fmt, clippy and tests. Local: rustc 1.98.1.
 - Open question for M2: Linux CI cannot compare stepped hashes made on Windows (maths library). Options: make

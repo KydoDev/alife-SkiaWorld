@@ -4,13 +4,24 @@
 use std::fs;
 use std::path::PathBuf;
 
-fn golden_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/golden/default")
+const GOLDEN_SETS: [&str; 2] = ["default", "volcanic"];
+
+fn golden_dirs() -> impl Iterator<Item = PathBuf> {
+    GOLDEN_SETS.iter().map(|name| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/golden")
+            .join(name)
+    })
 }
 
 #[test]
 fn hashes_csv_is_well_formed() {
-    let text = fs::read_to_string(golden_dir().join("hashes.csv")).expect("hashes.csv missing");
+    for dir in golden_dirs() {
+        check_hashes_csv(&fs::read_to_string(dir.join("hashes.csv")).expect("hashes.csv missing"));
+    }
+}
+
+fn check_hashes_csv(text: &str) {
     let mut lines = text.lines();
     assert_eq!(lines.next(), Some("step,population,hash"));
     let mut prev: Option<u64> = None;
@@ -33,12 +44,18 @@ fn hashes_csv_is_well_formed() {
 
 #[test]
 fn start_save_is_gzip_and_rng_vectors_exist() {
-    let save = fs::read(golden_dir().join("start.json.gz")).expect("start.json.gz missing");
+    for dir in golden_dirs() {
+        check_save_and_rng(&dir);
+    }
+    assert_eq!(worldsim_core::SAVE_VERSION, 5);
+}
+
+fn check_save_and_rng(golden: &std::path::Path) {
+    let save = fs::read(golden.join("start.json.gz")).expect("start.json.gz missing");
     assert_eq!(&save[..2], &[0x1f, 0x8b], "start save is not gzip");
-    let rng = fs::read_to_string(golden_dir().join("rng.json")).expect("rng.json missing");
+    let rng = fs::read_to_string(golden.join("rng.json")).expect("rng.json missing");
     assert!(
         rng.contains("\"save_version\":5"),
         "golden save version must match the kernel"
     );
-    assert_eq!(worldsim_core::SAVE_VERSION, 5);
 }

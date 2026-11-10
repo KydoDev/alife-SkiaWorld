@@ -1,4 +1,4 @@
-"""G2 golden vectors: reference data the Rust port (engine-rs/) must reproduce bit-for-bit.
+r"""G2 golden vectors: reference data the Rust port (engine-rs/) must reproduce bit-for-bit.
 
 Writes into --out:
 - start.json.gz  a v5 save after --warmup steps (default flags, no species tracker);
@@ -9,6 +9,8 @@ The state hash is defined in docs/G2_PLAN.md ("State hash"); both engines must i
 Golden files depend on the platform's maths library for gauss/pow/sin, so they record where they were made.
 
     python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/default
+    python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000 \
+        --out engine-rs/tests/golden/volcanic
 """
 import argparse
 import csv
@@ -25,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from worldsim.config import Config  # noqa: E402
 from worldsim.persistence import VERSION, save_world  # noqa: E402
 from worldsim.world import World  # noqa: E402
+from worldsim.worldgen import load_planet  # noqa: E402
 
 RANDRANGE_NS = (1, 2, 3, 7, 10, 100, 1000, 10_240, 2**31 - 1, 2**32 + 5)
 
@@ -74,7 +77,7 @@ def rng_vectors(seed: int) -> dict:
     # gauss caches its second value (gauss_next): interleave with random() so the cache is exercised
     seq = []
     for i in range(1000):
-        if i % 5 == 2:
+        if i % 4 == 3:                     # after an odd number of gauss calls: a cached value is pending
             seq.append(["r", f64_hex(rng.random())])
         else:
             seq.append(["g", f64_hex(rng.gauss(0.0, 0.05))])
@@ -88,13 +91,18 @@ def main(argv=None) -> None:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--warmup", type=int, default=200, help="steps run before the start save")
     ap.add_argument("--steps", type=int, default=1000, help="steps hashed after the start save")
+    ap.add_argument("--planet", type=Path, help="planet form (.json) or image; default: the flat default world")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
     if args.steps < 1 or args.warmup < 0:
         ap.error("--steps must be >= 1 and --warmup >= 0")
 
     args.out.mkdir(parents=True, exist_ok=True)
-    world = World(Config(), seed=args.seed, track_species=False)
+    if args.planet:
+        cfg, terrain, seed = load_planet(args.planet, Config(), args.seed)
+        world = World(cfg, seed=seed, track_species=False, terrain=terrain)
+    else:
+        world = World(Config(), seed=args.seed, track_species=False)
     for _ in range(args.warmup):
         world.step()
     save_world(world, args.out / "start.json.gz")
@@ -110,7 +118,8 @@ def main(argv=None) -> None:
 
     rng = rng_vectors(args.seed)
     rng["meta"] = {"python": platform.python_version(), "system": platform.system(), "platform": platform.platform(),
-                   "save_version": VERSION, "warmup": args.warmup, "steps": args.steps}
+                   "save_version": VERSION, "warmup": args.warmup, "steps": args.steps,
+                   "planet": args.planet.as_posix() if args.planet else None}
     (args.out / "rng.json").write_text(json.dumps(rng, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"{args.out}: start step {args.warmup} hash {start_hash[:12]}, "
           f"{args.steps} steps, final population {len(world.cells)}")
