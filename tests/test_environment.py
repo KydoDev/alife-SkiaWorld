@@ -199,3 +199,40 @@ def test_light_transcendentals_come_from_libm():
         assert w.base_light[y, 1] == depth
         assert w.light[y, 0] == depth * math.pow(cfg.shade, float(y))
         assert w.light[y, 1] == depth
+
+
+def test_terrain_transcendentals_come_from_libm():
+    """G2 regression: the vent field (generation and the G1 vent tool) and the seabed profile must equal
+    pure-Python `math` bit for bit. numpy's SIMD exp/sin are not correctly rounded on AVX-512 CPUs, so they
+    would differ from libm and from the Rust port (M5). The distance is sqrt of an exact integer sum."""
+    from worldsim.play import add_vent
+    from worldsim.terrain import seabed_heights, vent_field
+
+    H, W, strength, radius = 23, 31, 2.0, 3.7
+
+    def plume(vx, vy):
+        return [[strength * math.exp(-math.sqrt(min(abs(x - vx), W - abs(x - vx)) ** 2 + (y - vy) ** 2) / radius)
+                 for x in range(W)] for y in range(H)]
+
+    rock = np.zeros((H, W), dtype=bool)
+    rock[18:, :] = True
+    chem = vent_field(rock, 3, strength, radius, random.Random(7))
+    rng, expected = random.Random(7), np.zeros((H, W))
+    for _ in range(3):
+        expected += np.array(plume(rng.randrange(W), 17))      # first water tile above the rock is row 17
+    expected[rock] = 0.0
+    assert np.array_equal(chem, expected)
+
+    cfg = Config(width=W, height=H, initial_cells=0, vent_strength=strength, vent_radius=radius)
+    w = World(cfg, seed=1, track_species=False, populate=False)
+    assert add_vent(w, 29, 5, max_chem=1e9) == 1             # near the x-wrap
+    assert np.array_equal(w.terrain.chem, np.array(plume(29, 5)))
+
+    heights = seabed_heights(W, H, 0.3, random.Random(3))
+    rng, profile = random.Random(3), [1.0] * W
+    for k in (1, 2, 3, 5):
+        phase = rng.uniform(0, 2 * math.pi)
+        profile = [p + (0.6 / k) * math.sin(2 * math.pi * k * x / W + phase) for x, p in enumerate(profile)]
+    profile = np.clip(np.array(profile), 0.0, None)
+    profile *= 0.3 * H / profile.mean()
+    assert np.array_equal(heights, np.clip(np.rint(profile), 0, H - 1).astype(np.int64))
