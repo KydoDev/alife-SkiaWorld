@@ -50,6 +50,12 @@ def decode_rule(r):
             min(len(RULE_TARGETS) - 1, int(r[2] * len(RULE_TARGETS))), 2.0 * r[3] - 1.0)
 
 
+def genetic_diet(photo, sapro, chemo):
+    """F5b: the genetic split of the non-predatory share among photo / sapro / chemo (sums to 1)."""
+    s = photo + sapro + chemo
+    return (photo / s, sapro / s, chemo / s) if s > 0.0 else (1 / 3, 1 / 3, 1 / 3)
+
+
 def describe_rule(r):
     cond, thr, target, w = decode_rule(r)
     when = "always" if cond == 0 else f"{RULE_CONDITIONS[cond]}{thr:.2f}"
@@ -61,10 +67,10 @@ class Cell:
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
-        "sense", "species", "rules", "rule_fx", "sex_p",
+        "sense", "species", "rules", "rule_fx", "sex_p", "plast_p", "diet",
     )
 
-    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0):
+    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0, plast_p=0.0):
         self.id = cid
         self.x = x
         self.y = y
@@ -73,6 +79,8 @@ class Cell:
         self.genes = genes
         self.rules = rules        # F4 rule genes (list of 4-value lists); empty unless open_genome is on
         self.sex_p = sex_p        # F5a propensity to mate at division; 0 unless sex is on
+        self.plast_p = plast_p    # F5b rate of diet acclimation; 0 unless plasticity is on
+        self.diet = ()            # F5b acclimated (photo, sapro, chemo) split; empty unless plasticity is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
         # same order across runs AND across save/load, which a set cannot guarantee.
@@ -116,6 +124,23 @@ class Cell:
             self.upkeep += cfg.rule_upkeep * len(self.rules)
             if not cfg.rules_neutral:
                 self.rule_fx = tuple(decode_rule(r) for r in self.rules)
+        if cfg.plasticity:
+            self.upkeep += cfg.plastic_upkeep * self.plast_p
+            self.diet = genetic_diet(self.photo, self.sapro, self.chemo)
+            self.apply_diet(cfg)
+
+    def apply_diet(self, cfg):
+        """F5b: phenotype shares from the acclimated diet; the predation share stays genetic.
+        Always used when plasticity is on (also at birth), so a resumed world derives the same floats."""
+        g = self.genes
+        # all four feeding genes at 0: the cell cannot feed, as with plasticity off (not a 1/3 generalist)
+        non_pred = 1.0 - self.pred if (g[G_PHOTO] or g[G_SAPRO] or g[G_PRED] or g[G_CHEMO]) else 0.0
+        p, s, ch = self.diet
+        e = cfg.spec_exp
+        self.photo, self.sapro, self.chemo = non_pred * p, non_pred * s, non_pred * ch
+        self.photo_k = self.photo ** e
+        self.sapro_k = self.sapro ** e
+        self.chemo_k = self.chemo ** e
 
     @property
     def strategy(self):
@@ -183,7 +208,8 @@ class World:
             x, y = i % self.W, i // self.W
             cid = self._new_id()
             cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg,
-                        sex_p=self.rng.random() if self.cfg.sex else 0.0)
+                        sex_p=self.rng.random() if self.cfg.sex else 0.0,
+                        plast_p=self.rng.random() if self.cfg.plasticity else 0.0)
             self._place(cell)
             if self.tracker is not None:
                 self.tracker.on_root(cell, ORIGIN_SEED, self.now)
@@ -279,6 +305,25 @@ class World:
         propensity, so taking it half the time would pull the mean towards the population mean by itself
         (by about share_of_matings / 2 x variance per generation) and fake selection against sex."""
         return min(1.0, max(0.0, c.sex_p + self.rng.gauss(0.0, c.mut_sigma)))
+
+    def offspring_plast_p(self, c):
+        """F5b: the dividing parent's acclimation rate, mutated (never a mate's, as for sex_p)."""
+        return min(1.0, max(0.0, c.plast_p + self.rng.gauss(0.0, c.mut_sigma)))
+
+    def acclimate(self, c, light_here, organic_here, chem_here):
+        """F5b: move the diet towards the split of what each diet would yield here at full specialisation.
+        Deterministic (no RNG); with nothing to gain here the diet stays put."""
+        cfg = self.cfg
+        yp = cfg.photo_gain * light_here
+        ys = cfg.sapro_eff * min(organic_here, cfg.sapro_rate)
+        yc = cfg.chemo_gain * chem_here
+        total = yp + ys + yc
+        if total <= 0.0:
+            return
+        r = c.plast_p * cfg.plastic_rate
+        p, s, ch = c.diet
+        c.diet = (p + r * (yp / total - p), s + r * (ys / total - s), ch + r * (yc / total - ch))
+        c.apply_diet(cfg)
 
     def sensed_move(self, c, sense=None):
         """F3 directed movement: score staying put and each free neighbour tile, return the best
@@ -417,6 +462,7 @@ class World:
         sensing = cfg.sensing
         open_genome = cfg.open_genome
         sex_on, mating = cfg.sex, cfg.sex and not cfg.sex_neutral
+        plastic_on, plastic = cfg.plasticity, cfg.plasticity and not cfg.plastic_neutral
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -432,7 +478,9 @@ class World:
             c.age += 1
             x, y = c.x, c.y
 
-            # 1-3: metabolism and feeding
+            # 1-3: metabolism and feeding (F5b: the diet first acclimates to this tile)
+            if plastic and c.plast_p > 0.0:
+                self.acclimate(c, light[y, x], org[y, x], chem[y, x] if chem is not None else 0.0)
             e = c.energy - c.upkeep
             if c.photo_k > 0.0:
                 e += cfg.photo_gain * c.photo_k * light[y, x]
@@ -504,7 +552,9 @@ class World:
                     genes = self.mutate(self.offspring_genes(c, mate) if mating else c.genes, c.mut_sigma)
                     rules = self.mutate_rules(c.rules, c.mut_sigma) if open_genome else ()
                     sex_p = self.offspring_sex_p(c) if sex_on else 0.0
-                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, sex_p)
+                    plast_p = self.offspring_plast_p(c) if plastic_on else 0.0
+                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, sex_p,
+                                 plast_p)
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
@@ -529,7 +579,8 @@ class World:
                 if self.grid[i] is None and not self.blocked[i]:
                     cid = self._new_id()
                     cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
-                                self.random_genes(), cid, cfg, sex_p=rng.random() if cfg.sex else 0.0)
+                                self.random_genes(), cid, cfg, sex_p=rng.random() if cfg.sex else 0.0,
+                                plast_p=rng.random() if cfg.plasticity else 0.0)
                     self._place(cell)
                     if tracker is not None:
                         tracker.on_root(cell, ORIGIN_IMMIGRANT, self.now)
@@ -567,15 +618,27 @@ class World:
             s["mean_age"] = round(sum(c.age for c in cells) / n, 1)
             s["rules_mean"] = round(sum(len(c.rules) for c in cells) / n, 3)
             s["sex_p_mean"] = round(sum(c.sex_p for c in cells) / n, 4)
+            s["plast_p_mean"] = round(sum(c.plast_p for c in cells) / n, 4)
+            s["diet_shift"] = round(sum(self.diet_shift(c) for c in cells) / n, 4)
             s["rules_max"] = max(len(c.rules) for c in cells)
         else:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
             s["rules_mean"], s["rules_max"], s["sex_p_mean"] = 0.0, 0, 0.0
+            s["plast_p_mean"], s["diet_shift"] = 0.0, 0.0
         if self.tracker is not None:
             s.update(self.tracker.stats())
         return s
+
+    @staticmethod
+    def diet_shift(c):
+        """F5b: how far the acclimated diet is from the genetic one (total variation distance, 0..1)."""
+        if not c.diet:
+            return 0.0
+        g = c.genes
+        gen = genetic_diet(g[G_PHOTO], g[G_SAPRO], g[G_CHEMO])
+        return 0.5 * sum(abs(a - b) for a, b in zip(c.diet, gen))
 
     def cell_at(self, x, y):
         if 0 <= x < self.W and 0 <= y < self.H:

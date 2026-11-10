@@ -1,9 +1,10 @@
 """Save and load a complete world state (ADR-0002).
 
-Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 4, ...}`.
+Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 6, ...}`.
 Version 2 (F2, ADR-0004) added the static terrain maps and the 10th gene, version 3
 (F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes,
-version 5 (F5a, ADR-0007) the mating propensity and a sexual-births counter.
+version 5 (F5a, ADR-0007) the mating propensity and a sexual-births counter,
+version 6 (F5b, ADR-0009) the acclimation rate and the acclimated diet.
 Older saves are rejected (their genomes cannot continue under the new rules).
 JSON is used instead of pickle so a save file shared by someone else can never
 execute code when loaded. Python's float repr round-trips exactly through JSON,
@@ -25,8 +26,8 @@ from .terrain import Terrain
 from .world import N_GENES, RULE_LEN, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 5
-CELL_ROW_LEN = 11
+VERSION = 6
+CELL_ROW_LEN = 13
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
 COUNTERS = ("births", "deaths", "kills", "extinctions", "sex_births")
 
@@ -49,9 +50,10 @@ def world_to_dict(world: World) -> dict:
         "rng": {"version": version, "internal": list(internal), "gauss_next": gauss_next},
         "organic": world.organic.tolist(),
         "terrain": _terrain_to_dict(world.terrain),
-        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p]
+        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p, plast_p, diet]
         "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
-                   [b.id for b in c.bonds], [list(r) for r in c.rules], c.sex_p] for c in world.cells],
+                   [b.id for b in c.bonds], [list(r) for r in c.rules], c.sex_p,
+                   c.plast_p, list(c.diet)] for c in world.cells],
         "tracker": world.tracker.to_dict() if world.tracker is not None else None,
     }
 
@@ -128,7 +130,7 @@ def _world_from_dict(d: dict) -> World:
     by_id: dict[int, Cell] = {}
     if any(not isinstance(row, list) or len(row) != CELL_ROW_LEN for row in d["cells"]):
         raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
-    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p in d["cells"]:
+    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet in d["cells"]:
         if not (0 <= x < world.W and 0 <= y < world.H):
             raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
@@ -141,7 +143,17 @@ def _world_from_dict(d: dict) -> World:
             raise SaveFormatError(f"cell #{cid} has invalid rule genes")
         if not (_finite(sex_p) and 0.0 <= sex_p <= 1.0) or (sex_p and not cfg.sex):
             raise SaveFormatError(f"cell #{cid} has an invalid sex_p")
-        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p)
+        if not (_finite(plast_p) and 0.0 <= plast_p <= 1.0) or (plast_p and not cfg.plasticity):
+            raise SaveFormatError(f"cell #{cid} has an invalid plast_p")
+        if not _valid_diet(diet, cfg):
+            raise SaveFormatError(f"cell #{cid} has an invalid diet")
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p, plast_p)
+        if cfg.plasticity:
+            frozen = cfg.plastic_neutral or plast_p == 0.0      # such a diet never leaves the genetic split
+            if frozen and any(abs(a - b) > 1e-9 for a, b in zip(diet, c.diet)):
+                raise SaveFormatError(f"cell #{cid} has a diet that could not have moved")
+            c.diet = tuple(diet)
+            c.apply_diet(cfg)
         c.age = age
         c.species = species
         world._place(c)
@@ -184,6 +196,16 @@ def _valid_rules(rules, cfg) -> bool:
         return False
     return all(isinstance(r, list) and len(r) == RULE_LEN and all(_finite(v) and 0.0 <= v <= 1.0 for v in r)
                for r in rules)
+
+
+def _valid_diet(diet, cfg) -> bool:
+    """F5b diet: empty when plasticity is off, else 3 proportions in [0, 1] summing to 1 (within rounding)."""
+    if not isinstance(diet, list):
+        return False
+    if not cfg.plasticity:
+        return not diet
+    return (len(diet) == 3 and all(_finite(v) and 0.0 <= v <= 1.0 for v in diet)
+            and abs(sum(diet) - 1.0) < 1e-6)
 
 
 def _finite(v) -> bool:

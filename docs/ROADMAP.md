@@ -123,7 +123,7 @@ Original scope:
 See the dedicated section. In short: from a fixed vector to a **variable-length genome** with gene duplication and deletion.
 
 ## F5 — Two parents and variation during life
-**Status**: in progress — **F5a two parents done** (2026-11-10); plasticity, learning and horizontal transfer still open (one mechanism at a time).
+**Status**: in progress — **F5a two parents** and **F5b diet plasticity done** (2026-11-10); learning and horizontal transfer still open (one mechanism at a time).
 
 **F5a — two parents** ([ADR-0007](adr/0007-two-parents-and-save-v5.md)). `--set sex=1`: each cell carries an evolvable propensity `sex_p`; when it divides it may recombine with a genetically close cell within radius 2 (uniform crossover of the 16 fixed genes; the partner gives genes, not energy), at an optional `sex_cost`. `sex_neutral=1` is the control arm (`sex_p` inherited and mutated, no mating). Off by default and then bit-identical to F4 and F3 (full-state fingerprints; a test asserts no mating code runs). A probe before coding found that 85–96% of neighbours are within the species distance, 1–2.5 mutation steps apart, and only 1–6% from another lineage: mates are close relatives.
 
@@ -144,6 +144,25 @@ See the dedicated section. In short: from a fixed vector to a **variable-length 
 - **P1 — assay power, then a re-ask** (2026-11-10; plan in plan_history). Positive control (`sex_cost=4` vs neutral), 20 planet x seed pairs (seeds 1–19 odd, both planets), second half of 30k-step runs, rule fixed before running (lower in >= 16/20, sign test p ≈ 0.012): it **fires** at 30k steps with immigration 0.5 (**A**, 16/20, median 0.29 vs 0.43; [p1_calib_A.csv](p1_calib_A.csv)) and without immigration (**B**, 16/20, 0.21 vs 0.49; [p1_calib_B.csv](p1_calib_B.csv)). Run length was the missing lever. Re-ask, sex at cost 0 vs neutral, same pairs, verdict only if both settings agree at >= 16/20: higher in **8/20 (A)** and **9/20 (B)** (medians 0.50 vs 0.43 and 0.48 vs 0.49; [p1_reask_A_on.csv](p1_reask_A_on.csv), [p1_reask_B_on.csv](p1_reask_B_on.csv)) → **no detectable selection on sex at cost 0**, now at a known sensitivity: the assay sees an 80%-of-a-body cost, so any benefit of recombination among close relatives is smaller than that.
 - **Methods standard from P1**: weak-selection questions use 30k-step runs, 20 planet x seed pairs, a pre-registered positive control, and the 16/20 rule. Earlier 10k-step nulls (F3–F5a) stay inconclusive until re-run this way.
 - Not run: sex with more mixing (wider radius, mating across lineages), which is where the roadmap expects combined innovations; and an explicit "cost of males". Separate experiments.
+
+**F5b — diet plasticity** ([ADR-0009](adr/0009-diet-plasticity-and-save-v6.md)). `--set plasticity=1`: each cell carries an evolvable acclimation rate `plast_p`; every step it shifts the photo/sapro/chemo split of its non-predatory share towards what each diet would yield on its tile (lagged, `plastic_rate` 0.05; cost `plastic_upkeep` 0.05 x `plast_p`). The predation share and the genes do not change, and the diet restarts from the genes at birth (no epigenetic or Lamarckian inheritance: later, separate experiments). Off by default and then bit-identical to P1 (`c3e1c43`).
+
+**Experiment** (`python scripts/f5b_experiment.py --steps 30000`, [f5b_experiment.csv](f5b_experiment.csv)), P1 standard, rules fixed in advance (plan_history): immigration 0, flat world with day/night + seasons and `volcanic.json`, seeds 1–19 odd = 20 pairs, second half, descendants only. Arms: off / on / neutral (no effect, no cost) / neutral_cost (no effect, the same cost as `on`) / control (no effect, cost 0.2).
+
+| Question | Result | Verdict |
+|---|---|---|
+| **Positive control**: `plast_p` control < neutral, ≥ 16/20 | 20/20 (median 0.07 vs 0.49) | **fires** |
+| **Is acclimation itself favoured?** `plast_p` on vs neutral_cost (same cost, no effect), ≥ 16/20 | higher in **19/20** (median 0.56 vs 0.24); flat 9/10, volcanic 10/10 | **beneficial** |
+| Net selection: `plast_p` on vs neutral (no cost) | higher in 14/20; flat 7/10, volcanic 7/10 | no detectable selection |
+| Power at the real cost: neutral_cost < neutral | 15/20 | not detected (just below 16) |
+| Does the diet move? (mechanism check) | shift from the genetic diet 0.16–0.31 (median 0.26) in `on`, 0 in neutral | yes |
+| Contrast, constant light (exploratory, 10 pairs; prediction: favoured less) | on > neutral in 2/10 (vs 14/20 with day/night); shift 0.12 | in the predicted direction |
+| Population, on vs off | higher in **16/20** (median 1009 vs 903) | higher (at the threshold, not confirmed on new seeds) |
+| Diversity, species, colonies, on vs off | 8–15/20 | no consistent sign |
+
+- **Plasticity pays for itself, about exactly.** Against a control that pays the same cost, cells that can acclimate keep a much higher rate (19/20): the benefit is real. Against a free neutral arm the net lean (14/20) does not reach a verdict, and the cost alone (15/20) is just below detection: benefit and cost are of the same size at the default `plastic_upkeep` 0.05. Under constant light plasticity leans against (on lower than neutral in 8/10), as predicted: the benefit comes from changing conditions.
+- **First run superseded.** The F5b review found that a cell with all four feeding genes at 0 was fed as a 1/3 generalist when plasticity was on; fixed with a regression test, and the whole experiment was re-run with a cost-matched arm added (rules written before the re-run). The first run (control 20/20, on vs neutral 13/20) is not kept.
+- Not run: epigenetic inheritance of the acclimated diet, Lamarckism, a confirmation of the population effect on new seeds.
 
 Original scope:
 See the dedicated section: sexual reproduction, plasticity, learning, horizontal gene transfer.

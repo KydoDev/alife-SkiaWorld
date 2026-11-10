@@ -303,3 +303,82 @@ otherwise "no detectable selection at this sensitivity".
 ### Re-ask result (2026-11-10)
 Sex at cost 0 higher than neutral in **8/20 (A)** and **9/20 (B)** (lower in 12 and 11; medians 0.497 vs 0.425 and
 0.478 vs 0.493) -> **no detectable selection at this sensitivity** (the sensitivity that detects `sex_cost=4`).
+
+
+## F5b Diet plasticity (closed 2026-11-10)
+
+### Checklist
+1. [x] F5b design: within-life diet plasticity with an evolvable rate; verdict rules fixed below before running
+2. [x] Engine: `plasticity` flag, `Cell.plast_p` + acclimated diet, upkeep, neutral arm; off-world bit-identical
+3. [x] Save format v6 (plast_p, diet), viewer inspector line, stats `plast_p_mean` / `diet_shift`
+4. [x] Tests: no plasticity code runs when off, fingerprints vs c3e1c43, loader validation, resume, bookkeeping
+5. [x] `scripts/f5b_experiment.py`; positive control first, then the question (P1 standard)
+6. [x] ADR-0009, ROADMAP F5b, ARCHITECTURE, USER_MANUAL, CHANGELOG, TEST.md; local commit; ask before pushing
+
+### Mechanism (item 1)
+Roadmap: "during life some traits adjust to the environment (e.g. more photosynthesis if there is light), without
+changing the DNA". One mechanism: **diet acclimation**. Not included (separate mechanisms, later): passing the
+acclimated state to the offspring (epigenetic inheritance), Lamarckism.
+
+- With `plasticity` on, each cell carries `plast_p` in [0, 1] (not a gene: stored like F5a `sex_p`, exists and
+  draws RNG only when the flag is on). Seeded cells and immigrants draw it at random; children inherit it from
+  the dividing parent, mutated with its `mut_sigma`.
+- The predation share stays genetic. The non-predatory share is split among photo / sapro / chemo by an
+  acclimated `diet` (3 proportions). At birth `diet` = the genetic proportions (no transgenerational effect).
+- Each step, before feeding, the cell reads what each diet would yield on its tile at full specialisation
+  (`photo_gain x light`, `sapro_eff x min(organic, sapro_rate)`, `chemo_gain x chem`), normalises to proportions
+  `t`, and moves `diet += plast_p x plastic_rate x (t - diet)`. Shares and `*_k` are re-derived. Deterministic,
+  no RNG. If all yields are 0 the diet does not move.
+- Lag: `plastic_rate` 0.05 -> time constant >= 20 steps (a day is 200, a life up to 600).
+- Cost: `plastic_upkeep x plast_p` per step (default 0.05, a quarter of `base_cost` at plast_p = 1).
+- `plastic_neutral`: control arm, `plast_p` inherited and mutated, diet never moves; it pays `plastic_upkeep`
+  as configured (so the drift baseline uses `plastic_upkeep=0`, the positive control a large cost).
+
+### Experiment (item 5), fixed before running
+P1 standard: 30k steps, measured on the second half, descendants only. **Immigration 0** (setting B, chosen in
+advance: widest separation in P1). Planets with day/night: flat with day/night + seasons, `volcanic.json`;
+seeds 1, 3, ..., 19 -> 20 pairs. Sensing, open genome and sex off.
+Arms: `off`; `on` (default cost 0.05); `neutral` (neutral, cost 0); `control` (neutral, cost 0.2).
+
+1. **Positive control first**: `plast_p` in `control` lower than `neutral` in >= 16/20 pairs. If it does not
+   fire, report the assay as blind for this trait and stop before claiming anything.
+2. **Question**: `plast_p` in `on` vs `neutral`: selected if higher in >= 16/20, selected against if lower in
+   >= 16/20, otherwise no detectable selection (at the control's sensitivity).
+3. **Mechanism check** (reported, no verdict): mean |diet - genetic diet| of descendants in `on`, so that a
+   null cannot mean "it never moved".
+4. **Contrast** (exploratory, 10 pairs, flat world with constant light, seeds 1-19 odd): prediction written now —
+   plasticity is favoured less there than on the day/night planets (fewer pairs higher than neutral).
+5. **Consequences** `on` vs `off` (population, diversity, species): a claim only at >= 16/20.
+
+### Result (2026-11-10)
+Positive control 20/20 (fires). `plast_p` on > neutral in 13/20 (lower 7) -> no detectable selection. Diet shift in
+`on` median 0.25 (0.16-0.31). Contrast: on > neutral 2/10 under constant light vs 13/20 with day/night (predicted
+direction). Consequences on vs off: 9-15/20, no claim. Per planet: flat day/night 8/10, volcanic 5/10.
+
+
+### F5b addendum: review fixes and re-run (closed 2026-11-10)
+
+#### Checklist
+1. [x] F5b implemented, tested and run once (closed items in docs/plan_history.md, "F5b Diet plasticity")
+2. [x] Review fixes: no-feeding-gene cell fed as a generalist under plasticity; loader accepts a frozen diet that moved
+3. [x] Re-run the whole F5b experiment on the fixed code, with a cost-matched neutral arm (rules below)
+4. [x] Rewrite the F5b results in ROADMAP, CHANGELOG, TEST.md, plan_history; local commit; ask before pushing
+
+#### Why (items 2-3)
+The review found that a cell with all four feeding genes at 0 was fed as a 1/3 generalist when plasticity was on
+(it cannot feed with plasticity off). Rare, but it touches every plasticity arm, so the first run is superseded.
+The review also noted that `on` vs `neutral` mixes the benefit of acclimation with its cost (on pays 0.05 x plast_p,
+neutral pays nothing), and that the positive control's cost (0.2) is four times the `on` arm's.
+
+#### Re-run rules, fixed before running (written while the run was in progress, before any result was seen)
+Same setting, seeds, planets, contrast and rules 1-5 as before (plan_history). New arm `neutral_cost`: neutral with
+the default `plastic_upkeep` 0.05 (pays exactly what `on` pays, no effect).
+6. **Acclimation effect, cost-matched**: `plast_p` on vs neutral_cost: beneficial if higher in >= 16/20, harmful if
+   lower in >= 16/20, otherwise no detectable effect.
+7. **Power at the real cost**: `plast_p` neutral_cost < neutral in >= 16/20 means the assay detects a cost of the size
+   plasticity pays; if not, a null in rule 6 is only bounded by the 0.2 control.
+
+#### Re-run result (2026-11-10)
+Control 20/20 (fires). on vs neutral_cost: higher 19/20 -> **acclimation beneficial**. on vs neutral: 14/20 -> no
+detectable net selection. neutral_cost < neutral: 15/20 -> the 0.05 cost alone is not detected. Contrast 2/10.
+Population on > off 16/20 (rule 5: higher; not confirmed on new seeds). Diet shift median 0.26.

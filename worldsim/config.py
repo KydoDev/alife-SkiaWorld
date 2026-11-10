@@ -19,6 +19,7 @@ _BOUNDS = {
     "rule_dup_rate": (0, 1), "rule_del_rate": (0, 1), "rule_new_rate": (0, 1), "rule_upkeep": (0, 10),
     "max_rules": (0, 64), "rule_div_shift": (0, 1),
     "mate_radius": (1, 5), "mate_distance": (0, 10), "sex_cost": (0, 10),
+    "plastic_rate": (0, 1), "plastic_upkeep": (0, 10),
 }
 
 
@@ -89,6 +90,12 @@ class Config:
     mate_radius: int = 2             # partners are searched within this Chebyshev distance
     mate_distance: float = 0.3       # max fixed-gene distance to a partner (own field, not the species threshold)
     sex_cost: float = 0.0            # energy the dividing cell pays each time it mates
+
+    # --- plasticity (F5b). Off by default: the diet is fixed by the genes for life ---
+    plasticity: bool = False         # cells carry an evolvable rate plast_p of within-life diet acclimation
+    plastic_neutral: bool = False    # control arm: plast_p is inherited and mutates, but the diet never moves
+    plastic_rate: float = 0.05       # per-step acclimation at plast_p = 1 (time constant >= 1 / rate steps)
+    plastic_upkeep: float = 0.05     # cost per step x plast_p (paid in the neutral arm too)
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)

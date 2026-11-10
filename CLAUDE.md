@@ -96,6 +96,8 @@ runs (same seed, before/after), not only by unit tests.
   must stay bit-identical). Species are defined on the 16 fixed genes only (ADR-0006).
 - **Two parents (F5a)**: `Cell.sex_p` and mating exist only when `cfg.sex` is on (same
   rule: no RNG draws when off). Partner choice uses `mate_distance`, never the tracker (ADR-0007).
+- **Plasticity (F5b)**: `Cell.plast_p` and the acclimated `diet` exist only when `cfg.plasticity` is on; the
+  diet update uses no RNG and the phenotype is always derived from the diet when on (ADR-0009).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

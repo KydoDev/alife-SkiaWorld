@@ -1,4 +1,5 @@
 # PLAN
 
-No active plan. Last closed: P1 Experiment power (see docs/plan_history.md).
-G2 engine port runs in a separate session/worktree (branch feat/g2-engine-port, plan in docs/G2_PLAN.md there).
+No active plan. Last closed: F5b Diet plasticity (see docs/plan_history.md).
+G2 engine port: see docs/G2_PLAN.md.
+Next per ROADMAP: F5 learning or horizontal transfer (one at a time).

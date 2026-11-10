@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-10 — P1 experiment power (working tree before the P1 commit)
+Last run: 2026-11-10 — F5b Diet plasticity (working tree before the F5b commit)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -8,18 +8,16 @@ Last run: 2026-11-10 — P1 experiment power (working tree before the P1 commit)
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| Unit + integration (`tests/`, 159 tests; new `tests/test_sex.py`) | 159 | 0 | 0 | 98.8% (`worldsim/`, excl. render) |
-| Off-world identity: full-state fingerprints vs the F3 and F4 commits (sex off; F4 rules on) | identical | | | |
-| F5a experiment (`scripts/f5_experiment.py`, 40 runs x 10k steps), after the review fix | sex_p not selected (6/10, cost 5/10); no consistent consequence | | | |
-| F5a confirmation of lower diversity (seeds 11–19, arms off/on) | 6/10: not confirmed | | | |
-| F5a positive control (`sex_cost=4`, pre-registered: lower than neutral in >= 8/10) | 6/10: did not fire, assay blind | | | |
-| P1 positive control (`sex_cost=4` vs neutral, 30k steps, 20 pairs; pre-registered >= 16/20) | A 16/20, B 16/20: fires | | | |
-| P1 re-ask (sex cost 0 vs neutral, same pairs, both settings must agree) | higher 8/20 (A), 9/20 (B): no detectable selection | | | |
-| End-to-end `run.py --set sex=1 --set sex_cost=0.5 --save-every 300`, then `--resume` | same final stats as the straight run | | | |
+| Unit + integration (`tests/`, 172 tests; new `tests/test_plasticity.py`) | 172 | 0 | 0 | 98.8% (`worldsim/`, excl. render) |
+| Off-world identity: full-state fingerprints vs `c3e1c43` (default, day/night + sensing, F4, F5a, vents + rock) | identical | | | |
+| Speed (default world, 2000 steps): off / on | 583 / 406 steps/s (before: 577) | | | |
+| F5b positive control (`plastic_upkeep=0.2`, neutral; pre-registered >= 16/20) | 20/20: fires | | | |
+| F5b cost-matched question (`plast_p` on vs neutral_cost, 20 pairs, 30k steps) | higher 19/20: beneficial | | | |
+| F5b net selection (on vs neutral) / power at the real cost (neutral_cost < neutral) | 14/20, 15/20: not detected | | | |
 
 Lint: `ruff check .` — clean.
 
 ## Failures
-None at the end. During the work: the review's regression tests failed before their fixes (partner propensity
-inherited by the child; unaffordable `sex_cost` driving energy negative). The first experiment run was
-invalid (transmission artefact) and was discarded; the confirmatory run started on it was stopped.
+None at the end. The review's two regression tests (no-feeding-gene cell fed as a generalist; loader accepting a
+moved diet in a frozen arm) failed before their fixes; the first experiment run was superseded. One new test compared a float distance to exactly 0 and failed on
+rounding (~1e-16); the assertion now uses a tolerance.

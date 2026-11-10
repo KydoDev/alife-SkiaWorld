@@ -47,15 +47,16 @@ fn start_save_is_gzip_and_rng_vectors_exist() {
     for dir in golden_dirs() {
         check_save_and_rng(&dir);
     }
-    assert_eq!(worldsim_core::SAVE_VERSION, 5);
+    assert_eq!(worldsim_core::SAVE_VERSION, 6);
 }
 
 fn check_save_and_rng(golden: &std::path::Path) {
     let save = fs::read(golden.join("start.json.gz")).expect("start.json.gz missing");
     assert_eq!(&save[..2], &[0x1f, 0x8b], "start save is not gzip");
     let rng = fs::read_to_string(golden.join("rng.json")).expect("rng.json missing");
+    let expected = format!("\"save_version\":{}", worldsim_core::SAVE_VERSION);
     assert!(
-        rng.contains("\"save_version\":5"),
+        rng.contains(&expected),
         "golden save version must match the kernel"
     );
 }

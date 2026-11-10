@@ -6,6 +6,17 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F5b Diet plasticity** (second F5 mechanism, ADR-0009): `--set plasticity=1` gives
+  cells an evolvable acclimation rate; during life the photo/sapro/chemo split shifts
+  towards the food on the tile (lagged, with a per-step cost); neutral arm
+  `plastic_neutral`; save format v6; `plast_p_mean`/`diet_shift` stats; plasticity in the
+  viewer inspector. Experiment `scripts/f5b_experiment.py` (P1 standard): against a
+  cost-matched control, acclimation is favoured (19/20 pairs); its net selection against a
+  free neutral arm is not detectable (14/20): benefit and cost are about equal. Population
+  higher in 16/20. A review fix (cells without feeding genes were fed as generalists under
+  plasticity) came before the final run.
+  G2 golden vectors regenerated for save v6 (state hashes unchanged: the default world
+  is identical) and the Rust kernel's `SAVE_VERSION` set to 6.
 - **P1 experiment power**: `--immigration` option in `scripts/f4_experiment.py` and
   `scripts/f5_experiment.py`; the F5 verdict covers every sexual arm present. A positive
   control (`sex_cost=4`) is detected at 30k steps (16/20 pairs, with or without

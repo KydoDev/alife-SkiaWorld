@@ -75,6 +75,11 @@ SHA-256 of the bytes → seed). Size caps and field validation; errors are `Plan
   `find_mate()` picks a genetically close cell within `mate_radius` and `offspring_genes()`
   does a uniform crossover before mutation. Lineage and species follow the dividing parent.
   Off by default with no RNG draws (ADR-0007).
+- **Plasticity (F5b)**: with `Config.plasticity`, each cell has an evolvable acclimation rate
+  `plast_p` and an acclimated `diet` (photo/sapro/chemo split of the non-predatory share).
+  `acclimate()` moves the diet each step, before feeding, towards what each diet would yield
+  on the tile; `apply_diet()` re-derives the shares. No RNG in the update; the diet restarts
+  from the genes at birth. Off by default with no RNG draws (ADR-0009).
 - **Bonds**: colonies are symmetric `bonds` links between cells, created at
   division with probability `attach`, cleared on death. Stored as an
   insertion-ordered `dict` used as an ordered set: energy sharing iterates it,
@@ -91,7 +96,7 @@ activity and the novelty counter. Never touches the RNG; the dynamics never read
 
 ### `worldsim/persistence.py`
 `save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
-v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007). Resume is bit-exact.
+v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007; v6 the diet plasticity, ADR-0009). Resume is bit-exact.
 
 ### `worldsim/render.py`
 Maps the world to an RGB array: cell color mixes green/purple/red/cyan by

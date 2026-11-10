@@ -21,7 +21,8 @@ Numbered, append-only records of the decisions that shaped the system:
 [0005 sensor genes and save v3](./adr/0005-sensor-genes-and-save-v3.md) ·
 [0006 rule genome and save v4](./adr/0006-rule-genome-and-save-v4.md) ·
 [0007 two parents and save v5](./adr/0007-two-parents-and-save-v5.md) ·
-[0008 engine port stack](./adr/0008-engine-port-stack.md).
+[0008 engine port stack](./adr/0008-engine-port-stack.md) ·
+[0009 diet plasticity and save v6](./adr/0009-diet-plasticity-and-save-v6.md).
 
 ### [G2 engine port plan](./G2_PLAN.md)
 Milestones and verification criteria for the Rust core port (ADR-0008).

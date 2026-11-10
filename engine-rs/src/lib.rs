@@ -6,8 +6,8 @@
 //!
 //! Milestone M1a: crate skeleton and access to the golden vectors only.
 
-/// Save format version this kernel reads (`worldsim/persistence.py`, ADR-0007).
-pub const SAVE_VERSION: u32 = 5;
+/// Save format version this kernel reads (`worldsim/persistence.py`, ADR-0009).
+pub const SAVE_VERSION: u32 = 6;
 
 /// Number of fixed genes per cell (`worldsim/world.py::N_GENES`).
 pub const N_GENES: usize = 16;
