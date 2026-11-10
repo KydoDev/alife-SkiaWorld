@@ -11,7 +11,7 @@ the F-phase experiments).
 3. [x] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
 4. [x] M1c Load a save (current `SAVE_VERSION`) in Rust; state hash at step 0 equals Python's
 5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
-6. [ ] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
+6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [ ] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
 8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
@@ -182,3 +182,22 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   libm, so the committed `hashes.csv` are unchanged (regenerated: identical over 1200 steps on both sets);
   Linux runs made before this change are no longer reproducible bit-for-bit on AVX-512 CPUs. Regression test:
   `tests/test_environment.py::test_light_transcendentals_come_from_libm`.
+- **M3** (2026-11-10, Windows 11, Intel Core i9-14900HX, rustc 1.98.1 release, single thread):
+  `python scripts/g2_bench.py --out engine-rs/target/bench` writes three step-0 saves and times Python on them;
+  `cd engine-rs && cargo run --release --example bench -- target/bench 1000` steps each for 1000 steps. The
+  default world is light-limited (~700 cells), so the 10k/50k worlds use `light_depth=1000, shade=0.97,
+  photo_gain=4` (a 50k start on default parameters collapses to ~5k cells and mostly times the field passes).
+  Cell-updates/s include the per-step O(W·H) light and organic passes. Three runs:
+
+  | World | Mean population | Rust cell-updates/s | Steps/s | × Python (same world) | × target 1.8×10⁶ |
+  |---|---|---|---|---|---|
+  | 160×64, default | 537 | 5.5–5.8×10⁶ | ~10 300 | ~12–13 | ~3.1 |
+  | 400×160, rich | 21 200 | 7.1–7.7×10⁶ | ~350 | ~24 | ~4.1 |
+  | 800×320, rich | 48 300 | 5.2–5.4×10⁶ | ~110 | ~26 | ~2.9 |
+
+  **M3 target met** about 3× over: ~48k cells at ~110 steps/s, i.e. 1 step per frame at 60 fps with headroom.
+  Fast-forward ×10 at 50k (≈3×10⁷) is **not** reached by the reference kernel (recorded, not required; M6).
+  Correctness at scale: the kernel's hash equals Python's after the steps Python timed (200 / 40 / 10) on all
+  three worlds. The speed-up over CPython (12–27×) is below ADR-0008's 30–100× estimate; the kernel is
+  unoptimised (it copies the organic field and the config every step, `Vec` bonds), so there is room before M6.
+  Timings vary ±5% between runs; Python's baseline is the first steps of each world (a transient).

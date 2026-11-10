@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 milestone M3**: benchmark of the Rust reference kernel (`scripts/g2_bench.py`,
+  `cargo run --release --example bench`): single-threaded 5–8×10⁶ cell-updates/s, ~48k cells at
+  ~110 steps/s, about 3× the 60 fps target and 12–27× Python on the same worlds; the kernel's
+  hash still equals Python's on the 10k and 50k worlds.
 - **G2 milestone M2**: the Rust kernel ports `World.step()` for the default flags
   (terrain, vents, day/night and seasons included) and reproduces Python's state hash at
   every one of 1000 steps on both golden sets, bit-for-bit (Windows). On a mismatch the
