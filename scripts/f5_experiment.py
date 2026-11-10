@@ -33,8 +33,8 @@ NEED = 8
 WINDOW = ("population", "species", "in_colony", "mean_mut", "mean_div")   # averaged over the samples
 
 
-def make_world(planet, seed, arm):
-    base = Config().apply_overrides(["immigration_rate=0.5", *ARMS[arm]])
+def make_world(planet, seed, arm, immigration=0.5):
+    base = Config().apply_overrides([f"immigration_rate={immigration}", *ARMS[arm]])
     if planet == "flat_seasons":
         return World(base.apply_overrides(["day_amplitude=1", "season_amplitude=0.5"]).validate(), seed=seed)
     cfg, terrain, seed = load_planet(planet, base, seed)
@@ -42,8 +42,8 @@ def make_world(planet, seed, arm):
 
 
 def run(job):
-    planet, seed, arm, steps = job
-    w = make_world(planet, seed, arm)
+    planet, seed, arm, steps, immigration = job
+    w = make_world(planet, seed, arm, immigration)
     # Instrument partner search (observation only: it neither draws nor changes anything).
     tries = {"n": 0, "found": 0, "dist": []}
     find = w.find_mate
@@ -104,7 +104,8 @@ def spread(rows, arm, key):
 
 def verdict(rows, need=NEED):
     lines = []
-    for arm in ("on", "on_cost"):
+    present = {r["arm"] for r in rows}
+    for arm in [a for a in ARMS if a not in ("off", "neutral") and a in present]:
         up, n = count(rows, arm, "neutral", "sex_p", +1)
         down, _ = count(rows, arm, "neutral", "sex_p", -1)
         v = "SELECTED" if up >= need else "SELECTED AGAINST" if down >= need else "no detectable selection"
@@ -126,9 +127,10 @@ def main():
     p.add_argument("--planets", nargs="+", default=PLANETS)
     p.add_argument("--arms", nargs="+", default=list(ARMS), choices=list(ARMS))
     p.add_argument("--need", type=int, default=NEED, help="pairs that must agree for a verdict")
+    p.add_argument("--immigration", type=float, default=0.5)
     p.add_argument("--out", default="docs/f5_experiment.csv")
     a = p.parse_args()
-    jobs = [(pl, sd, arm, a.steps) for pl, sd, arm in itertools.product(a.planets, a.seeds, a.arms)]
+    jobs = [(pl, sd, arm, a.steps, a.immigration) for pl, sd, arm in itertools.product(a.planets, a.seeds, a.arms)]
     with ProcessPoolExecutor() as ex:
         rows = list(ex.map(run, jobs))
     with open(a.out, "w", newline="", encoding="utf-8") as f:

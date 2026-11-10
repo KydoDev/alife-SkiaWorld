@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **P1 experiment power**: `--immigration` option in `scripts/f4_experiment.py` and
+  `scripts/f5_experiment.py`; the F5 verdict covers every sexual arm present. A positive
+  control (`sex_cost=4`) is detected at 30k steps (16/20 pairs, with or without
+  immigration); re-asked there, sex at cost 0 shows no detectable selection (8/20, 9/20).
+  New methods standard in ROADMAP.
 - **F5a Two parents** (first of the four F5 mechanisms, ADR-0007): `--set sex=1` gives
   cells an evolvable mating propensity; at division they may recombine (uniform
   crossover) with a genetically close cell within `mate_radius`, at `sex_cost`; neutral

@@ -259,3 +259,47 @@ inconclusive.
 
 Result: lower than neutral in 6/10 (median 0.37 vs 0.50) -> the positive control **did not fire**; every F5a
 null is inconclusive.
+
+
+## P1 Experiment power (closed 2026-11-10)
+
+### Checklist
+1. [x] P1 design: calibrate experiment power on a positive control before re-asking open questions
+2. [x] `--immigration` option in the F4/F5 experiment scripts
+3. [x] Calibration: positive control (`sex_cost=4` vs neutral) under longer runs and no immigration
+4. [x] Re-ask F5a (sex at cost 0) at the cheapest setting where the control fires
+5. [x] Docs (ROADMAP methods note, F5a section), CHANGELOG, TEST.md; local commit; ask before pushing
+
+### Why (item 1)
+F3, F4 and F5a ended with weak or null results, and F5a's pre-registered positive control (a mating cost of 80%
+of a body) was not detected at the standard setting (10k steps, immigration 0.5, 10 planet x seed pairs).
+A null from an assay that cannot see a known effect is not a result. Fix the assay first, one lever at a time,
+and measure each lever on a known effect. The machine has 32 cores, so seeds are cheap in wall-clock time.
+
+### Calibration (item 3), fixed before running
+Positive control: arm `on_cost4` vs `neutral`, both planets (flat day/night + seasons, `volcanic.json`),
+**10 seeds each (1, 3, …, 19) = 20 pairs**. Measured on the second half of each run, descendants only.
+Settings:
+- **A** immigration 0.5, 30k steps (longer runs only);
+- **B** immigration 0, 30k steps (no fresh random propensities after the start);
+- (reference, already known: immigration 0.5, 10k steps, 10 pairs: 6/10.)
+
+Detection rule: the control fires if `sex_p` is lower than neutral in >= 16 of 20 pairs (sign test, two-sided
+p ≈ 0.012). The cheapest setting where it fires becomes the standard; if none fires, report that and stop
+before re-asking anything.
+
+### Re-ask (item 4), fixed before running
+At the chosen setting, arms `on` (cost 0) vs `neutral`, same 20 pairs: sex selected if `sex_p` higher in >= 16/20,
+selected against if lower in >= 16/20, otherwise no detectable selection — now at a known sensitivity.
+
+### Calibration result (2026-11-10)
+Positive control lower than neutral: **A 16/20, B 16/20** — it fires at both settings (borderline), with a wider
+gap without immigration (median `sex_p` 0.21 vs 0.49 neutral in B; 0.29 vs 0.43 in A). Reference at 10k steps
+with immigration: 6/10. So run length was the missing lever; immigration 0 adds separation.
+Both settings cost the same, and the rule did not say how to break a tie, so — fixed before the re-ask — the
+re-ask runs at **both** A and B, and a verdict is claimed only if both settings give it (>= 16/20 each);
+otherwise "no detectable selection at this sensitivity".
+
+### Re-ask result (2026-11-10)
+Sex at cost 0 higher than neutral in **8/20 (A)** and **9/20 (B)** (lower in 12 and 11; medians 0.497 vs 0.425 and
+0.478 vs 0.493) -> **no detectable selection at this sensitivity** (the sensitivity that detects `sex_cost=4`).

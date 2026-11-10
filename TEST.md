@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-10 — F5a Two parents (working tree before the F5a commit)
+Last run: 2026-11-10 — P1 experiment power (working tree before the P1 commit)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -13,6 +13,8 @@ Last run: 2026-11-10 — F5a Two parents (working tree before the F5a commit)
 | F5a experiment (`scripts/f5_experiment.py`, 40 runs x 10k steps), after the review fix | sex_p not selected (6/10, cost 5/10); no consistent consequence | | | |
 | F5a confirmation of lower diversity (seeds 11–19, arms off/on) | 6/10: not confirmed | | | |
 | F5a positive control (`sex_cost=4`, pre-registered: lower than neutral in >= 8/10) | 6/10: did not fire, assay blind | | | |
+| P1 positive control (`sex_cost=4` vs neutral, 30k steps, 20 pairs; pre-registered >= 16/20) | A 16/20, B 16/20: fires | | | |
+| P1 re-ask (sex cost 0 vs neutral, same pairs, both settings must agree) | higher 8/20 (A), 9/20 (B): no detectable selection | | | |
 | End-to-end `run.py --set sex=1 --set sex_cost=0.5 --save-every 300`, then `--resume` | same final stats as the straight run | | | |
 
 Lint: `ruff check .` — clean.

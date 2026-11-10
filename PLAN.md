@@ -1,5 +1,4 @@
 # PLAN
 
-No active plan. Last closed: F5a Two parents (see docs/plan_history.md).
-Next per ROADMAP: the next F5 mechanism (plasticity, learning or horizontal transfer), or G2 engine port.
-Note: F3-F5a experiments are at the limit of their power (10k steps, 5 seeds, immigration).
+No active plan. Last closed: P1 Experiment power (see docs/plan_history.md).
+G2 engine port runs in a separate session/worktree (branch feat/g2-engine-port, plan in docs/G2_PLAN.md there).
