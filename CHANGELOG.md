@@ -84,6 +84,11 @@ All notable changes to this project are documented here. Format based on
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
 
 ### Fixed
+- **G2 Rust kernel diverged from Python on Linux** (AVX-512 CPUs): numpy's `exp`/`power` SIMD
+  paths are not correctly rounded, so the light differed by an ULP at some rows. The light's
+  transcendentals now come from libm (`math.exp`, `math.pow`, tabulated per row/count), as in
+  the Rust kernel. Windows results are bit-identical (golden hashes unchanged); Linux runs on
+  AVX-512 CPUs from before this fix are not reproducible bit-for-bit.
 - **G2 Rust loader reads save v7** (main was red after #15 and #14 merged in that order). The M1c loader
   was written for v6. It now knows the four `hgt*` config keys and reads 14-field cell rows. It refuses
   `hgt` (unsupported until M5) and a nonzero `hgt_p` with the flag off. It checks the `hgt_events` and

@@ -104,6 +104,10 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
 ## Rules for the port
 - No global RNG, no `HashMap` iteration in the dynamics (use `Vec` + ids, or an
   insertion-ordered map for bonds); no `-ffast-math` equivalents, no `mul_add`.
+- Transcendentals in the Python dynamics go through libm (`math.exp`, `math.pow`, `math.sin`), never numpy's
+  ufuncs: on AVX-512 CPUs numpy takes SIMD paths that are not correctly rounded (see the M2 Linux entry). Still
+  numpy and to be moved before M5 ports them: the vent field of `terrain.py` (generation) and of the G1 vent
+  intervention in `play.py` (`np.exp`, `np.hypot`); they do not affect M2, which reads terrain from saves.
 - Every constant comes from the loaded `Config`; unknown config keys are an error.
 - Save loading in Rust validates like `persistence.py` (untrusted input) and returns an
   error, never panics.
@@ -169,3 +173,12 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   verified by the `rust-core` CI job (Linux-made sets); numpy may use SVML `exp`/`pow` on AVX-512 runners, a
   risk the per-platform scheme absorbs only if Rust's libm agrees with it, so a Linux divergence there is
   recorded here, not hidden.
+- **M2 on Linux** (2026-11-10): the `rust-core` job of PR #17 diverged (default at step 209, volcanic at step
+  201; merged red). A throwaway diagnostic (draft PR #18, closed) showed the runner has AVX-512 (numpy finds
+  `X86_V4`, `AVX512_ICL`): `np.exp(-rows/30)` differs from `math.exp` at row 36 and `np.power(0.7, k)` from
+  `math.pow` at k = 4, 10, 31, 33; the first differing field was a cell's energy (photosynthesis). Owner's
+  decision: compute the light's transcendentals with libm in Python (`World.set_terrain` tabulates
+  `math.exp` depth and `math.pow(shade, k)`; `update_light` indexes the table). On Windows numpy already used
+  libm, so the committed `hashes.csv` are unchanged (regenerated: identical over 1200 steps on both sets);
+  Linux runs made before this change are no longer reproducible bit-for-bit on AVX-512 CPUs. Regression test:
+  `tests/test_environment.py::test_light_transcendentals_come_from_libm`.
