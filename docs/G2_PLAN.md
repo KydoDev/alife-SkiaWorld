@@ -8,7 +8,7 @@ the F-phase experiments).
 ## Checklist
 1. [x] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a v5 save
 2. [x] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
-3. [ ] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
+3. [x] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
 4. [ ] M1c Load a v5 save in Rust; state hash at step 0 equals Python's
 5. [ ] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [ ] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
@@ -54,9 +54,9 @@ which are recomputed and would only hide where a difference started.
 ## Verification criteria
 - **M1b**: every golden RNG draw equal bit-for-bit.
 - **M1c**: hash at step 0 equal.
-- **M2**: first divergent step = none in 1000 steps on both golden cases, on the OS that made
-  the golden set (Windows). Linux is unknown until measured: pytest runs the stepped check there
-  as a non-strict xfail, so the first CI run says whether the hashes match. If transcendentals (`gauss`, `powf`, `sin`,
+- **M2**: first divergent step = none in 1000 steps on both golden cases, against the golden set made
+  on the same OS (committed Windows sets locally, Linux sets regenerated in CI; see "Golden sets per
+  platform"). pytest keeps its non-strict xfail for the stepped check on non-Windows. If transcendentals (`gauss`, `powf`, `sin`,
   `exp`) break it, report the step and the field that differs first, then fall back to the
   statistical test (ADR-0008) and ask the owner whether to make the Python maths portable.
 - **M3**: ≥ 1.8×10⁶ cell-updates/s single-threaded (30k cells × 60 steps/s); fast-forward
@@ -70,6 +70,17 @@ engine of this branch's base, `d0e0a3d`), so the default-flags target of M0–M2
 fail on the v5 `start.json.gz`. Fix then: regenerate the golden sets (the hashes should not change, since
 the hash excludes the version; check that they don't) and have the Rust loader read the version current at
 that point (`SAVE_VERSION` in `engine-rs/src/lib.rs`).
+
+## Golden sets per platform (decided 2026-11-10)
+`gauss` and the stepped hashes go through the platform maths library (`log`, `cos`, `sin`, `pow`, `exp`), so
+golden files made on one OS cannot be compared bit-for-bit on another. Decision (owner, after M1b's first CI
+run): the committed sets in `engine-rs/tests/golden/` are the **Windows reference**; the `rust-core` CI job
+regenerates both sets on Linux with `scripts/g2_golden.py` (same commands, into the uncommitted
+`engine-rs/target/golden-linux/`) and runs `cargo test` against them via `WORLDSIM_GOLDEN_DIR`. Each platform
+is thus compared with Python on the same platform, still bit-for-bit, never with a tolerance. Rust tests read
+`$WORLDSIM_GOLDEN_DIR` and default to the committed sets. The M2 stepped hashes follow the same scheme.
+pytest's non-strict xfail of the stepped check on non-Windows stays as is (it compares Python on Linux with
+the Windows-made hashes). Cross-platform identity, if ever needed, is a separate question (portable maths).
 
 ## Rules for the port
 - No global RNG, no `HashMap` iteration in the dynamics (use `Vec` + ids, or an
@@ -90,5 +101,17 @@ that point (`SAVE_VERSION` in `engine-rs/src/lib.rs`).
   interleave calls `random()` while a cached gauss value is pending, so the Rust port must keep `gauss_next`.
 - **M1a** (2026-11-10): crate `worldsim-core` in `engine-rs/` (no dependencies yet), `cargo test` checks the
   golden files are present and well formed; CI job `rust-core` runs fmt, clippy and tests. Local: rustc 1.98.1.
-- Open question for M2: Linux CI cannot compare stepped hashes made on Windows (maths library). Options: make
-  the golden files on Linux in CI, or keep one set per OS. Decide when M2 starts.
+- **M1b** (2026-11-10, Windows 11, rustc 1.98.1 `x86_64-pc-windows-msvc`): `cd engine-rs && cargo test`
+  → `tests/golden_rng.rs` passes on both golden sets: 1000 `random()`, 200 `randrange` (n up to 2^32+5, so
+  `getrandbits(33)`), 3 shuffles of 50, 50 `choice`, 750 `gauss` + 250 `random()` interleaved (the pending
+  `gauss_next` survives `random()`), and `end_state`, all bit-for-bit. Floats are compared by bits with no
+  tolerance (a 2-ULP perturbation of `gauss` makes the test fail: checked). A save/restore round trip with
+  a pending gauss value continues identically. Linux is unverified until the `rust-core` CI job runs: integer
+  draws and `end_state` cannot differ there, `gauss` (libm log/cos/sin) may. If it does, record it here and
+  decide with the M2 open question below; the comparison stays strict.
+- **M1b on Linux** (2026-11-10, first `rust-core` CI run of PR #13, against the Windows-made sets): integer
+  draws and `end_state` matched; 25 of 750 `gauss` draws differed by 1 ULP (platform libm). Resolved by the
+  decision in "Golden sets per platform": CI now regenerates the golden sets on Linux and compares there.
+  Local check of that path: sets regenerated on Windows into `engine-rs/target/golden-local/` give
+  `hashes.csv` identical to the committed ones, and `WORLDSIM_GOLDEN_DIR=target/golden-local cargo test` passes.
+- M2 open question (Linux vs Windows-made stepped hashes): settled by the same decision.
