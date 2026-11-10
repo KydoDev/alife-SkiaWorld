@@ -1,5 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Repo root on sys.path: the `pytest` entry point (used by CI) does not add it,
+# unlike `python -m pytest`; without it `import worldsim` fails.
+pythonpath = ["."]
 addopts = "--cov=worldsim --cov-report=term-missing --cov-fail-under=90"
 
 [tool.coverage.run]

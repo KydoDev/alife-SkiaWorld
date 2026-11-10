@@ -45,6 +45,9 @@ All notable changes to this project are documented here. Format based on
   comments/docstrings translated to English.
 
 ### Fixed
+- CI: `pytest` failed with `ModuleNotFoundError: worldsim` on every run (main and
+  all Dependabot PRs) because the `pytest` entry point does not put the repo root
+  on `sys.path`; set `pythonpath = ["."]` in `pyproject.toml`.
 - Engine: a newborn eaten in its birth step stayed in the cell list as a dead
   ghost for one step (double-counted energy and population, phantom shading).
 - Viewer: window height now fits the full cell inspector panel; the last gene
