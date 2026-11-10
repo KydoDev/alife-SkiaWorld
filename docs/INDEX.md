@@ -20,7 +20,11 @@ Numbered, append-only records of the decisions that shaped the system:
 [0004 terrain and save v2](./adr/0004-terrain-and-save-v2.md) ·
 [0005 sensor genes and save v3](./adr/0005-sensor-genes-and-save-v3.md) ·
 [0006 rule genome and save v4](./adr/0006-rule-genome-and-save-v4.md) ·
-[0007 two parents and save v5](./adr/0007-two-parents-and-save-v5.md).
+[0007 two parents and save v5](./adr/0007-two-parents-and-save-v5.md) ·
+[0008 engine port stack](./adr/0008-engine-port-stack.md).
+
+### [G2 engine port plan](./G2_PLAN.md)
+Milestones and verification criteria for the Rust core port (ADR-0008).
 
 ### [Developer Guide](./DEVELOPER_GUIDE.md)
 Bootstrap, running locally, tests, contribution rules.

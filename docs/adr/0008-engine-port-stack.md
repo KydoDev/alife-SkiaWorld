@@ -1,6 +1,6 @@
 # ADR-0008: Engine port stack for G2
 
-- **Status**: Proposed (awaiting the owner's choice of stack)
+- **Status**: Accepted
 - **Date**: 2026-11-10
 - **Deciders**: project owner
 
@@ -142,12 +142,26 @@ is headroom (Rust) versus a single game-side language and lower upkeep (C#).
   repo a small research project; the game pins a core version.
 
 ## Decision
-*Pending the owner's choice.* Fixed regardless of the stack:
+The owner chose (2026-11-10) **option 2, a Rust core library called from Unity**, and
+**layout A, the same repository**:
+- `engine-rs/` holds the Rust crate `worldsim-core` (the reference kernel) beside
+  `worldsim/`; the Unity project will live in `unity/` when the front-end starts.
 - The reference kernel is sequential, preserves Python's iteration order and RNG
-  stream, and has no game-engine dependency; it is verified by golden tests in CI.
+  stream, and has no game-engine dependency; it is verified by golden tests
+  (`cargo test`) that run in CI next to `pytest`.
 - Python stays the reference: rules change there first, then in the port.
 - Parallel kernels are separate modes and are judged statistically, never claimed
   equivalent.
+- Transcendentals start on the platform libm (closest to CPython on the same OS); if the
+  golden test diverges there, the fallback is decided by the owner (see the tier table).
 
 ## Consequences
-To be completed once the decision is taken.
+- Three languages to maintain (Python lab, Rust core, C# glue in Unity) and an FFI
+  boundary: no panics may cross it, buffers are owned by Rust and copied out.
+- CI gains a Rust job (`cargo test`, `cargo clippy`); the golden vectors are produced by
+  `scripts/g2_golden.py` and committed, so CI does not need both engines in one job.
+- Native builds per platform are needed before the game ships (Windows first).
+- A PyO3 binding becomes possible later (Rust core as a fast lab backend), but is out of
+  scope until the port passes the golden test.
+- Every rule change in `worldsim/` now has a port cost; the roadmap's F-phases keep
+  running in Python and are ported in batches, not one by one.

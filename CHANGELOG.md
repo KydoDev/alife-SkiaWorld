@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 engine port, design step**: ADR-0008 compares Unity + C# with a Rust core on
+  determinism, verifiability against Python, performance and maintenance; the owner
+  chose a Rust core (`engine-rs/`) called from Unity, in this repository. Milestone
+  plan in `docs/G2_PLAN.md`.
 - **F5a Two parents** (first of the four F5 mechanisms, ADR-0007): `--set sex=1` gives
   cells an evolvable mating propensity; at division they may recombine (uniform
   crossover) with a genetically close cell within `mate_radius`, at `sex_cost`; neutral

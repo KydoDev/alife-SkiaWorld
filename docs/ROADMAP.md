@@ -245,6 +245,8 @@ An ALife simulation is fascinating to watch for 10 minutes and then gets boring.
   - Found on the way: the *Nutrients* tool barely matters on the default world (organic matter is not limiting there, ~10⁵ units lie on the seabed) — a candidate to rethink after the playtest.
   - Deliverable: docs/USER_MANUAL.md — done.
 - **G2 (after F3)**: engine port and visualization in Unity.
-  - **Status**: planned
+  - **Status**: in progress (2026-11-10). Stack decided in [ADR-0008](adr/0008-engine-port-stack.md): a **Rust core** (`engine-rs/`, crate `worldsim-core`) called from Unity, in this repository. Working plan and milestones: [G2_PLAN.md](G2_PLAN.md).
+  - Key finding of the design step: the step is sequential and order-dependent, so a parallel kernel is a different simulation. The port's reference kernel is single-threaded and keeps Python's order and RNG stream; by estimate it already meets ~30k cells at 1 step/frame. Bit-exactness against Python is the target (golden per-step state hashes from a v5 save); transcendentals (`gauss`, light `pow`, `sin`) may break it, in which case equivalence becomes statistical.
+  - First milestone: golden vectors from Python, CPython-compatible RNG in Rust, load a v5 save, port `step()` for the default flags, compare hashes for 1000 steps.
 - **G3**: UI, tree of life, progression, saves, sharing.
   - **Status**: planned
