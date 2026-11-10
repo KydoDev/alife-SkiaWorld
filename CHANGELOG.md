@@ -18,6 +18,12 @@ All notable changes to this project are documented here. Format based on
   established. The review's notes
   added a loader check (`hgt_foreign` <= `hgt_events`) and the 16/20 threshold caveat.
 - **F5b confirmation** on seeds 21–39 (`docs/f5b_confirm.csv`): population on > off 16/20 again.
+- **G2 milestone M1c**: the Rust kernel (`engine-rs/`) loads a v6 save (gzip JSON, validated
+  like `persistence.py`: untrusted input returns errors, never panics; unknown config keys
+  are refused; typed, length-capped parsing keeps memory proportional to the data) and
+  computes the G2 state hash; it equals Python's step-0 hash on both golden sets. New crate
+  dependencies: `flate2`, `serde`, `serde_json`, `sha2`. A new `Config` field must now
+  also be declared in `engine-rs/src/config.rs` (see `docs/G2_PLAN.md`).
 - **F5b Diet plasticity** (second F5 mechanism, ADR-0009): `--set plasticity=1` gives
   cells an evolvable acclimation rate; during life the photo/sapro/chemo split shifts
   towards the food on the tile (lagged, with a per-step cost); neutral arm
