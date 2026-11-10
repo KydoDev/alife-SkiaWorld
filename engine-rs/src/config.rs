@@ -115,6 +115,11 @@ config_fields! {
     plastic_neutral: bool,
     plastic_rate: f64 [0, 1],
     plastic_upkeep: f64 [0, 10],
+    // horizontal gene transfer (F5c)
+    hgt: bool,
+    hgt_neutral: bool,
+    hgt_rate: f64 [0, 1],
+    hgt_upkeep: f64 [0, 10],
     // reproduction
     body_cost: f64,
     div_min: f64,

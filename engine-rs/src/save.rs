@@ -19,8 +19,8 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5): saves with `sensing`, `open_genome`, `sex` or
-//!   `plasticity` on are refused, since this kernel only runs the default flags;
+//! - **unsupported** (until milestone M5): saves with `sensing`, `open_genome`, `sex`,
+//!   `plasticity` or `hgt` on are refused, since this kernel only runs the default flags;
 //! - **looser, on purpose**: the species tracker and the per-cell species ids are not validated
 //!   (only skipped). They are observer state that never affects the dynamics (ADR-0003) and the
 //!   kernel never reads them.
@@ -46,7 +46,7 @@ pub const FORMAT: &str = "worldsim-save";
 pub const MAX_SAVE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// `persistence.CELL_ROW_LEN`: fields per cell row.
-pub const CELL_ROW_LEN: usize = 13;
+pub const CELL_ROW_LEN: usize = 14;
 
 /// Largest step, id, age, lineage or event counter accepted from a save: far above anything a
 /// run reaches, and far enough below `u64::MAX` that no later increment can overflow.
@@ -114,7 +114,7 @@ struct RawSave {
     tracker: IgnoredAny,
 }
 
-/// Other counters (later F-phases add some) are skipped, as Python whitelists these.
+/// Other counters (later F-phases may add some) are skipped, as Python whitelists these.
 #[derive(Deserialize)]
 struct RawCounters {
     births: u64,
@@ -122,6 +122,8 @@ struct RawCounters {
     kills: u64,
     extinctions: u64,
     sex_births: u64,
+    hgt_events: u64,
+    hgt_foreign: u64,
 }
 
 #[derive(Deserialize)]
@@ -139,7 +141,7 @@ struct RawTerrain {
     sun: Capped<f64, MAX_SIDE>,
 }
 
-/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet]`.
+/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p]`.
 /// Rules and diet must be empty with their flags off (checked by the cap of 0).
 #[derive(Deserialize)]
 #[allow(dead_code)] // rules and diet (fields 9, 12) are only length-checked
@@ -157,6 +159,7 @@ struct RawCell(
     f64,
     f64,
     Capped<IgnoredAny, 0>,
+    f64,
 );
 
 /// A JSON list of at most `N` elements, refused as soon as it grows past `N`.
@@ -384,6 +387,7 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         ("open_genome", cfg.open_genome),
         ("sex", cfg.sex),
         ("plasticity", cfg.plasticity),
+        ("hgt", cfg.hgt),
     ] {
         if on {
             return Err(err(format!(
@@ -404,6 +408,10 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         extinctions: count(c.extinctions, "counter extinctions")?,
         sex_births: count(c.sex_births, "counter sex_births")?,
     };
+    // Observer-only counters (F5c): validated as Python does, never read by the kernel.
+    if count(c.hgt_foreign, "counter hgt_foreign")? > count(c.hgt_events, "counter hgt_events")? {
+        return Err(err("invalid counters: hgt_foreign exceeds hgt_events"));
+    }
     let rng = build_rng(&raw.rng)?;
     let organic = matrix_values(raw.organic, w, h, "organic field")?;
 
@@ -483,7 +491,8 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
     let mut by_id: HashMap<u64, CellRef> = HashMap::new();
     let mut bond_ids: Vec<Vec<u64>> = Vec::with_capacity(rows.len().min(w * h));
     for row in rows {
-        let RawCell(id, x, y, energy, age, genes, lineage, _, bonds, _, sex_p, plast_p, _) = row;
+        let RawCell(id, x, y, energy, age, genes, lineage, _, bonds, _, sex_p, plast_p, _, hgt_p) =
+            row;
         if !(x < w as u64 && y < h as u64) {
             return Err(err(format!("cell #{id} outside the grid at ({x}, {y})")));
         }
@@ -506,12 +515,15 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 world.next_id
             )));
         }
-        // With sex and plasticity off (checked above) Python accepts only a zero sex_p / plast_p.
+        // With sex, plasticity and hgt off (checked above) Python accepts only zero sex_p / plast_p / hgt_p.
         if !(sex_p.is_finite() && sex_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid sex_p")));
         }
         if !(plast_p.is_finite() && plast_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid plast_p")));
+        }
+        if !(hgt_p.is_finite() && hgt_p == 0.0) {
+            return Err(err(format!("cell #{id} has an invalid hgt_p")));
         }
         let r = world.slab.len() as CellRef;
         world.slab.push(Cell {
