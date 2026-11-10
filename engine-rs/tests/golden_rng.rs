@@ -5,12 +5,13 @@
 //! Integer draws and `end_state` do not depend on the platform maths library; `gauss` does
 //! (log/sqrt/cos/sin), so its comparison reports the first mismatch instead of a tolerance.
 
+mod common;
+
+use common::{golden_dir, GOLDEN_SETS};
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
 use worldsim_core::rng::{PyRandom, RngStateError};
 
-const GOLDEN_SETS: [&str; 2] = ["default", "volcanic"];
 /// `RANDRANGE_NS` of the generator script, in generation order (JSON object keys are unordered).
 const RANDRANGE_NS: [u64; 10] = [
     1,
@@ -26,11 +27,9 @@ const RANDRANGE_NS: [u64; 10] = [
 ];
 
 fn load(set: &str) -> Value {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/golden")
-        .join(set)
-        .join("rng.json");
-    serde_json::from_str(&fs::read_to_string(&path).expect("rng.json missing")).expect("bad JSON")
+    let path = golden_dir(set).join("rng.json");
+    let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    serde_json::from_str(&text).expect("bad JSON")
 }
 
 fn words(v: &Value) -> Vec<u32> {

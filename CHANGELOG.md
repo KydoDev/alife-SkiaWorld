@@ -24,6 +24,9 @@ All notable changes to this project are documented here. Format based on
   in Rust (MT19937 restored from `getstate()`, `random`, `getrandbits`, `randrange`, `choice`,
   `shuffle`, `gauss` with its `gauss_next` cache); `engine-rs/tests/golden_rng.rs` matches every
   golden draw and the end state bit-for-bit on Windows. `serde_json` added as a dev-dependency.
+- **G2 golden sets per platform**: the committed golden sets are the Windows reference; the
+  `rust-core` CI job regenerates them on Linux and tests against those (`WORLDSIM_GOLDEN_DIR`),
+  after Linux showed 25/750 `gauss` draws 1 ULP off the Windows-made set. Still bit-exact.
 - **F5a Two parents** (first of the four F5 mechanisms, ADR-0007): `--set sex=1` gives
   cells an evolvable mating propensity; at division they may recombine (uniform
   crossover) with a genetically close cell within `mate_radius`, at `sex_cost`; neutral

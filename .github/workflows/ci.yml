@@ -45,4 +45,20 @@ jobs:
       - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      # Committed golden sets are the Windows reference; gauss and the stepped hashes depend on
+      # the platform maths library, so CI regenerates them on Linux and tests against those
+      # (docs/G2_PLAN.md, "Golden sets per platform").
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+        working-directory: .
+      - name: Regenerate golden sets on Linux
+        working-directory: .
+        run: |
+          python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/target/golden-linux/default
+          python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000             --out engine-rs/target/golden-linux/volcanic
       - run: cargo test
+        env:
+          WORLDSIM_GOLDEN_DIR: ${{ github.workspace }}/engine-rs/target/golden-linux

@@ -1,17 +1,14 @@
 //! M1a: the golden vectors written by `scripts/g2_golden.py` are present and well formed.
 //! Later milestones compare the kernel against them (docs/G2_PLAN.md).
 
+mod common;
+
+use common::{golden_dir, GOLDEN_SETS};
 use std::fs;
 use std::path::PathBuf;
 
-const GOLDEN_SETS: [&str; 2] = ["default", "volcanic"];
-
 fn golden_dirs() -> impl Iterator<Item = PathBuf> {
-    GOLDEN_SETS.iter().map(|name| {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/golden")
-            .join(name)
-    })
+    GOLDEN_SETS.iter().map(|name| golden_dir(name))
 }
 
 #[test]
