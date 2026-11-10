@@ -32,8 +32,8 @@ ARMS = {"f3": [], "on": ["open_genome=1"], "neutral": ["open_genome=1", "rules_n
 TOP_K, KEEP_PAIRS, TYPE_PAIRS = 3, 8, 6
 
 
-def make_world(planet, seed, arm):
-    base = Config().apply_overrides(["sensing=1", "immigration_rate=0.5", *ARMS[arm]])
+def make_world(planet, seed, arm, immigration=0.5):
+    base = Config().apply_overrides(["sensing=1", f"immigration_rate={immigration}", *ARMS[arm]])
     if planet == "flat_day":
         return World(base.apply_overrides(["day_amplitude=1"]).validate(), seed=seed)
     cfg, terrain, seed = load_planet(planet, base, seed)
@@ -46,8 +46,8 @@ def rule_type(r):
 
 
 def run(job):
-    planet, seed, arm, steps = job
-    w = make_world(planet, seed, arm)
+    planet, seed, arm, steps, immigration = job
+    w = make_world(planet, seed, arm, immigration)
     t0 = time.perf_counter()
     n_cells = n_rules = n_cond = samples = 0
     types = Counter()
@@ -106,9 +106,10 @@ def main():
     p.add_argument("--seeds", type=int, nargs="+", default=[1, 3, 5, 7, 9])
     p.add_argument("--planets", nargs="+", default=PLANETS)
     p.add_argument("--arms", nargs="+", default=list(ARMS), choices=list(ARMS))
+    p.add_argument("--immigration", type=float, default=0.5)
     p.add_argument("--out", default="docs/f4_experiment.csv")
     a = p.parse_args()
-    jobs = [(pl, sd, arm, a.steps) for pl, sd, arm in itertools.product(a.planets, a.seeds, a.arms)]
+    jobs = [(pl, sd, arm, a.steps, a.immigration) for pl, sd, arm in itertools.product(a.planets, a.seeds, a.arms)]
     with ProcessPoolExecutor() as ex:
         results = list(ex.map(run, jobs))
     rows = [r for r, _ in results]

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **P1 experiment power**: `--immigration` option in `scripts/f4_experiment.py` and
+  `scripts/f5_experiment.py`; the F5 verdict covers every sexual arm present. A positive
+  control (`sex_cost=4`) is detected at 30k steps (16/20 pairs, with or without
+  immigration); re-asked there, sex at cost 0 shows no detectable selection (8/20, 9/20).
+  New methods standard in ROADMAP.
 - **G2 engine port, design step**: ADR-0008 compares Unity + C# with a Rust core on
   determinism, verifiability against Python, performance and maintenance; the owner
   chose a Rust core (`engine-rs/`) called from Unity, in this repository. Milestone
