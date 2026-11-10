@@ -79,6 +79,11 @@ All notable changes to this project are documented here. Format based on
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
 
 ### Fixed
+- **G2 Rust loader reads save v7** (main was red after #15 and #14 merged in that order). The M1c loader
+  was written for v6. It now knows the four `hgt*` config keys and reads 14-field cell rows. It refuses
+  `hgt` (unsupported until M5) and a nonzero `hgt_p` with the flag off. It checks the `hgt_events` and
+  `hgt_foreign` counters as Python does. The golden sets on main were already v7, and their hashes are
+  unchanged.
 - F5a review, before release: the child inherited the partner's mating propensity half
   the time, a transmission bias that faked selection against sex (first experiment run
   discarded); an unaffordable `sex_cost` could drive energy negative; partner search
