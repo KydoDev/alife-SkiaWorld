@@ -8,6 +8,15 @@ C_PRED = np.array([235, 50, 45], dtype=np.float32)     # red: predators
 C_CHEMO = np.array([40, 215, 225], dtype=np.float32)   # cyan: chemosynthesizers (vents)
 C_ROCK = np.array([92, 88, 84], dtype=np.float32)      # grey: rock
 C_VENT = np.array([255, 120, 20], dtype=np.float32)    # orange glow: chemical energy
+C_ORGANIC = np.array([120, 80, 35], dtype=np.float32)  # brown: organic matter
+C_WATER_LIT = np.array([28, 59, 140], dtype=np.float32)  # blue: water at full light (dark = shade/depth)
+
+# (label, colour) pairs for legends; cells mix the first four by their feeding shares
+LEGEND = [
+    ("plants (photosynthesis)", C_PHOTO), ("decomposers", C_SAPRO), ("predators", C_PRED),
+    ("chemosynthesis (vents)", C_CHEMO), ("light (dark = shade)", C_WATER_LIT),
+    ("organic matter", C_ORGANIC), ("vent chemical energy", C_VENT), ("rock", C_ROCK),
+]
 
 
 def render_rgb(world, show_organic=True):
@@ -23,7 +32,7 @@ def render_rgb(world, show_organic=True):
         img = img * (1 - v) + C_VENT * v
     if show_organic:
         o = np.clip(world.organic / 20.0, 0, 1)[..., None]
-        img = img * (1 - 0.8 * o) + np.array([120, 80, 35], dtype=np.float32) * 0.8 * o
+        img = img * (1 - 0.8 * o) + C_ORGANIC * 0.8 * o
     if world.has_rock:
         img[world.terrain.rock] = C_ROCK
 

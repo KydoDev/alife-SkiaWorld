@@ -90,6 +90,20 @@ class Config:
     def to_dict(self):
         return asdict(self)
 
+    def apply_overrides(self, assignments) -> "Config":
+        """Apply `KEY=VALUE` strings (CLI `--set`); the type is inferred from the default."""
+        types = {f.name: type(f.default) for f in fields(self)}
+        for kv in assignments:
+            key, sep, value = kv.partition("=")
+            if not sep or key not in types:
+                raise ValueError(f"unknown parameter or missing '=': {kv!r}")
+            kind = types[key]
+            try:
+                setattr(self, key, value.lower() in ("1", "true", "yes") if kind is bool else kind(value))
+            except ValueError as e:
+                raise ValueError(f"{key} must be {kind.__name__}: {value!r}") from e
+        return self
+
     def validate(self) -> "Config":
         """Check types and ranges (configs can come from untrusted saves and planet forms).
 

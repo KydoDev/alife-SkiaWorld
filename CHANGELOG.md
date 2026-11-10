@@ -16,6 +16,8 @@ All notable changes to this project are documented here. Format based on
   - World seed (`worldsim/worldgen.py`): `run.py/view.py --planet` from a JSON form or an
     image; `examples/` with two forms and a sample image.
   - `Config.validate()`: type and range checks for every parameter.
+  - Viewer: `--set KEY=VALUE` (shared `Config.apply_overrides`, also used by `run.py`),
+    `--seed` with `--planet`, colour legend and strategy swatches in the panel.
   - Tests: `tests/test_environment.py`, `tests/test_worldgen.py`, hardening tests.
   - Experiments and figures in ROADMAP (variable light, vents, planet from an image).
 - **F1 Foundations** (roadmap phase complete):

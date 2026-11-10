@@ -36,6 +36,7 @@ python run.py --steps 5000 --out runs/c --set day_amplitude=1 --set season_ampli
 # world seed: a planet from a form or from a photo (same photo = same world)
 python run.py --planet examples/volcanic.json --steps 5000 --out runs/volcanic
 python view.py --planet examples/planet.png
+python view.py --set rock_fraction=0.3 --set vent_count=6   # any Config field, also with --planet
 ```
 
 Each run also tracks **species** and writes a species tree and a "novelty over time" chart
@@ -44,7 +45,7 @@ the viewer shows the world live.
 
 Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter · `S` snapshot · `R` new world · click = inspect a cell.
 
-**Colors**: green = photosynthesis · purple = decomposers · red = predators · cyan = chemosynthesis at vents (mixes give intermediate colors, e.g. yellow = plant-predator). Blue background shows light, brown organic matter, orange glow chemical energy, grey rock.
+The viewer panel shows a colour key. **Colors**: green = photosynthesis · purple = decomposers · red = predators · cyan = chemosynthesis at vents (mixes give intermediate colors, e.g. yellow = plant-predator). Blue background shows light, brown organic matter, orange glow chemical energy, grey rock.
 
 ## How it works
 

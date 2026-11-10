@@ -3,6 +3,7 @@
     python view.py [--seed 1] [--scale 6]
     python view.py --load runs/test1/world_final.json.gz
     python view.py --planet examples/volcanic.json      # or an image file
+    python view.py --set rock_fraction=0.3 --set vent_count=6 --set day_amplitude=1
 
 Controls:
   SPACE   pause / resume          N    one step (while paused)
@@ -18,37 +19,45 @@ import pygame
 
 from worldsim import Config, World
 from worldsim.persistence import load_world
-from worldsim.render import render_rgb, save_png
+from worldsim.render import LEGEND, render_rgb, save_png
 from worldsim.worldgen import PlanetError, load_planet
 from worldsim.world import GENE_NAMES
 
 PANEL_W = 260
 PANEL_TOP = 10
 LINE_H = 18
-# Tallest panel: 12 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
-PANEL_MAX_LINES = 12 + 4 + len(GENE_NAMES)
+# Tallest panel: 12 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene,
+# then the colour legend (title + one line per entry + a note) below a blank line.
+LEGEND_LINES = 2 + len(LEGEND) + 2
+PANEL_MAX_LINES = 12 + 4 + len(GENE_NAMES) + LEGEND_LINES
+SWATCH = 10
 
 
 def main():
     p = argparse.ArgumentParser(description="WorldSim interactive viewer")
-    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--seed", type=int, default=None, help="RNG seed (default 1; a planet has its own)")
     p.add_argument("--scale", type=int, default=6)
     p.add_argument("--load", metavar="SAVE", help="open a world_*.json.gz save file instead of a new world")
     p.add_argument("--planet", metavar="FILE", help="generate the world from a planet form (.json) or an image")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="override a Config parameter (form fields win over --set with --planet)")
     args = p.parse_args()
 
     if args.load:
+        if args.set or args.planet or args.seed is not None:
+            raise SystemExit("--load opens the saved world as-is: --set/--planet/--seed are not allowed")
         world = load_world(args.load)
         cfg = world.cfg
-    elif args.planet:
-        try:
-            cfg, terrain, seed = load_planet(args.planet)
-        except PlanetError as e:
-            raise SystemExit(f"Invalid planet: {e}") from e
-        world = World(cfg, seed=seed, terrain=terrain)
     else:
-        cfg = Config()
-        world = World(cfg, seed=args.seed)
+        try:
+            base = Config().apply_overrides(args.set)
+            if args.planet:
+                cfg, terrain, seed = load_planet(args.planet, base, args.seed)
+            else:
+                cfg, terrain, seed = base.validate(), None, 1 if args.seed is None else args.seed
+        except (PlanetError, ValueError) as e:
+            raise SystemExit(f"Invalid world: {e}") from e
+        world = World(cfg, seed=seed, terrain=terrain)
     sc = args.scale
     pygame.init()
     # The window must fit both the world and the full inspector panel, whichever is taller.
@@ -107,10 +116,10 @@ def main():
         lines = [
             f"step         {s['step']}",
             f"population   {s['population']}",
-            f"  plants     {s['photo']}",
-            f"  decomp.    {s['sapro']}",
-            f"  predators  {s['pred']}",
-            f"  chemo      {s['chemo']}",
+            f"    plants   {s['photo']}",
+            f"    decomp.  {s['sapro']}",
+            f"    predat.  {s['pred']}",
+            f"    chemo    {s['chemo']}",
             f"in colony    {s['in_colony']}",
             f"lineages     {s['lineages']}",
             f"species      {s.get('species', '-')}",
@@ -130,10 +139,27 @@ def main():
         x0 = cfg.width * sc + 12
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 220)), (x0, PANEL_TOP + i * LINE_H))
+        for i, (_, color) in enumerate(LEGEND[:4]):          # swatches next to the strategy counts
+            draw_swatch(screen, color, x0 + 12, PANEL_TOP + (2 + i) * LINE_H)
+        draw_legend(screen, font, x0, height - PANEL_TOP - LEGEND_LINES * LINE_H + LINE_H)
 
         pygame.display.flip()
         clock.tick(60)
     pygame.quit()
+
+
+def draw_swatch(screen, color, x, y):
+    pygame.draw.rect(screen, tuple(int(c) for c in color), (x, y + (LINE_H - SWATCH) // 2 - 1, SWATCH, SWATCH))
+
+
+def draw_legend(screen, font, x, y):
+    """Colour key, pinned to the bottom of the panel."""
+    screen.blit(font.render("colours", True, (150, 150, 160)), (x, y))
+    for i, (label, color) in enumerate(LEGEND, start=1):
+        draw_swatch(screen, color, x, y + i * LINE_H)
+        screen.blit(font.render(label, True, (200, 200, 200)), (x + SWATCH + 8, y + i * LINE_H))
+    for j, note in enumerate(("mixed colour = mixed diet", "brighter cell = in a colony")):
+        screen.blit(font.render(note, True, (150, 150, 160)), (x, y + (len(LEGEND) + 1 + j) * LINE_H))
 
 
 if __name__ == "__main__":

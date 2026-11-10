@@ -34,6 +34,7 @@ python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b  # 
 python view.py --load runs/a/world_final.json.gz                           # open a save
 python run.py --planet examples/volcanic.json --steps 5000 --out runs/v   # planet from a form
 python view.py --planet examples/planet.png                               # planet from an image
+python view.py --set rock_fraction=0.3 --set day_amplitude=1              # viewer overrides
 ```
 A run writes `config.json`, `stats.csv`, `snap_*.png`, `world_final.json.gz`
 (+ `world_NNNNNN.json.gz`), `stats.png`, and with species tracking (default;

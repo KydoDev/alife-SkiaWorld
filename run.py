@@ -30,13 +30,10 @@ def build_config(args):
         cfg.width = args.width
     if args.height:
         cfg.height = args.height
-    for kv in args.set:
-        k, v = kv.split("=", 1)
-        if not hasattr(cfg, k):
-            raise SystemExit(f"Unknown parameter: {k}")
-        cur = getattr(cfg, k)
-        setattr(cfg, k, type(cur)(v) if not isinstance(cur, bool) else v.lower() in ("1", "true", "yes"))
-    return cfg
+    try:
+        return cfg.apply_overrides(args.set).validate()
+    except ValueError as e:
+        raise SystemExit(f"Invalid --set: {e}") from e
 
 
 def main():

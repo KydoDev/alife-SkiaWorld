@@ -121,3 +121,13 @@ def test_stats_columns_used_by_runner_exist():
 @pytest.mark.parametrize("x,y", [(-1, 0), (0, -1), (40, 0), (0, 20)])
 def test_cell_at_out_of_bounds_returns_none(x, y):
     assert World(small_config(), seed=1).cell_at(x, y) is None
+
+
+def test_config_overrides_infer_types_and_reject_unknown():
+    import pytest
+    from worldsim import Config
+    cfg = Config().apply_overrides(["vent_count=3", "shade=0.5", "reseed_on_extinction=no"])
+    assert (cfg.vent_count, cfg.shade, cfg.reseed_on_extinction) == (3, 0.5, False)
+    for bad in (["nope=1"], ["shade"], ["vent_count=x"]):
+        with pytest.raises(ValueError):
+            Config().apply_overrides(bad)

@@ -24,7 +24,7 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
   - `worldgen.py` — planet from a JSON form or an image (untrusted input).
 - **run.py**: headless runner → stats, snapshots, saves, species outputs.
 - **plots.py**: matplotlib charts (outside the headless engine).
-- **view.py**: interactive viewer (pygame), `--load` a save, `--planet` a form/image.
+- **view.py**: interactive viewer (pygame), `--load` a save, `--planet` a form/image, `--set`; colour legend in the panel.
 - **examples/**: sample planet forms and image.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
