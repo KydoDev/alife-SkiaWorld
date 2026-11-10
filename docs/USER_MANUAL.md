@@ -1,6 +1,6 @@
 # User Manual
 
-Last updated: 2026-11-10 (G1 prototype)
+Last updated: 2026-11-10 (F3 sensors)
 
 WorldSim has three programs:
 
@@ -48,7 +48,7 @@ Left click uses the selected tool; the white circle shows its reach.
 | Milestone | How to get it |
 |---|---|
 | Life in the abyss | Open a vent with the volcano; wait until 50 chemosynthesis specialists live around it |
-| Full ecosystem | At one moment, at least 30 specialists of each strategy: plants, decomposers, predators, chemosynthesizers |
+| Full ecosystem | At one moment, at least 30 specialists of each strategy: plants, decomposers, predators, and chemosynthesizers living around a vent **you** opened |
 | Giant organism | One colony (cells bonded together) of 80 cells |
 | Survivors | Kill a third of all life with meteorites within 100 steps, then let the population recover to its previous level. If life dies out completely it does not count |
 | Divided ocean | Build walls so the ocean splits into two isolated seas, each with at least 100 cells (the ocean wraps around left-right, so you need two walls) |
@@ -57,7 +57,8 @@ None of them happens on its own: an idle player reaches none on the example
 planets (measured). Milestones are kept when you restart with `R`.
 
 Difficulty depends on the planet. On the default *Volcanic ocean* all five are
-reachable (verified with scripted players; aim meteorites at crowded areas). On
+reachable (verified with scripted players; aim meteorites at crowded areas;
+*Giant organism* is the slowest and may need more than 20 000 steps). On
 flat or steady planets, *Giant organism* and *Full ecosystem* are much harder:
 day/night cycles, seasons and several vents help diversity.
 
@@ -82,10 +83,12 @@ python view.py                                    # default world
 python view.py --planet examples/volcanic.json    # a planet form or image
 python view.py --set day_amplitude=1 --set vent_count=4
 python view.py --load runs/a/world_final.json.gz  # open a save
+python view.py --set sensing=1                    # cells steer by their senses (F3)
 ```
 Keys: `SPACE` pause · `N` one step while paused · `+/-` speed · `O` organic
 matter · `S` snapshot PNG · `R` new seed on the same terrain · click to inspect
-a cell (its 10 genes) · `ESC` quit.
+a cell (its genes; *sensor weights* from −1 = avoids to +1 = seeks light, organic matter,
+chemical energy, kin, strangers, danger — they only act with `--set sensing=1`) · `ESC` quit.
 
 ## Headless runs (`run.py`)
 ```bash

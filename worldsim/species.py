@@ -6,9 +6,11 @@ history with tracking on or off (see ADR-0003).
 
 Species definition (threshold speciation on a fixed founder genome):
 - Seeded and immigrant cells found a new *root* species.
-- A newborn joins its parent's species if the Euclidean distance between its
-  genome and that species' founder genome is below `species_threshold`;
-  otherwise it founds a new species whose parent is the parent's species.
+- A newborn joins its parent's species if the distance between its genome and
+  that species' founder genome is below `species_threshold`; otherwise it
+  founds a new species whose parent is the parent's species. The distance is
+  Euclidean, rescaled to a 10-gene genome (ADR-0005), so the threshold keeps
+  its per-gene meaning when genes are appended.
 
 Evolutionary activity (a simplified version of Bedau & Packard's statistics):
 - Each species accumulates `activity` = sum over steps of its population.
@@ -23,6 +25,12 @@ import math
 ORIGIN_SEED = "seed"
 ORIGIN_IMMIGRANT = "immigrant"
 ORIGIN_SPECIATION = "speciation"
+REFERENCE_GENES = 10          # genome length the threshold was calibrated on (F1/F2)
+
+
+def genome_distance(a, b):
+    """Euclidean distance rescaled to a `REFERENCE_GENES`-gene genome (ADR-0005)."""
+    return math.dist(a, b) * math.sqrt(REFERENCE_GENES / len(a))
 
 
 class Species:
@@ -86,7 +94,7 @@ class SpeciesTracker:
 
     def on_birth(self, child, parent_cell, step):
         s = self.species[parent_cell.species]
-        if math.dist(child.genes, s.founder_genes) < self.threshold:
+        if genome_distance(child.genes, s.founder_genes) < self.threshold:
             self._join(child, s)
         else:
             self.speciations += 1

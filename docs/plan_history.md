@@ -79,3 +79,31 @@ Branch: `main` (owner decision 2026-11-10: work on main for now, single commit f
 - Out of scope (G3): saving game progress (budget, milestones), naming species, tree-of-life view, sharing.
 - Milestones (first draft): predators (>= 50), deep life (>= 50 chemosynthesizers), colonies (>= 50% bonded, pop >= 300),
   evolution (25 new species established), survivor (population falls below 30% of its peak, then recovers to 80%).
+
+---
+
+## Closed 2026-11-10
+
+### PLAN — F3 Sensors and behavior
+
+## Checklist
+1. [x] Baseline before any edit: 563 steps/s (seed 1, 3000 steps); pre-F3 10k-step runs for speciation/novelty
+2. [x] 6 sensor genes appended (weights in [-1,1]); `Config.sensing` (off by default), `sense_noise`, `sense_upkeep`
+3. [x] Directed movement: score the 8 tiles + staying put; move to the best; random walk when sensing is off
+4. [x] Species distance normalised per gene (ref. 10 genes); save VERSION 3; ADR-0005
+5. [x] Tests: determinism, sensing off == random walk, phototaxis/flee unit cases, save v3 round-trip, bounds
+6. [x] Experiment: sensing on/off x seeds 1, 7 x immigration on/off; hunting, fleeing, vertical migration
+7. [x] Cross-impact: viewer/game inspector, G1 idle + bot recalibration; docs, CHANGELOG, TEST.md; one commit
+
+## Detail
+- Roadmap F3: perceive the 8 neighbouring tiles (light, organic, cells, kinship); directed movement with genome weights.
+  Experiment: do hunting, fleeing, day/night vertical migrations emerge?
+- Inputs per candidate tile (radius 1, seen from the mover's tile): light, organic matter, chemical energy,
+  kin (same lineage) and strangers among the mover's neighbours adjacent to that tile, danger (predator share of
+  those strangers). Score = sum(weight * input) + noise; the current tile is a candidate (staying costs nothing).
+- Kinship uses `lineage`, never `species` (the tracker is a pure observer).
+- Honest limit: predation already strikes any adjacent cell and perception is radius 1, so hunting can barely
+  emerge; fleeing, phototaxis and vertical migration can. No widening of the radius to rescue the hypothesis.
+- Control: same engine with `sensing=False` (sensor genes drift neutrally). Selection signature: `mean_w_*`
+  leaving 0.5 with sensing on and staying near 0.5 with it off. Immigration-off arm against the F2a confound.
+- Sensing is computed only after the movement gate passes; signed weights precomputed in `express()`.

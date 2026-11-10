@@ -15,7 +15,7 @@ _BOUNDS = {
     "rock_fraction": (0, 0.9), "vent_count": (0, 100), "max_bonds": (0, 8),
     "max_age": (1, 10**9), "mut_min": (0, 1), "mut_max": (0, 1),
     "immigration_rate": (0, 100), "species_threshold": (1e-9, math.inf),
-    "novelty_activity": (1, 10**12),
+    "novelty_activity": (1, 10**12), "sense_noise": (0, 10), "sense_upkeep": (0, 10),
 }
 
 
@@ -64,6 +64,11 @@ class Config:
     vent_count: int = 0              # hydrothermal vents on top of the seabed
     vent_strength: float = 2.0       # chemical energy at a vent mouth (1.0 was below the colonisation threshold)
     vent_radius: float = 4.0         # e-folding distance of the chemical field (tiles)
+
+    # --- sensing and behaviour (F3). Off by default: movement stays a random walk ---
+    sensing: bool = False            # directed movement steered by the 6 sensor genes (weights in [-1, 1])
+    sense_noise: float = 0.1         # random jitter added to each candidate tile's score (breaks ties)
+    sense_upkeep: float = 0.05       # cost per step x mean |sensor weight|, paid only when sensing is on
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)

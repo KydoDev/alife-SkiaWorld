@@ -4,7 +4,8 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import load_world, save_world
-from worldsim.play import (Game, GameRules, add_vent, colony_sizes, dig, meteorite, raise_rock, replay, seas)
+from worldsim.play import (Game, GameRules, add_vent, colony_sizes, dig, meteorite, raise_rock, replay,
+                           seas)
 
 
 def small(**kw):
@@ -165,7 +166,8 @@ def test_colony_sizes_and_restart():
 
 def test_total_extinction_is_not_survival():
     rules = GameRules(budget_start=1e6, budget_max=1e6, collapse_window=50)
-    game = Game(World(small(), seed=8), rules)
+    # no immigrants: otherwise one landing in the emptied world can pre-empt the reseed
+    game = Game(World(small(immigration_rate=0.0), seed=8), rules)
     for _ in range(30):
         game.step()
     for x in range(0, 40, 8):
@@ -209,3 +211,20 @@ def test_replay_applies_late_actions_and_restart_clears_the_log():
     assert [a[1] for a in game.actions] == ["nutrients", "meteorite"]
     game.restart(seed=2)
     assert game.actions == []
+
+
+# ------------------------------------------------- regression (F3 recalibration, 2026-11-10)
+def test_natural_vents_alone_never_give_a_full_ecosystem():
+    """An idle player reached "balance" on volcanic.json once the RNG stream changed: chemosynthesizers
+    at natural vents counted. Only those around the player's own vents count now."""
+    game = Game(World(small(), seed=2), GameRules(balance_cells=1, budget_start=1e6, budget_max=1e6))
+    for strategy_gene, c in zip((0, 1, 2, 9), game.world.cells):     # photo, sapro, pred, chemo
+        c.genes[:10] = [0.0] * 10
+        c.genes[strategy_gene] = 1.0
+        c.express(game.world.cfg)
+    chemo_cell = game.world.cells[3]
+    game.check_milestones()
+    assert "balance" not in game.achieved            # the old global rule fired here
+    assert game.act("volcano", chemo_cell.x, chemo_cell.y + 1 if chemo_cell.y + 1 < game.world.H else chemo_cell.y - 1)
+    game.check_milestones()
+    assert "balance" in game.achieved

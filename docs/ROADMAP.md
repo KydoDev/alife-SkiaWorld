@@ -20,7 +20,7 @@ F1 Foundations ──► F2 Living environment + world seed ──► G1 "Planet
 ---
 
 ## v0 — Base engine
-**Status**: done (2026-11). Cells with a 9-gene genome, energy, light, organic matter, colonies; headless runner and pygame viewer. See [design-v0.md](design-v0.md).
+**Status**: done (2026-11). Cells with a 9-gene genome (16 since F3), energy, light, organic matter, colonies; headless runner and pygame viewer. See [design-v0.md](design-v0.md).
 
 ## F1 — Foundations (before adding biology)
 **Status**: done (2026-11-10). Determinism per seed, bit-exact save/resume ([ADR-0002](adr/0002-save-format.md)), species tracking and simplified evolutionary activity ([ADR-0003](adr/0003-species-definition.md)), energy-conservation and invariant tests, profiling (~540 steps/s at ~800 cells, see ARCHITECTURE).
@@ -74,8 +74,27 @@ Original scope:
 - Experiment: in a variable environment, does the mutation rate rise again? Do seasonal strategies (spores, reserves) arise?
 
 ## F3 — Sensors and behavior
-**Status**: planned
+**Status**: done (2026-11-10). Six sensor genes (weights for light, organic matter, chemical energy, kin, strangers, danger) steer movement when `--set sensing=1` ([ADR-0005](adr/0005-sensor-genes-and-save-v3.md)). Off by default; the genes are always present (16-gene genome) and inert when sensing is off, which gives a neutral-drift control arm. Sensing costs ~30% of the speed (≈ 545 → 380 steps/s, seed 1, 3000 steps).
 
+**Experiment** (`python scripts/f3_experiment.py --steps 10000`, results in [f3_experiment.csv](f3_experiment.csv)): sensing on/off × flat default world and `examples/volcanic.json` × seeds 1, 7 × immigration 0.5 / 0; measured over steps 5–10k on motile unbonded **descendants** (`move` > 0.3; seeded founders and immigrants excluded, since a light-seeking immigrant would bias the sample without any inheritance). Means below use only arms with ≥ 10 motile descendants on average (5 off, 7 on); the 4 small arms (no immigration, 2.8–8.9 motile cells) are in the CSV. Measured after the F3 code review fixed the social inputs (edge rows, kin predators); the sensing-off arms match the pre-fix run on every reported column, as they should.
+
+| Question | Sensing off (5 arms) | Sensing on (7 arms) | Verdict |
+|---|---|---|---|
+| Phototaxis, immigration arms only (535–766 motile lineages each): mean `w_light` | −0.16 (1/4 positive) | +0.26 (3/4 positive; +0.36, +0.52, +0.18, −0.01) | likely selected; modest effect, 2 seeds |
+| Phototaxis, all arms with enough motile cells | −0.27 (1/5 positive) | +0.41 (6/7 positive) | founder-dominated arms inflate this |
+| Fleeing: mean `w_danger` | −0.25 (3/5 negative, by drift) | +0.07 (3/7 negative) | no |
+| Hunting: kills per predator-step (median) | 0.65 | 0.63 | no |
+| Fleeing (prey side): kills per prey-step | 0.051 | 0.050 | no |
+| Vertical migration (volcanic, day/night): corr(light factor, mean depth of motile plants) | −0.03 to −0.10 (3 arms) | −0.05 to −0.26 (4 arms; 2 clearly negative) | weak and inconsistent |
+
+- **Phototaxis is likely selected, with a modest effect.** The clean evidence is the 4 immigration arms, where hundreds of lineages move: +0.26 on average with sensing vs −0.16 without. The no-immigration arms (1–5 lineages supply all motile cells) are founder lotteries: drift alone reaches ±0.7 there, and the small flat seed-1 arm with sensing ended at −0.74. Before the review fixes the same 4 arms gave +0.30 to +0.56, so the effect shrank. More seeds are needed to call it robust.
+- **Day/night depth rhythm**: weak and inconsistent. Where it shows (seed 1: plants slightly shallower in daylight) it is most simply a by-product of phototaxis, whose pull weakens at night when the light gradient falls below the sensing noise; not tested as a separately evolved trait.
+- **No fleeing or hunting.** Expected for hunting: predation strikes any adjacent cell and perception has radius 1, so moving buys a predator little. Other weights (organic, chemical, kin, strangers) wander in both arms: founder effects are large, especially without immigration, where 1–5 lineages supply all motile cells.
+- The control arm is not perfectly neutral (ADR-0005): a sensing cell may choose to stay, and every cell pays `sense_upkeep`.
+- Speciation stays comparable after the per-gene distance rescaling: with immigration, 77–93 species and 299–435 established novelties at 10k steps with sensing off and 67–113 / 220–490 with sensing on, vs 72–107 and 359–587 before F3 (same planets and seeds). Comparable in order of magnitude only: the sensor genes add neutral drift to the distance (ADR-0005).
+- Next: a wider perception radius, or a cost on staying near predators, are separate experiments (one mechanism at a time).
+
+Original scope:
 - The cell perceives its 8 neighboring tiles: light, organic matter, presence of cells, kinship.
 - **Directed** movement (towards food/light, away from predators) instead of random.
 - Implementation: a small neural network or a set of weighted rules, **with the weights in the genome**.
@@ -185,7 +204,8 @@ An ALife simulation is fascinating to watch for 10 minutes and then gets boring.
   - **Status**: done (2026-11-10). Owner playtest passed the exit criterion ("is it fun?") with no change requests; the known weaknesses below stay open for G3.
   - Built: `game.py` + `worldsim/play.py`. Planet from a form or photo (`--planet`), divine-energy budget, 5 tools (nutrients, meteorite, mountain, dig, volcano) and 5 milestones (abyss, full ecosystem, giant organism, survivors, divided ocean). Manual: [USER_MANUAL.md](USER_MANUAL.md).
   - Design rule: interventions are RNG-free instant edits of saved state, so games stay deterministic and replayable (`play.replay`), and save/resume stays bit-exact.
-  - **Milestone calibration** (scripted players, 2026-11-10): an *idle* player reaches **no** milestone in 6000 steps on any example planet. On `examples/volcanic.json` all five were reached: a simple scripted player got abyss (350), divided ocean (2325), full ecosystem (9025) and giant organism (12 500); survivors needs an aimed meteor shower (5 meteorites at step 5000 killed 34% of life; recovered at 5240), while the bot's unaimed shower killed too few. Scripted players reach only 1–3 on the flat default world, `red_dwarf` and `planet.png`: giant colonies and stable decomposer specialists need day/night, seasons and several vents. Hence `game.py` starts on the volcanic planet. First drafts that fired on their own (predators ≥ 50, 50% in colonies, 25 new species, population dips on day/night planets) were replaced. A code review then fixed a survivor check that could fire without any recovery, replay stalling on late actions, vents weakening each other, and toast/drag glitches in the UI.
+  - **Milestone calibration** (scripted players, 2026-11-10, before F3; see the recalibration below): an *idle* player reaches **no** milestone in 6000 steps on any example planet. On `examples/volcanic.json` all five were reached: a simple scripted player got abyss (350), divided ocean (2325), full ecosystem (9025) and giant organism (12 500); survivors needs an aimed meteor shower (5 meteorites at step 5000 killed 34% of life; recovered at 5240), while the bot's unaimed shower killed too few. Scripted players reach only 1–3 on the flat default world, `red_dwarf` and `planet.png`: giant colonies and stable decomposer specialists need day/night, seasons and several vents. Hence `game.py` starts on the volcanic planet. First drafts that fired on their own (predators ≥ 50, 50% in colonies, 25 new species, population dips on day/night planets) were replaced. A code review then fixed a survivor check that could fire without any recovery, replay stalling on late actions, vents weakening each other, and toast/drag glitches in the UI.
+  - **Recalibrated after F3** (2026-11-10; the game keeps `sensing` off, but six new genes shift every seed's random stream): the idle player then reached *Full ecosystem* on `volcanic.json` (step 5950) from natural vents alone — on seeds 42 and 3 all four specialist groups exceed 30 for up to 30 checks with no player. Fix: only chemosynthesizers around vents the **player** opened count (as for *Life in the abyss*); regression test added. Now: idle = 0 milestones on all four example planets; scripted player on `volcanic.json`: abyss 725, divided 2325, full ecosystem 6125; survivors 5220 with an aimed shower (48% killed at step 5000). *Giant organism* was reached at 13 225 in one run and not within 20k steps in another (largest colony 53): reachable, but not reliably by this bot. Calibration numbers depend on the RNG stream, so they move whenever genes are added.
   - Found on the way: the *Nutrients* tool barely matters on the default world (organic matter is not limiting there, ~10⁵ units lie on the seabed) — a candidate to rethink after the playtest.
   - Deliverable: docs/USER_MANUAL.md — done.
 - **G2 (after F3)**: engine port and visualization in Unity.

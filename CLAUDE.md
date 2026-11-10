@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 <project_context>
 <name>WorldSim</name>
 <description>
-Artificial-life simulation in Python: cells with a 10-gene genome (values in
+Artificial-life simulation in Python: cells with a 16-gene genome (values in
 [0,1]) live on a 2D grid, feed, divide with mutation and die. There is **no
 explicit fitness** — selection is implicit (whatever gets energy and reproduces
 spreads). Public, open-source, non-commercial hobby/research project; the
@@ -87,6 +87,9 @@ runs (same seed, before/after), not only by unit tests.
 - **Environment (F2)**: `light_factor(t)` (day/night × season) is a pure function
   of the step; `Terrain` maps are static and stored in saves (ADR-0004). Every
   placement path must check `blocked` (rock). New genes are appended, never inserted.
+- **Sensing (F3)**: `sensed_move()` steers movement from the 6 sensor genes when
+  `cfg.sensing` is on (off by default; the genes are then inert). Kinship uses
+  `lineage`, never `species`. Species distance is rescaled per gene (ADR-0005).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

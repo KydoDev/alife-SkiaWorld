@@ -5,7 +5,7 @@ This file is the **single source of truth** for the roles of all AI agents
 
 ## 1. System Context
 WorldSim is a public, open-source, non-commercial artificial-life simulation in
-Python: cells with a 9-gene genome live, feed, divide with mutation and die on
+Python: cells with a 16-gene genome live, feed, divide with mutation and die on
 a 2D grid, with no explicit fitness. Components: headless engine `worldsim/`
 (numpy), headless runner `run.py` (CSV, PNG, matplotlib), interactive viewer
 `view.py` (pygame). Roadmap: simulation phases F1–F7, then possibly a game (G1–G3).

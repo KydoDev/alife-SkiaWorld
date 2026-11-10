@@ -57,9 +57,15 @@ SHA-256 of the bytes → seed). Size caps and field validation; errors are `Plan
   × `shade` per cell above × `light_factor(t)` (day/night × season, a pure
   function of the step); `organic` = diffusing, sinking, decaying organic matter;
   `chem` = static chemical energy.
-- **Cell**: `__slots__` object with a 10-gene genome (`photo`, `sapro`, `pred`,
-  `move`, `div`, `child`, `attach`, `share`, `mut`, `chemo`). `express()` derives
-  the phenotype once at birth; the four feeding genes are normalised shares.
+- **Cell**: `__slots__` object with a 16-gene genome (`photo`, `sapro`, `pred`,
+  `move`, `div`, `child`, `attach`, `share`, `mut`, `chemo`, then the F3 sensor
+  weights `w_light`, `w_organic`, `w_chem`, `w_kin`, `w_stranger`, `w_danger`).
+  `express()` derives the phenotype once at birth; the four feeding genes are
+  normalised shares, sensor genes become signed weights `2g − 1` (`Cell.sense`).
+- **Sensing (F3)**: with `Config.sensing`, `sensed_move()` scores staying put and
+  each free neighbour tile (light, organic, chemical energy, kin/stranger/danger
+  densities, radius 1) and moves to the best; otherwise movement is a random walk
+  (ADR-0005).
 - **Bonds**: colonies are symmetric `bonds` links between cells, created at
   division with probability `attach`, cleared on death. Stored as an
   insertion-ordered `dict` used as an ordered set: energy sharing iterates it,
@@ -76,7 +82,7 @@ activity and the novelty counter. Never touches the RNG; the dynamics never read
 
 ### `worldsim/persistence.py`
 `save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
-v2 adds the terrain maps, ADR-0004). Resume is bit-exact.
+v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005). Resume is bit-exact.
 
 ### `worldsim/render.py`
 Maps the world to an RGB array: cell color mixes green/purple/red/cyan by
@@ -111,7 +117,7 @@ a planet form or image.
 1. Recompute `light` from current occupancy and the day/season factor.
 2. Shuffle cells; for each living cell: age → upkeep → photosynthesis /
    decomposition / chemosynthesis → predation (random unbonded neighbor) → movement (unbonded
-   cells only) → energy sharing with bonded cells → death check → division
+   cells only; sensed when `sensing` is on) → energy sharing with bonded cells → death check → division
    (mutated child, optional bond).
 3. Drop dead cells, append newborns, update `organic` (diffuse, sink, decay).
 4. Immigration of random cells; reseed on total extinction.
@@ -133,7 +139,8 @@ predation splits the prey's energy + body between predator and organic matter.
   (`random.Random(seed)`), and no iteration order may depend on memory
   addresses — `Cell.__hash__` returns the deterministic cell `id` so `bonds`
   sets iterate identically across runs. Same seed → byte-identical `stats.csv`.
-- **Performance**: F2 adds no measurable cost on a flat world (back-to-back on
+- **Performance**: F3 sensing costs ~30% (≈ 545 → 380 steps/s, seed 1, 3k steps); it is
+  computed only for cells that pass the movement gate. F2 adds no measurable cost on a flat world (back-to-back on
   the same machine: F1 303 vs F2 354 steps/s, seed 1, 3k steps; absolute numbers
   vary ±40% with machine load, so compare runs back-to-back). Rocks add one
   lookup per neighbour check. F1 profile (cProfile, ~800 cells): ~540 steps/s with species

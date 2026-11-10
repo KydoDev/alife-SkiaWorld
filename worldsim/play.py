@@ -46,7 +46,7 @@ class GameRules:
 
 MILESTONES = {
     "abyss": "Life in the abyss: a vent you made is colonised by chemosynthesizers",
-    "balance": "Full ecosystem: plants, decomposers, predators and chemosynthesizers thrive together",
+    "balance": "Full ecosystem: plants, decomposers, predators and chemosynthesizers at your vents thrive together",
     "giant": "Giant organism: one colony of 80 cells",
     "survivor": "Survivors: life recovers from a cataclysm you caused",
     "divided": "Divided ocean: two isolated seas, both alive",
@@ -275,22 +275,30 @@ class Game:
             self.achieved[key] = self.world.step_count
             self.news.append(MILESTONES[key])
 
+    def _chemo_near_player_vents(self):
+        """Chemosynthesis specialists within `abyss_radius` of a vent the player opened."""
+        w, radius = self.world, self.rules.abyss_radius
+        near = 0
+        for c in w.cells:
+            if c.chemo >= SPECIALIST:
+                for vx, vy in self.player_vents:
+                    dx = abs(c.x - vx)
+                    if math.hypot(min(dx, w.W - dx), c.y - vy) <= radius:
+                        near += 1
+                        break
+        return near
+
     def check_milestones(self):
         w, r = self.world, self.rules
         cells = w.cells
-        if "abyss" not in self.achieved and self.player_vents:
-            near = 0
-            for c in cells:
-                if c.chemo >= SPECIALIST:
-                    for vx, vy in self.player_vents:
-                        dx = abs(c.x - vx)
-                        if math.hypot(min(dx, w.W - dx), c.y - vy) <= r.abyss_radius:
-                            near += 1
-                            break
-            if near >= r.abyss_cells:
-                self._reach("abyss")
-        if "balance" not in self.achieved:
-            counts = [sum(1 for c in cells if getattr(c, a) >= SPECIALIST) for a in ("photo", "sapro", "pred", "chemo")]
+        need_vents = ("abyss" not in self.achieved or "balance" not in self.achieved) and self.player_vents
+        near = self._chemo_near_player_vents() if need_vents else 0
+        if "abyss" not in self.achieved and near >= r.abyss_cells:
+            self._reach("abyss")
+        # chemosynthesizers count only around vents the player opened: planets with natural vents
+        # otherwise reach a full ecosystem on their own (measured on volcanic.json after F3)
+        if "balance" not in self.achieved and near >= r.balance_cells:
+            counts = [sum(1 for c in cells if getattr(c, a) >= SPECIALIST) for a in ("photo", "sapro", "pred")]
             if min(counts) >= r.balance_cells:
                 self._reach("balance")
         if "giant" not in self.achieved and max(colony_sizes(cells), default=0) >= r.giant_colony:

@@ -148,3 +148,15 @@ def test_load_caps_decompressed_size_and_rejects_junk(tmp_path, monkeypatch):
     monkeypatch.setattr(persistence, "MAX_SAVE_BYTES", 10**6)
     with pytest.raises(SaveFormatError, match="not a valid save"):
         load_world(junk)
+
+
+def test_rejects_a_tracker_that_does_not_match_the_cells():
+    d = world_to_dict(World(small_config(), seed=1))
+    short = json.loads(json.dumps(d))
+    short["tracker"]["species"][0][3] = short["tracker"]["species"][0][3][:10]   # founder from an older genome
+    with pytest.raises(SaveFormatError, match="founder"):
+        world_from_dict(short)
+    orphan = json.loads(json.dumps(d))
+    orphan["cells"][0][7] = 987654                                                # species the tracker never saw
+    with pytest.raises(SaveFormatError, match="species"):
+        world_from_dict(orphan)

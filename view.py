@@ -29,7 +29,9 @@ LINE_H = 18
 # Tallest panel: 12 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene,
 # then the colour legend (title + one line per entry + a note) below a blank line.
 LEGEND_LINES = 2 + len(LEGEND) + 2
-PANEL_MAX_LINES = 12 + 4 + len(GENE_NAMES) + LEGEND_LINES
+N_TRAITS = GENE_NAMES.index("w_light")             # genes before the F3 sensor weights
+GENE_LINES = (N_TRAITS + 1) // 2 + 1 + (len(GENE_NAMES) - N_TRAITS + 1) // 2
+PANEL_MAX_LINES = 12 + 4 + GENE_LINES + LEGEND_LINES
 SWATCH = 10
 
 
@@ -140,7 +142,7 @@ def main():
             if selected.alive:
                 lines += [f"cell #{selected.id}", f"energy {selected.energy:.1f}  age {selected.age}",
                           f"bonds {len(selected.bonds)}  strategy {selected.strategy}", ""]
-                lines += [f"{n:7s} {v:.2f}" for n, v in zip(GENE_NAMES, selected.genes)]
+                lines += gene_lines(selected.genes)
             else:
                 lines.append("(dead cell)")
         else:
@@ -155,6 +157,15 @@ def main():
         pygame.display.flip()
         clock.tick(60)
     pygame.quit()
+
+
+def gene_lines(genes):
+    """Inspector text: trait genes two per line, then the sensor genes as signed weights (2g - 1)."""
+    def pairs(items):
+        return ["  ".join(items[i:i + 2]) for i in range(0, len(items), 2)]
+    traits = [f"{n:7s}{v:.2f}" for n, v in zip(GENE_NAMES[:N_TRAITS], genes)]
+    sensors = [f"{n[2:]:9s}{2 * v - 1:+.2f}" for n, v in zip(GENE_NAMES[N_TRAITS:], genes[N_TRAITS:])]
+    return pairs(traits) + ["sensor weights:"] + pairs(sensors)
 
 
 def draw_swatch(screen, color, x, y):

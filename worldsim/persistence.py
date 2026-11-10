@@ -23,7 +23,7 @@ from .terrain import Terrain
 from .world import N_GENES, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 2
+VERSION = 3
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
 COUNTERS = ("births", "deaths", "kills", "extinctions")
 
@@ -135,7 +135,7 @@ def world_from_dict(d: dict) -> World:
             cell.bonds[by_id[bid]] = None
 
     if d["tracker"] is not None:
-        world.tracker = SpeciesTracker.from_dict(d["tracker"])
+        world.tracker = _load_tracker(d["tracker"], by_id.values())
     world.update_light()
     return world
 
@@ -143,6 +143,20 @@ def world_from_dict(d: dict) -> World:
 def save_world(world: World, path) -> None:
     with gzip.open(path, "wt", encoding="utf-8") as f:
         json.dump(world_to_dict(world), f, separators=(",", ":"))
+
+
+def _load_tracker(data, cells) -> SpeciesTracker:
+    """Rebuild the species tracker and check it against the cells, so that a hostile or stale save
+    fails here rather than at the first birth or death."""
+    tracker = SpeciesTracker.from_dict(data)
+    for s in tracker.species.values():
+        genes = s.founder_genes
+        if len(genes) != N_GENES or not all(_finite(g) and 0.0 <= g <= 1.0 for g in genes):
+            raise SaveFormatError(f"species #{s.id} has an invalid founder genome")
+    for c in cells:
+        if c.species not in tracker.extant:
+            raise SaveFormatError(f"cell #{c.id} belongs to unknown or extinct species {c.species!r}")
+    return tracker
 
 
 def _finite(v) -> bool:

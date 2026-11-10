@@ -6,6 +6,23 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F3 Sensors and behavior** (roadmap phase complete, ADR-0005): six sensor genes
+  (`w_light`, `w_organic`, `w_chem`, `w_kin`, `w_stranger`, `w_danger`) and directed
+  movement with `--set sensing=1` (`sense_noise`, `sense_upkeep`); off by default.
+  Species distance rescaled per gene; save format v3. Experiment script
+  `scripts/f3_experiment.py` and results (phototaxis likely selected, modest effect on 2 seeds; no fleeing,
+  hunting or consistent day/night migration). Viewer inspector shows sensor weights.
+
+### Fixed
+- G1 *Full ecosystem* milestone fired for an idle player on `volcanic.json` once F3
+  changed the random stream (natural vents supplied the chemosynthesizers). Only
+  chemosynthesizers around vents the player opened count now.
+- Code review of F3: social densities were understated on the surface and floor rows
+  (divided by 8 neighbour tiles where only 5 exist); danger ignored predators of the
+  mover's own lineage, although predation eats kin; a save whose species tracker did
+  not match its cells loaded and then crashed at the first birth — now rejected.
+- Test `test_total_extinction_is_not_survival` depended on no immigrant landing in the
+  emptied world; it now runs without immigration.
 - **G1 "Planet in a jar" prototype** (owner playtest passed 2026-11-10): `game.py` front-end and
   `worldsim/play.py` rules — divine-energy budget, tools (nutrients, meteorite,
   mountain, dig, volcano), five milestones calibrated against idle and scripted

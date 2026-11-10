@@ -14,10 +14,26 @@ from .terrain import Terrain, generate_terrain
 
 # Gene indices. New genes are appended so existing indices keep their meaning.
 G_PHOTO, G_SAPRO, G_PRED, G_MOVE, G_DIV, G_CHILD, G_ATTACH, G_SHARE, G_MUT, G_CHEMO = range(10)
-N_GENES = 10
-GENE_NAMES = ["photo", "sapro", "pred", "move", "div", "child", "attach", "share", "mut", "chemo"]
+# F3 sensor weights (gene g -> weight 2g - 1): how much a tile's light, organic matter, chemical
+# energy, kin, strangers and danger attract (> 0) or repel (< 0) a moving cell.
+G_W_LIGHT, G_W_ORGANIC, G_W_CHEM, G_W_KIN, G_W_STRANGER, G_W_DANGER = range(10, 16)
+N_GENES = 16
+GENE_NAMES = ["photo", "sapro", "pred", "move", "div", "child", "attach", "share", "mut", "chemo",
+              "w_light", "w_organic", "w_chem", "w_kin", "w_stranger", "w_danger"]
 
 NEIGH8 = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+# Candidate tiles of a sensed move: stay put, or one of the 8 neighbours.
+# VIEWS[(top, bottom)][d] = how many of the mover's neighbour tiles inside the grid touch candidate d;
+# it normalises the social inputs (on the surface or floor row some neighbour tiles do not exist).
+
+
+def _view(top, bottom):
+    tiles = [n for n in NEIGH8 if not (top and n[1] == -1) and not (bottom and n[1] == 1)]
+    return {d: max(1, sum(1 for n in tiles if n != d and abs(n[0] - d[0]) <= 1 and abs(n[1] - d[1]) <= 1))
+            for d in [(0, 0), *NEIGH8]}
+
+
+VIEWS = {(top, bottom): _view(top, bottom) for top in (False, True) for bottom in (False, True)}
 STRATEGIES = ["photo", "sapro", "pred", "chemo"]
 
 
@@ -26,7 +42,7 @@ class Cell:
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
-        "species",
+        "sense", "species",
     )
 
     def __init__(self, cid, x, y, energy, genes, lineage, cfg):
@@ -71,6 +87,9 @@ class Cell:
         self.share = 0.5 * g[G_SHARE]
         self.mut_sigma = cfg.mut_min + g[G_MUT] * (cfg.mut_max - cfg.mut_min)
         self.upkeep = cfg.base_cost + cfg.pred_upkeep * self.pred + cfg.move_upkeep * self.move
+        self.sense = tuple(2.0 * v - 1.0 for v in g[G_W_LIGHT:G_W_DANGER + 1])
+        if cfg.sensing:
+            self.upkeep += cfg.sense_upkeep * sum(abs(w) for w in self.sense) / len(self.sense)
 
     @property
     def strategy(self):
@@ -169,6 +188,61 @@ class World:
             free = [(nx, ny) for nx, ny in self.neighbors(x, y) if grid[ny * W + nx] is None]
         return self.rng.choice(free) if free else None
 
+    def sensed_move(self, c):
+        """F3 directed movement: score staying put and each free neighbour tile, return the best
+        destination, or None to stay.
+
+        Perception has radius 1: the environment of each candidate tile (light, organic matter,
+        chemical energy) and the cells among the mover's neighbours that touch it (kin = same
+        lineage, strangers, danger = predator share of all of them, kin included, since kin predators
+        eat kin too), as densities in [0, 1] over the neighbour tiles inside the grid.
+        Score = sum(weight x input) + noise; the noise breaks ties, so zero weights = random walk."""
+        cfg, grid, W, H = self.cfg, self.grid, self.W, self.H
+        x, y = c.x, c.y
+        blocked = self.blocked if self.has_rock else None
+        social = []                                   # (dx, dy, is_kin, predator share)
+        cands = [(0, 0, x, y)]
+        for dx, dy in NEIGH8:
+            ny = y + dy
+            if not 0 <= ny < H:
+                continue
+            nx = (x + dx) % W
+            o = grid[ny * W + nx]
+            if o is None:
+                if blocked is None or not blocked[ny * W + nx]:
+                    cands.append((dx, dy, nx, ny))
+            else:
+                social.append((dx, dy, o.lineage == c.lineage, o.pred))
+        if len(cands) == 1:
+            return None
+        wl, wo, wc, wk, ws, wd = c.sense
+        light, org = self.light, self.organic
+        chem = self.chem if self.has_chem else None
+        inv_l = 1.0 / cfg.light_max if cfg.light_max > 0 else 0.0
+        noise, rand = cfg.sense_noise, self.rng.random
+        view = VIEWS[(y == 0, y == H - 1)]
+        best, best_score = cands[0], -math.inf
+        for dx, dy, tx, ty in cands:
+            o = org[ty, tx]
+            s = wl * light[ty, tx] * inv_l + wo * o / (o + 1.0)
+            if chem is not None:
+                ch = chem[ty, tx]
+                s += wc * ch / (ch + 1.0)
+            if social:
+                kin = strangers = danger = 0.0
+                for sx, sy, is_kin, pred in social:
+                    if -1 <= sx - dx <= 1 and -1 <= sy - dy <= 1 and (sx != dx or sy != dy):
+                        if is_kin:
+                            kin += 1.0
+                        else:
+                            strangers += 1.0
+                        danger += pred
+                s += (wk * kin + ws * strangers + wd * danger) / view[(dx, dy)]
+            s += noise * rand()
+            if s > best_score:
+                best, best_score = (dx, dy, tx, ty), s
+        return None if best[0] == 0 and best[1] == 0 else (best[2], best[3])
+
     def random_prey(self, c):
         grid, W = self.grid, self.W
         prey = []
@@ -248,6 +322,7 @@ class World:
         org, light = self.organic, self.light
         tracker = self.tracker
         chem = self.chem if self.has_chem else None
+        sensing = cfg.sensing
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -286,9 +361,9 @@ class World:
                     self.kill(prey, (1.0 - cfg.pred_eff) * food)
                     self.kills += 1
 
-            # 5: movement (unbonded cells only)
+            # 5: movement (unbonded cells only); F3 sensing steers it, otherwise a random walk
             if not c.bonds and c.move > 0.0 and rand() < c.move:
-                dest = self.random_empty_neighbor(x, y)
+                dest = self.sensed_move(c) if sensing else self.random_empty_neighbor(x, y)
                 if dest is not None:
                     grid[y * W + x] = None
                     c.x, c.y = dest
