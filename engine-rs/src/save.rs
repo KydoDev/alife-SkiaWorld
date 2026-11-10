@@ -415,20 +415,10 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     let rng = build_rng(&raw.rng)?;
     let organic = matrix_values(raw.organic, w, h, "organic field")?;
 
-    let mut world = World {
-        cfg,
-        width: w,
-        height: h,
-        step_count: count(raw.step_count, "step_count")?,
-        next_id: count(raw.next_id, "next_id")?,
-        counters,
-        rng,
-        organic,
-        terrain,
-        slab: Vec::new(),
-        order: Vec::new(),
-        grid: vec![EMPTY; w * h],
-    };
+    let mut world = World::from_parts(cfg, terrain, rng, organic);
+    world.step_count = count(raw.step_count, "step_count")?;
+    world.next_id = count(raw.next_id, "next_id")?;
+    world.counters = counters;
     load_cells(&mut world, raw.cells.0)?;
     Ok(world)
 }
@@ -526,18 +516,18 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             return Err(err(format!("cell #{id} has an invalid hgt_p")));
         }
         let r = world.slab.len() as CellRef;
-        world.slab.push(Cell {
+        let mut cell = Cell::new(
             id,
             x,
             y,
             energy,
-            age: count(age, "cell age")?,
             genes,
-            lineage: count(lineage, "cell lineage")?,
-            bonds: Vec::new(),
-            sex_p, // keeps the sign of a -0.0 (it is hashed by bits)
-            alive: true,
-        });
+            count(lineage, "cell lineage")?,
+            &world.cfg,
+        );
+        cell.age = count(age, "cell age")?;
+        cell.sex_p = sex_p; // keeps the sign of a -0.0 (it is hashed by bits)
+        world.slab.push(cell);
         world.order.push(r);
         world.grid[tile] = r;
         by_id.insert(id, r);

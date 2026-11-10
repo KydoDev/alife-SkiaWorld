@@ -1,9 +1,11 @@
 r"""G2 golden vectors: reference data the Rust port (engine-rs/) must reproduce bit-for-bit.
 
 Writes into --out:
-- start.json.gz  a v5 save after --warmup steps (default flags, no species tracker);
+- start.json.gz  a save (current format) after --warmup steps (default flags, no species tracker);
 - rng.json       draws from CPython's random.Random, floats stored as IEEE-754 bit patterns (hex);
-- hashes.csv     step,hash for each of the --steps steps that follow the save.
+- hashes.csv     step,hash for each of the --steps steps that follow the save;
+- step_N.json.gz with --dump-step N, a save at step N, so a mismatching kernel can name the first
+  field that differs (engine-rs/tests/golden_step.rs reads it from engine-rs/target/g2-dumps/<set>/).
 
 The state hash is defined in docs/G2_PLAN.md ("State hash"); both engines must implement it byte-for-byte.
 Golden files depend on the platform's maths library for gauss/pow/sin, so they record where they were made.
@@ -93,6 +95,7 @@ def main(argv=None) -> None:
     ap.add_argument("--steps", type=int, default=1000, help="steps hashed after the start save")
     ap.add_argument("--planet", type=Path, help="planet form (.json) or image; default: the flat default world")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--dump-step", type=int, help="also write a save at this step (step_N.json.gz)")
     args = ap.parse_args(argv)
     if args.steps < 1 or args.warmup < 0:
         ap.error("--steps must be >= 1 and --warmup >= 0")
@@ -115,6 +118,8 @@ def main(argv=None) -> None:
         for _ in range(args.steps):
             world.step()
             w.writerow([world.step_count, len(world.cells), state_hash(world)])
+            if world.step_count == args.dump_step:
+                save_world(world, args.out / f"step_{args.dump_step}.json.gz")
 
     rng = rng_vectors(args.seed)
     rng["meta"] = {"python": platform.python_version(), "system": platform.system(), "platform": platform.platform(),

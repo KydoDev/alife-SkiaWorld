@@ -10,7 +10,7 @@ the F-phase experiments).
 2. [x] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
 3. [x] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
 4. [x] M1c Load a save (current `SAVE_VERSION`) in Rust; state hash at step 0 equals Python's
-5. [ ] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
+5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [ ] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [ ] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
 8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
@@ -107,6 +107,9 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
 - Every constant comes from the loaded `Config`; unknown config keys are an error.
 - Save loading in Rust validates like `persistence.py` (untrusted input) and returns an
   error, never panics.
+- FFI (M4, from the M1c security review): expose only the save loaders and `step` (plus read-only views),
+  never `World::from_parts` or raw field writes; wrap every entry point in `catch_unwind` (`rng.rs` still
+  has `assert!`s). Before the cdylib ships: CI builds with `--locked` and runs `cargo audit`/`cargo deny`.
 - A rule change in `worldsim/` that touches the default dynamics regenerates the golden
   files in the same PR, and the Rust port follows (or the golden test is marked
   as tracking an older commit, explicitly).
@@ -150,3 +153,19 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   symmetric bonds without duplicates or self-bonds, every config key present, seed None/int/str, RNG version
   the integer 3 and words ≤ 32 bits. Saves with `sensing`, `open_genome`, `sex` or `plasticity` on are refused
   until M5; the species tracker is skipped, not validated (observer state, never read).
+- **M2** (2026-11-10, Windows 11, rustc 1.98.1, Python 3.12.10, numpy 2.5.4, CPU without AVX-512):
+  `engine-rs/src/world.rs` ports `World.step()` for the default flags (light with terrain, day/night and
+  seasons; feeding incl. chemosynthesis; predation; random walk; sharing; death; division with mutation;
+  organic diffusion/sinking/decay; immigration; reseed). `cargo test` → `tests/golden_step.rs`: **first
+  divergent step = none** in 1000 steps on both sets (default 200→1200, final population 711; volcanic, 447),
+  all bit-for-bit; ~11 s in a debug build including 2 × 1000 hashes. Transcendentals did not break it on
+  Windows: Rust's `powf`/`exp`/`sin`/`ln`/`cos` call the same UCRT functions as CPython, and numpy's float64
+  `exp`/`power` take the libm path on this CPU (its own SIMD `exp` is AVX-512 only). `shade ** k` is tabulated
+  for `k = 0..H` (same values, one `pow` per row count). Sensitivity: reassociating one sum of the organic
+  diffusion makes the test fail at the first step, and the diagnostic names `organic[0, 26]`. Diagnostic:
+  `scripts/g2_golden.py --dump-step N` writes Python's save at step N to `engine-rs/target/g2-dumps/<set>/`;
+  the stepped test then names the first differing field (`hash::first_difference`, in state-hash order).
+  Same check against sets regenerated locally into `target/golden-local/` (the CI path): passes. Linux is
+  verified by the `rust-core` CI job (Linux-made sets); numpy may use SVML `exp`/`pow` on AVX-512 runners, a
+  risk the per-platform scheme absorbs only if Rust's libm agrees with it, so a Linux divergence there is
+  recorded here, not hidden.
