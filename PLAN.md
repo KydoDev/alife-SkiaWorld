@@ -47,3 +47,16 @@ unbonded movers; with immigration 0 only 0-1.3% of cells are motile, too few for
    claimed), and `w_light` on vs off.
 5. Exploratory: population, species, share of motile cells, free vs off.
 6. A count of exactly 16/20 is reported as "at the threshold, not confirmed on new seeds".
+
+## Result of the main run (2026-11-10)
+Control 16/20 (fires, at the threshold). Phototaxis free vs off: higher 13/20 -> no detectable selection
+(free median 0.40, off -0.08). Motile descendants: 1 usable pair (median 2.6 motile cells per sample in free), no
+verdict. Not pre-registered: flat 9/10 higher, volcanic 4/10. Re-running `flat_seasons` seed 1 `free` on main
+after #19 (libm light) gave an identical row.
+
+## Confirmation (rules fixed before running; seeds 21, 23, ..., 39; arms off, free, control)
+C1. Control |w_light| control < free in >= 16/20: the assay's power is confirmed; otherwise the main null is only
+    "blind at a 0.5 cost".
+C2. Phototaxis free vs off: reported as a count; a verdict only at >= 16/20 in the confirmation itself.
+C3. Post-hoc lean from the main run: free > off on `flat_seasons` in >= 8/10 of the new seeds -> "flat lean
+    reproduced" (exploratory); otherwise it is not kept.
