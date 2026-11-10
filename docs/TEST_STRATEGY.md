@@ -39,7 +39,5 @@ Small worlds (`40×20`, 80 cells), explicit seeds, ≤200 steps. No fixtures yet
 a saved-world fixture will come with F1 save/load.
 
 ## Known gaps
-- **Determinism is broken** (xfail test, 2026-11-10): `Cell.bonds` set ordering
-  depends on `id()`. Risk: experiments are not reproducible.
 - No energy-conservation test yet (needs an accounting of light income per step).
 - `run.py` and `view.py` have no automated tests beyond the CI smoke run.

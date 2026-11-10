@@ -23,7 +23,7 @@ F1 Foundations ──► F2 Living environment + world seed ──► G1 "Planet
 **Status**: done (2026-11). Cells with a 9-gene genome, energy, light, organic matter, colonies; headless runner and pygame viewer. See [design-v0.md](design-v0.md).
 
 ## F1 — Foundations (before adding biology)
-**Status**: in progress — regression test suite started (2026-11-10); it revealed that determinism per seed is currently broken (see `TEST.md`).
+**Status**: in progress — regression test suite in place and determinism per seed fixed (2026-11-10). Remaining: save/load, species tracking, novelty metrics, energy-conservation test, profiling.
 
 Without these tools you cannot tell what is going on as the system grows.
 - **Saving/loading** the world and **determinism** (same seed → same history).

@@ -37,6 +37,13 @@ class Cell:
         self.lineage = lineage
         self.express(cfg)
 
+    def __hash__(self):
+        # Hash by the world-unique, seed-deterministic id rather than the default
+        # id()-based hash: iteration order of `bonds` sets (energy sharing) must not
+        # depend on memory addresses, or the same seed yields different histories.
+        # Equality stays identity, which is consistent because ids are unique.
+        return self.id
+
     def express(self, cfg):
         """Genotipo -> fenotipo (tratti derivati, calcolati una volta sola)."""
         g = self.genes

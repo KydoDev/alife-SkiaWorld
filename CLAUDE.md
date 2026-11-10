@@ -64,7 +64,8 @@ runs (same seed, before/after), not only by unit tests.
   organic matter; predation splits food between predator and organic. Preserve
   this balance when changing rules.
 - **Determinism**: all randomness goes through `self.rng` (`random.Random(seed)`).
-  Never use the global `random` or `np.random` in the engine.
+  Never use the global `random` or `np.random` in the engine, and never let
+  iteration order depend on memory addresses (`Cell.__hash__` returns `id`).
 - `stats()` returns the dict that becomes one `stats.csv` row; `plot_stats` in
   `run.py` reads some columns by name.
 - Performance today: ~500 steps/s with ~900 cells; Python's practical ceiling

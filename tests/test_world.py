@@ -37,15 +37,16 @@ def test_bonds_are_symmetric_and_point_to_living_cells():
         assert len(c.bonds) <= world.cfg.max_bonds
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known bug (2026-11-10, see TEST.md/.nextPrompt): Cell.bonds is a set of objects hashed "
-           "by id(), so colony energy-sharing order varies between runs; histories diverge at step ~4.",
-)
 def test_same_seed_gives_identical_history():
-    a = run(World(small_config(), seed=11), 150)
-    b = run(World(small_config(), seed=11), 150)
-    assert a.stats() == b.stats()
+    # Regression (2026-11-10): Cell.bonds was a set hashed by id(), so colony
+    # energy-sharing order varied between runs and histories diverged at step ~4.
+    a = World(small_config(), seed=11)
+    b = World(small_config(), seed=11)
+    for _ in range(300):
+        a.step()
+        b.step()
+        assert a.stats() == b.stats(), f"diverged at step {a.step_count}"
+    assert [(c.id, c.x, c.y, c.energy) for c in a.cells] == [(c.id, c.x, c.y, c.energy) for c in b.cells]
 
 
 def test_different_seeds_diverge():

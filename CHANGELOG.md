@@ -26,11 +26,10 @@ All notable changes to this project are documented here. Format based on
 - ROADMAP: v0 marked done, F1 in progress, per-phase status lines.
 
 ### Fixed
+- Determinism per seed: `Cell` now hashes by its seed-deterministic `id`, so
+  the iteration order of `bonds` sets (colony energy sharing) no longer depends
+  on memory addresses. Same seed now gives byte-identical `stats.csv`.
 - Removed unused `math` import in `worldsim/world.py`.
-
-### Known issues
-- Determinism per seed is broken: `Cell.bonds` is a set of objects hashed by
-  `id()`, so colony energy-sharing order differs between runs (xfail test).
 
 ## [0.1.0] - 2026-11
 - v0: base engine, pygame viewer, headless runner, research/design docs.

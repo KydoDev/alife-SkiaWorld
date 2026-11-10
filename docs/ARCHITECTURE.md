@@ -73,8 +73,9 @@ predation splits the prey's energy + body between predator and organic matter.
 ## Cross-cutting concerns
 
 - **Determinism**: all randomness must go through `World.rng`
-  (`random.Random(seed)`). *Currently broken*: `Cell.bonds` is a set of objects
-  hashed by `id()`, so energy-sharing order varies between runs (see `TEST.md`).
+  (`random.Random(seed)`), and no iteration order may depend on memory
+  addresses — `Cell.__hash__` returns the deterministic cell `id` so `bonds`
+  sets iterate identically across runs. Same seed → byte-identical `stats.csv`.
 - **Performance**: ~500 steps/s with ~900 cells; the per-cell loop is the hot
   path. Fields are vectorized with numpy.
 - **Invariants** (covered by `tests/`): grid ↔ cell list consistency, bond
