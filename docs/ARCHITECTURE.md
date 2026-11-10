@@ -80,6 +80,10 @@ SHA-256 of the bytes → seed). Size caps and field validation; errors are `Plan
   `acclimate()` moves the diet each step, before feeding, towards what each diet would yield
   on the tile; `apply_diet()` re-derives the shares. No RNG in the update; the diet restarts
   from the genes at birth. Off by default with no RNG draws (ADR-0009).
+- **Gene transfer (F5c)**: with `Config.hgt`, each cell has an evolvable propensity `hgt_p`. At the
+  start of its turn it may copy one of the 16 fixed genes from a random occupied neighbour
+  (`transfer_gene()`, any lineage) and is re-expressed; with plasticity on that resets its diet.
+  Species stay as assigned at birth. Off by default with no RNG draws (ADR-0010).
 - **Bonds**: colonies are symmetric `bonds` links between cells, created at
   division with probability `attach`, cleared on death. Stored as an
   insertion-ordered `dict` used as an ordered set: energy sharing iterates it,
@@ -96,7 +100,7 @@ activity and the novelty counter. Never touches the RNG; the dynamics never read
 
 ### `worldsim/persistence.py`
 `save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
-v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007; v6 the diet plasticity, ADR-0009). Resume is bit-exact.
+v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007; v6 the diet plasticity, ADR-0009; v7 the gene-transfer propensity and counters, ADR-0010). Resume is bit-exact.
 
 ### `worldsim/render.py`
 Maps the world to an RGB array: cell color mixes green/purple/red/cyan by

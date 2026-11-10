@@ -6,6 +6,18 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F5c Horizontal gene transfer** (third F5 mechanism, ADR-0010): `--set hgt=1` gives cells an
+  evolvable propensity `hgt_p` to copy one fixed gene from a random neighbour during life (cost
+  `hgt_upkeep` x `hgt_p`); neutral arm `hgt_neutral`; save format v7 (`hgt_p` per cell, counters
+  `hgt_events`/`hgt_foreign`; G2 golden sets regenerated, hashes unchanged, Rust `SAVE_VERSION` 7);
+  stats `hgt_p_mean`/`hgt_events`/`hgt_foreign`; `hgt` in the viewer inspector. Experiment
+  `scripts/f5c_experiment.py` (P1 standard + confirmation on seeds 21–39): transfer itself has no
+  detectable effect (donors are near-clones: the mechanism is nearly inert here); net selection is
+  against it through its cost (16/20, then 18/20 on new seeds). Species counts rise because of the
+  transfer, cause untested (16/20 twice); diversity falls, consistent with the cost but not
+  established. The review's notes
+  added a loader check (`hgt_foreign` <= `hgt_events`) and the 16/20 threshold caveat.
+- **F5b confirmation** on seeds 21–39 (`docs/f5b_confirm.csv`): population on > off 16/20 again.
 - **G2 milestone M1c**: the Rust kernel (`engine-rs/`) loads a v6 save (gzip JSON, validated
   like `persistence.py`: untrusted input returns errors, never panics; unknown config keys
   are refused; typed, length-capped parsing keeps memory proportional to the data) and

@@ -1,5 +1,7 @@
 # PLAN
 
-No active plan. Last closed: F5b Diet plasticity (see docs/plan_history.md).
-G2 engine port: see docs/G2_PLAN.md.
-Next per ROADMAP: F5 learning or horizontal transfer (one at a time).
+No plan in progress. F5c closed (2026-11-10, see docs/plan_history.md). Next F5 mechanism: learning;
+G2 continues in its own session (docs/G2_PLAN.md).
+
+## Checklist
+(empty)

@@ -1,10 +1,11 @@
 """Save and load a complete world state (ADR-0002).
 
-Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 6, ...}`.
+Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 7, ...}`.
 Version 2 (F2, ADR-0004) added the static terrain maps and the 10th gene, version 3
 (F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes,
 version 5 (F5a, ADR-0007) the mating propensity and a sexual-births counter,
-version 6 (F5b, ADR-0009) the acclimation rate and the acclimated diet.
+version 6 (F5b, ADR-0009) the acclimation rate and the acclimated diet, version 7 (F5c, ADR-0010)
+the gene-transfer propensity and two transfer counters.
 Older saves are rejected (their genomes cannot continue under the new rules).
 JSON is used instead of pickle so a save file shared by someone else can never
 execute code when loaded. Python's float repr round-trips exactly through JSON,
@@ -26,10 +27,10 @@ from .terrain import Terrain
 from .world import N_GENES, RULE_LEN, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 6
-CELL_ROW_LEN = 13
+VERSION = 7
+CELL_ROW_LEN = 14
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
-COUNTERS = ("births", "deaths", "kills", "extinctions", "sex_births")
+COUNTERS = ("births", "deaths", "kills", "extinctions", "sex_births", "hgt_events", "hgt_foreign")
 
 
 class SaveFormatError(ValueError):
@@ -45,15 +46,15 @@ def world_to_dict(world: World) -> dict:
         "seed": world.seed,
         "step_count": world.step_count,
         "next_id": world.next_id,
-        "counters": {"births": world.births, "deaths": world.deaths, "sex_births": world.sex_births,
-                     "kills": world.kills, "extinctions": world.extinctions},
+        "counters": {k: getattr(world, k) for k in COUNTERS},
         "rng": {"version": version, "internal": list(internal), "gauss_next": gauss_next},
         "organic": world.organic.tolist(),
         "terrain": _terrain_to_dict(world.terrain),
-        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p, plast_p, diet]
+        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p, plast_p, diet,
+        #  hgt_p]
         "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
                    [b.id for b in c.bonds], [list(r) for r in c.rules], c.sex_p,
-                   c.plast_p, list(c.diet)] for c in world.cells],
+                   c.plast_p, list(c.diet), c.hgt_p] for c in world.cells],
         "tracker": world.tracker.to_dict() if world.tracker is not None else None,
     }
 
@@ -117,6 +118,8 @@ def _world_from_dict(d: dict) -> World:
         if not isinstance(v, int) or isinstance(v, bool) or v < 0:
             raise SaveFormatError(f"invalid counter {k!r}")
         setattr(world, k, v)
+    if world.hgt_foreign > world.hgt_events:
+        raise SaveFormatError("invalid counters: hgt_foreign exceeds hgt_events")
     rng = d["rng"]
     world.rng.setstate((rng["version"], tuple(rng["internal"]), rng["gauss_next"]))
 
@@ -130,7 +133,7 @@ def _world_from_dict(d: dict) -> World:
     by_id: dict[int, Cell] = {}
     if any(not isinstance(row, list) or len(row) != CELL_ROW_LEN for row in d["cells"]):
         raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
-    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet in d["cells"]:
+    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet, hgt_p in d["cells"]:
         if not (0 <= x < world.W and 0 <= y < world.H):
             raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
@@ -147,7 +150,9 @@ def _world_from_dict(d: dict) -> World:
             raise SaveFormatError(f"cell #{cid} has an invalid plast_p")
         if not _valid_diet(diet, cfg):
             raise SaveFormatError(f"cell #{cid} has an invalid diet")
-        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p, plast_p)
+        if not (_finite(hgt_p) and 0.0 <= hgt_p <= 1.0) or (hgt_p and not cfg.hgt):
+            raise SaveFormatError(f"cell #{cid} has an invalid hgt_p")
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p, plast_p, hgt_p)
         if cfg.plasticity:
             frozen = cfg.plastic_neutral or plast_p == 0.0      # such a diet never leaves the genetic split
             if frozen and any(abs(a - b) > 1e-9 for a, b in zip(diet, c.diet)):

@@ -123,7 +123,7 @@ Original scope:
 See the dedicated section. In short: from a fixed vector to a **variable-length genome** with gene duplication and deletion.
 
 ## F5 — Two parents and variation during life
-**Status**: in progress — **F5a two parents** and **F5b diet plasticity done** (2026-11-10); learning and horizontal transfer still open (one mechanism at a time).
+**Status**: in progress — **F5a two parents**, **F5b diet plasticity** and **F5c horizontal gene transfer done** (2026-11-10); learning still open (one mechanism at a time).
 
 **F5a — two parents** ([ADR-0007](adr/0007-two-parents-and-save-v5.md)). `--set sex=1`: each cell carries an evolvable propensity `sex_p`; when it divides it may recombine with a genetically close cell within radius 2 (uniform crossover of the 16 fixed genes; the partner gives genes, not energy), at an optional `sex_cost`. `sex_neutral=1` is the control arm (`sex_p` inherited and mutated, no mating). Off by default and then bit-identical to F4 and F3 (full-state fingerprints; a test asserts no mating code runs). A probe before coding found that 85–96% of neighbours are within the species distance, 1–2.5 mutation steps apart, and only 1–6% from another lineage: mates are close relatives.
 
@@ -157,12 +157,36 @@ See the dedicated section. In short: from a fixed vector to a **variable-length 
 | Power at the real cost: neutral_cost < neutral | 15/20 | not detected (just below 16) |
 | Does the diet move? (mechanism check) | shift from the genetic diet 0.16–0.31 (median 0.26) in `on`, 0 in neutral | yes |
 | Contrast, constant light (exploratory, 10 pairs; prediction: favoured less) | on > neutral in 2/10 (vs 14/20 with day/night); shift 0.12 | in the predicted direction |
-| Population, on vs off | higher in **16/20** (median 1009 vs 903) | higher (at the threshold, not confirmed on new seeds) |
+| Population, on vs off | higher in **16/20** (median 1009 vs 903); **confirmed on new seeds 21–39: 16/20** (median 963 vs 871, [f5b_confirm.csv](f5b_confirm.csv)) | **higher** (32/40 pairs over both sets) |
 | Diversity, species, colonies, on vs off | 8–15/20 | no consistent sign |
 
 - **Plasticity pays for itself, about exactly.** Against a control that pays the same cost, cells that can acclimate keep a much higher rate (19/20): the benefit is real. Against a free neutral arm the net lean (14/20) does not reach a verdict, and the cost alone (15/20) is just below detection: benefit and cost are of the same size at the default `plastic_upkeep` 0.05. Under constant light plasticity leans against (on lower than neutral in 8/10), as predicted: the benefit comes from changing conditions.
 - **First run superseded.** The F5b review found that a cell with all four feeding genes at 0 was fed as a 1/3 generalist when plasticity was on; fixed with a regression test, and the whole experiment was re-run with a cost-matched arm added (rules written before the re-run). The first run (control 20/20, on vs neutral 13/20) is not kept.
-- Not run: epigenetic inheritance of the acclimated diet, Lamarckism, a confirmation of the population effect on new seeds.
+- **Confirmation** (`python scripts/f5b_experiment.py --steps 30000 --seeds 21 23 ... 39 --arms off on --no-contrast --out docs/f5b_confirm.csv`): population on > off in 16/20 again; species on > off 16/20 there (8–15/20 in the first set, so not claimed).
+- Not run: epigenetic inheritance of the acclimated diet, Lamarckism.
+
+**F5c — horizontal gene transfer** ([ADR-0010](adr/0010-horizontal-gene-transfer-and-save-v7.md)). `--set hgt=1`: each cell carries an evolvable propensity `hgt_p`; at the start of its turn, with probability `hgt_p` x `hgt_rate` (0.1), it copies one of the 16 fixed genes from a random occupied neighbour (any lineage, bonded or not) and is re-expressed. The genome changes for life and is inherited; species stay as assigned at birth. Cost `hgt_upkeep` 0.05 x `hgt_p`. Off by default and then bit-identical to `367aecd` (six configurations); save format v7. A probe before coding found that neighbours are near-clones with immigration 0 (median gene difference about one mutation step, 0–9% foreign donors), so a null was predicted and worded in advance as "mechanism nearly inert here".
+
+**Experiment** (`python scripts/f5c_experiment.py --steps 30000`, [f5c_experiment.csv](f5c_experiment.csv)), P1 standard, rules fixed in advance (plan_history): immigration 0, flat world with day/night + seasons and `volcanic.json`, seeds 1–19 odd = 20 pairs, second half, descendants only. Arms: off / on / neutral (no transfer, no cost) / neutral_cost (no transfer, the same cost as `on`) / control (no transfer, cost 0.2). Confirmation on seeds 21–39 (arms off, on, neutral, neutral_cost; [f5c_confirm.csv](f5c_confirm.csv)).
+
+| Question | Result (seeds 1–19; confirmation 21–39) | Verdict |
+|---|---|---|
+| **Positive control**: `hgt_p` control < neutral, ≥ 16/20 | 20/20 (median 0.07 vs 0.49) | **fires** |
+| **Is transfer itself favoured?** `hgt_p` on vs neutral_cost (same cost, no transfer) | higher 10/20, lower 10/20; confirmation lower 13/20 | no detectable effect |
+| **Net selection**: `hgt_p` on vs neutral (no cost) | lower in **16/20** (at the threshold); confirmation **18/20** (median 0.22 vs 0.52) | **selected against** (confirmed on new seeds) |
+| Power at the real cost: neutral_cost < neutral | 15/20; confirmation 18/20 | not detected, then detected on the new seeds |
+| Mechanism check | 0.48 transfers per birth (0.17–1.04); foreign-donor share median 0 (0–9%); neighbour gene difference 0.03 | transfers happen, almost all between kin |
+| Contrast, immigration 0.5 (exploratory, 10 pairs; prediction: pushed down more) | on < neutral_cost in 5/10 (the same share as 10/20 in the main runs); foreign share 5% | no difference |
+| Species, on vs off | higher in **16/20** (at the threshold); confirmation 16/20 (median 49 vs 36) | higher (exploratory), cause untested, see below |
+| Genetic diversity, on vs off | lower in **17/20**; confirmation 16/20 | lower (exploratory), see below |
+| Population, colonies, on vs off | 14/20, 14/20; population 11/20 in the confirmation | no consistent sign |
+
+- **Transfer is selected against through its cost, not its effect.** Against a control that pays the same cost, the propensity is not pushed either way (10/20, then 13/20); against a free neutral arm it falls (16/20, then 18/20 on new seeds). In this world a transfer copies a gene from a near-clone neighbour, so it does almost nothing and the cost decides: the predicted "mechanism nearly inert here".
+- **The extra species come from the transfer, not from its cost; why is untested** (post-hoc analysis, not a pre-registered rule): on > neutral_cost in 18/20 and 19/20, while the cost alone does not raise the count (neutral_cost > off in 9/20 and 8/20). One hypothesis is a tracker effect: species are assigned at birth by distance to the founder, so a genome that changes during life gives children further from their founder. But with near-clone donors and about 0.5 transfers per birth at one locus of 16, the extra drift looks small for a rise from about 34 to 49–55 species, so the hypothesis needs its own test. Genetic diversity does not rise with it.
+- **The lower diversity is consistent with the cost, not established** (post-hoc): on vs neutral_cost 10/20 and 9/20 (no transfer effect), but the cost alone lowers it in only 15/20 and 14/20.
+- **Contrast with divergent donors failed as a test** (and it was weak by design: immigrants' offspring count as descendants and pull `hgt_p` towards 0.5 in both arms; the contrast world also has seasons, `season_amplitude` 0.5, where the plan said day/night only): with immigration 0.5 the foreign-donor share only reached 5% (why was not checked; a likely reason is that random-gene immigrants die before they meet residents). Divergent donors need another design (for example transfer from organic matter, which the ADR lists as a separate experiment).
+- Confirmation command: `python scripts/f5c_experiment.py --steps 30000 --seeds 21 23 ... 39 --arms off on neutral neutral_cost --no-contrast --out docs/f5c_confirm.csv`.
+- Not run: transfer from organic matter, a distance-filtered transfer, transfer of rule genes, a test of why species rise, and a species measure that is robust to genomes changing during life.
 
 Original scope:
 See the dedicated section: sexual reproduction, plasticity, learning, horizontal gene transfer.

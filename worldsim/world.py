@@ -67,10 +67,10 @@ class Cell:
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
-        "sense", "species", "rules", "rule_fx", "sex_p", "plast_p", "diet",
+        "sense", "species", "rules", "rule_fx", "sex_p", "plast_p", "diet", "hgt_p",
     )
 
-    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0, plast_p=0.0):
+    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0, plast_p=0.0, hgt_p=0.0):
         self.id = cid
         self.x = x
         self.y = y
@@ -81,6 +81,7 @@ class Cell:
         self.sex_p = sex_p        # F5a propensity to mate at division; 0 unless sex is on
         self.plast_p = plast_p    # F5b rate of diet acclimation; 0 unless plasticity is on
         self.diet = ()            # F5b acclimated (photo, sapro, chemo) split; empty unless plasticity is on
+        self.hgt_p = hgt_p        # F5c propensity to copy a neighbour's gene; 0 unless hgt is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
         # same order across runs AND across save/load, which a set cannot guarantee.
@@ -128,6 +129,8 @@ class Cell:
             self.upkeep += cfg.plastic_upkeep * self.plast_p
             self.diet = genetic_diet(self.photo, self.sapro, self.chemo)
             self.apply_diet(cfg)
+        if cfg.hgt:
+            self.upkeep += cfg.hgt_upkeep * self.hgt_p
 
     def apply_diet(self, cfg):
         """F5b: phenotype shares from the acclimated diet; the predation share stays genetic.
@@ -170,6 +173,8 @@ class World:
         self.kills = 0
         self.extinctions = 0
         self.sex_births = 0       # F5a: divisions that recombined with a partner
+        self.hgt_events = 0       # F5c: genes copied from a neighbour
+        self.hgt_foreign = 0      # F5c: ... of which from a donor of another lineage
         self.now = 0              # step being executed (step_count + 1 during step())
         self.tracker = (SpeciesTracker(self.cfg.species_threshold, self.cfg.novelty_activity,
                                        self.cfg.species_prune_peak) if track_species else None)
@@ -209,7 +214,8 @@ class World:
             cid = self._new_id()
             cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg,
                         sex_p=self.rng.random() if self.cfg.sex else 0.0,
-                        plast_p=self.rng.random() if self.cfg.plasticity else 0.0)
+                        plast_p=self.rng.random() if self.cfg.plasticity else 0.0,
+                        hgt_p=self.rng.random() if self.cfg.hgt else 0.0)
             self._place(cell)
             if self.tracker is not None:
                 self.tracker.on_root(cell, ORIGIN_SEED, self.now)
@@ -309,6 +315,29 @@ class World:
     def offspring_plast_p(self, c):
         """F5b: the dividing parent's acclimation rate, mutated (never a mate's, as for sex_p)."""
         return min(1.0, max(0.0, c.plast_p + self.rng.gauss(0.0, c.mut_sigma)))
+
+    def offspring_hgt_p(self, c):
+        """F5c: the dividing parent's transfer propensity, mutated (never a mate's, as for sex_p)."""
+        return min(1.0, max(0.0, c.hgt_p + self.rng.gauss(0.0, c.mut_sigma)))
+
+    def transfer_gene(self, c):
+        """F5c: copy one random fixed gene from a random neighbour (any lineage, bonded or not) and re-express.
+
+        The genome changes for life and is inherited; with plasticity on, re-expression resets the diet to the
+        new genetic split. Species labels stay as assigned at birth (the tracker is not told)."""
+        grid, W = self.grid, self.W
+        donors = [o for nx, ny in self.neighbors(c.x, c.y) if (o := grid[ny * W + nx]) is not None]
+        if not donors:
+            return
+        donor = self.rng.choice(donors)
+        k = self.rng.randrange(N_GENES)
+        genes = list(c.genes)
+        genes[k] = donor.genes[k]
+        c.genes = genes
+        c.express(self.cfg)
+        self.hgt_events += 1
+        if donor.lineage != c.lineage:
+            self.hgt_foreign += 1
 
     def acclimate(self, c, light_here, organic_here, chem_here):
         """F5b: move the diet towards the split of what each diet would yield here at full specialisation.
@@ -463,6 +492,8 @@ class World:
         open_genome = cfg.open_genome
         sex_on, mating = cfg.sex, cfg.sex and not cfg.sex_neutral
         plastic_on, plastic = cfg.plasticity, cfg.plasticity and not cfg.plastic_neutral
+        hgt_on, transfer = cfg.hgt, cfg.hgt and not cfg.hgt_neutral
+        hgt_rate = cfg.hgt_rate
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -478,6 +509,9 @@ class World:
             c.age += 1
             x, y = c.x, c.y
 
+            # 0: F5c horizontal transfer, before feeding so the whole turn uses one phenotype
+            if transfer and rand() < c.hgt_p * hgt_rate:
+                self.transfer_gene(c)
             # 1-3: metabolism and feeding (F5b: the diet first acclimates to this tile)
             if plastic and c.plast_p > 0.0:
                 self.acclimate(c, light[y, x], org[y, x], chem[y, x] if chem is not None else 0.0)
@@ -553,8 +587,9 @@ class World:
                     rules = self.mutate_rules(c.rules, c.mut_sigma) if open_genome else ()
                     sex_p = self.offspring_sex_p(c) if sex_on else 0.0
                     plast_p = self.offspring_plast_p(c) if plastic_on else 0.0
+                    hgt_p = self.offspring_hgt_p(c) if hgt_on else 0.0
                     child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, sex_p,
-                                 plast_p)
+                                 plast_p, hgt_p)
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
@@ -580,7 +615,8 @@ class World:
                     cid = self._new_id()
                     cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
                                 self.random_genes(), cid, cfg, sex_p=rng.random() if cfg.sex else 0.0,
-                                plast_p=rng.random() if cfg.plasticity else 0.0)
+                                plast_p=rng.random() if cfg.plasticity else 0.0,
+                                hgt_p=rng.random() if cfg.hgt else 0.0)
                     self._place(cell)
                     if tracker is not None:
                         tracker.on_root(cell, ORIGIN_IMMIGRANT, self.now)
@@ -606,6 +642,7 @@ class World:
             "organic_total": round(float(self.organic.sum()), 2),
             "births": self.births, "deaths": self.deaths, "kills": self.kills,
             "extinctions": self.extinctions, "sex_births": self.sex_births,
+            "hgt_events": self.hgt_events, "hgt_foreign": self.hgt_foreign,
             "light_factor": round(self.light_factor(self.step_count), 4),
         }
         if n:
@@ -620,13 +657,14 @@ class World:
             s["sex_p_mean"] = round(sum(c.sex_p for c in cells) / n, 4)
             s["plast_p_mean"] = round(sum(c.plast_p for c in cells) / n, 4)
             s["diet_shift"] = round(sum(self.diet_shift(c) for c in cells) / n, 4)
+            s["hgt_p_mean"] = round(sum(c.hgt_p for c in cells) / n, 4)
             s["rules_max"] = max(len(c.rules) for c in cells)
         else:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
             s["rules_mean"], s["rules_max"], s["sex_p_mean"] = 0.0, 0, 0.0
-            s["plast_p_mean"], s["diet_shift"] = 0.0, 0.0
+            s["plast_p_mean"], s["diet_shift"], s["hgt_p_mean"] = 0.0, 0.0, 0.0
         if self.tracker is not None:
             s.update(self.tracker.stats())
         return s

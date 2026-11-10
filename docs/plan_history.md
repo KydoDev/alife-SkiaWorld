@@ -382,3 +382,77 @@ the default `plastic_upkeep` 0.05 (pays exactly what `on` pays, no effect).
 Control 20/20 (fires). on vs neutral_cost: higher 19/20 -> **acclimation beneficial**. on vs neutral: 14/20 -> no
 detectable net selection. neutral_cost < neutral: 15/20 -> the 0.05 cost alone is not detected. Contrast 2/10.
 Population on > off 16/20 (rule 5: higher; not confirmed on new seeds). Diet shift median 0.26.
+
+---
+
+### F5c Horizontal gene transfer (closed 2026-11-10)
+
+F5c Horizontal gene transfer (third F5 mechanism). G2 engine port runs in parallel: see docs/G2_PLAN.md
+(session g2-m1c-m2); the default dynamics stay frozen, the save bump below regenerates the golden sets.
+
+## Checklist
+1. [x] F5c design and pre-registered verdict rules (this file); ADR-0010
+2. [x] Engine: `Config.hgt*`, `Cell.hgt_p`, transfer in `step()`, stats; no RNG when off
+3. [x] Save v7 (`hgt_p` per cell, `hgt_events` counter); golden sets regenerated, Rust `SAVE_VERSION = 7`
+4. [x] Tests: off-world untouched, transfer semantics, neutral arm, bit-exact resume, loader validation
+5. [x] Off-world fingerprints equal to `367aecd` (6 configurations); speed off/on
+6. [x] Experiment `scripts/f5c_experiment.py`, 30k steps, 20 pairs; verdict per the rules below
+7. [x] Review (code-review-security), docs (ROADMAP, ARCHITECTURE, CLAUDE.md, USER_MANUAL, CHANGELOG, TEST.md)
+
+## Design
+- **Source: living neighbours** (conjugation-like). A per-tile gene pool in the organic field (transformation)
+  would add a large save field; it is a later, separate experiment.
+- **What moves: one fixed gene.** The recipient copies the value of one random locus (of the 16 fixed genes)
+  from a random neighbour (Moore neighbourhood, bonded or not, any lineage, no genetic-distance filter: that is
+  the difference from F5a mating). Rules, `sex_p`, `plast_p` and `hgt_p` itself are not transferred.
+- **When:** at the start of the cell's turn, before feeding: with probability `hgt_p x hgt_rate` (one
+  `rand()` per living cell per step, only in the active arm). The genome changes for life and is inherited,
+  so the phenotype is re-expressed (`express`); with plasticity on that resets the diet to the genetic split.
+- **Evolvable propensity `hgt_p`** in [0, 1], outside the genome (like `sex_p`, `plast_p`): seeded cells and
+  immigrants draw it at random (after the `plast_p` draw), children inherit the dividing parent's, mutated
+  with its `mut_sigma`.
+- **Cost:** `hgt_upkeep x hgt_p` per step (default 0.05), paid in the neutral arm too.
+- **Neutral arm** `hgt_neutral`: `hgt_p` inherited and mutated, cost paid, no transfer, no draw.
+- **Observer stats:** `hgt_p_mean`, `hgt_events` (cumulative counter, saved), `hgt_foreign` (cumulative
+  transfers whose donor has another lineage; saved). Species stay as assigned at birth (tracker unchanged).
+- Default `hgt_rate` **0.1**, set from the probe below (at `hgt_p` 0.5, ~0.85 transfers per mean lifetime).
+
+## Probe (before coding; existing engine, seeds 41 and 43, 10k steps, second half, immigration 0)
+`scratchpad f5c_probe.py`; flat day/night + seasons and `volcanic.json`, 4 runs:
+- **Mean lifespan ~16–18 steps** (population / deaths per step), not the 600-step maximum: most cells die
+  young, so a rate of 0.01 would give < 0.1 transfers per life. Hence `hgt_rate` 0.1.
+- 92–97% of cells have a neighbour (a donor is almost always there).
+- |gene difference| to a random neighbour at a random locus: **median 0.010, about one mutation step**
+  (`mut_sigma` ≈ 0.010–0.011); mean 0.03 (a tail of divergent donors). Foreign-lineage donors 0–9%.
+- So with immigration 0 a transfer is mostly one extra mutation-sized change at one of 16 loci (6 of them,
+  the sensor weights, inert with sensing off). **A null here is likely and is worded "mechanism nearly inert
+  in this world (donors are near-clones)", not "horizontal transfer is not selected".**
+
+## Experiment (P1 standard, rules fixed before any run)
+Immigration 0; flat world with day/night + seasons, and `examples/volcanic.json`; seeds 1, 3, ..., 19 = 20
+pairs; 30k steps; second half, sampled every 10 steps; descendants only (`id != lineage`, as F5b). Arms: off /
+on / neutral (cost 0) / neutral_cost (cost = default) / control (neutral, cost 0.2). The metric is the mean
+`hgt_p` of descendants over the second half.
+1. **Positive control**: `hgt_p` control < neutral in ≥ 16/20, else the experiment cannot see a cost this
+   size and no selection verdict is given.
+2. **Is transfer itself favoured?** `hgt_p` on vs neutral_cost (same cost, no effect): higher in ≥ 16/20 →
+   beneficial; lower in ≥ 16/20 → harmful; otherwise no detectable selection.
+3. **Net selection**: on vs neutral (no cost), same thresholds.
+4. **Mechanism check** (reported, not a verdict): transfers per birth (`hgt_events / births`, second half),
+   foreign-donor share (`hgt_foreign / hgt_events`), and the expected |change| per transfer measured as in
+   the probe (random neighbour, random locus, sampled); 0 events in the neutral arms.
+5. **Population, lineages, species** on vs off: a direction is claimed only at ≥ 16/20, as exploratory.
+6. **Power at the real cost**: neutral_cost < neutral in ≥ 16/20 → the assay detects the default cost.
+7. **Contrast with divergent donors** (exploratory, 10 pairs): flat day/night world with immigration 0.5
+   (random-gene immigrants), arms on / neutral_cost. Prediction: larger |change| and foreign share than in
+   the main runs, and `hgt_p` on < neutral_cost in more pairs than in the main runs (foreign genes are
+   mostly maladapted, so transfer is pushed down). Reported as a count, no verdict.
+8. A verdict at exactly 16/20 is reported as "at the threshold, not confirmed on new seeds".
+
+#### Result (2026-11-10)
+Control 20/20 (fires). on vs neutral_cost 10/20 -> no detectable effect of transfer. on vs neutral lower 16/20 ->
+selected against, at the threshold; confirmation on seeds 21-39 lower 18/20. neutral_cost < neutral 15/20
+(18/20 in the confirmation). 0.48 transfers per birth, foreign share median 0: mechanism nearly inert here. Contrast
+5/10 (foreign share only 5%). Species on > off 16/20 (16/20 confirmation; post hoc 18-19/20 vs neutral_cost: from the
+transfer, cause untested). Diversity lower 17/20 (16/20); the cost alone 15/20 and 14/20, so not attributed.
+Population no consistent sign.
