@@ -1,7 +1,7 @@
-"""Motore della simulazione: mondo a griglia, cellule, regole locali.
+"""Simulation engine: grid world, cells, local rules.
 
-Headless: nessuna dipendenza grafica. La griglia ha x toroidale e y = profondità
-(riga 0 = superficie illuminata, ultima riga = fondale).
+Headless: no graphics dependencies. The grid is toroidal in x, and y = depth
+(row 0 = lit surface, last row = seabed).
 """
 import random
 
@@ -9,7 +9,7 @@ import numpy as np
 
 from .config import Config
 
-# Indici dei geni
+# Gene indices
 G_PHOTO, G_SAPRO, G_PRED, G_MOVE, G_DIV, G_CHILD, G_ATTACH, G_SHARE, G_MUT = range(9)
 N_GENES = 9
 GENE_NAMES = ["photo", "sapro", "pred", "move", "div", "child", "attach", "share", "mut"]
@@ -45,7 +45,7 @@ class Cell:
         return self.id
 
     def express(self, cfg):
-        """Genotipo -> fenotipo (tratti derivati, calcolati una volta sola)."""
+        """Genotype -> phenotype (derived traits, computed once)."""
         g = self.genes
         s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] or 1e-9
         self.photo = g[G_PHOTO] / s
@@ -150,7 +150,7 @@ class World:
 
     # ------------------------------------------------------------ fields
     def update_light(self):
-        """Luce = attenuazione con profondità x ombra delle cellule sopra."""
+        """Light = depth attenuation x shading by the cells above."""
         H, W = self.H, self.W
         occ = np.zeros((H, W), dtype=np.float64)
         if self.cells:
@@ -162,17 +162,17 @@ class World:
 
     def update_organic(self):
         cfg, o = self.cfg, self.organic
-        # diffusione (x toroidale, y con bordi chiusi)
+        # diffusion (toroidal x, closed edges in y)
         up = np.vstack([o[:1], o[:-1]])
         down = np.vstack([o[1:], o[-1:]])
         left = np.roll(o, 1, axis=1)
         right = np.roll(o, -1, axis=1)
         o += cfg.organic_diffusion * ((up + down + left + right) * 0.25 - o)
-        # sedimentazione verso il fondale
+        # sinking toward the seabed
         moved = o[:-1] * cfg.organic_sink
         o[:-1] -= moved
         o[1:] += moved
-        # decadimento
+        # decay
         o *= 1.0 - cfg.organic_decay
 
     # ------------------------------------------------------------- step
@@ -194,7 +194,7 @@ class World:
             c.age += 1
             x, y = c.x, c.y
 
-            # 1-3: metabolismo e nutrizione
+            # 1-3: metabolism and feeding
             e = c.energy - c.upkeep
             if c.photo_k > 0.0:
                 e += cfg.photo_gain * c.photo_k * light[y, x]
@@ -206,7 +206,7 @@ class World:
                     e += cfg.sapro_eff * take
             c.energy = e
 
-            # 4: predazione
+            # 4: predation
             if c.pred_k > 0.0 and rand() < c.pred_k:
                 prey = self.random_prey(c)
                 if prey is not None:
@@ -215,7 +215,7 @@ class World:
                     self.kill(prey, (1.0 - cfg.pred_eff) * food)
                     self.kills += 1
 
-            # 5: movimento (solo cellule libere)
+            # 5: movement (unbonded cells only)
             if not c.bonds and c.move > 0.0 and rand() < c.move:
                 dest = self.random_empty_neighbor(x, y)
                 if dest is not None:
@@ -224,7 +224,7 @@ class World:
                     grid[c.y * W + c.x] = c
                     c.energy -= cfg.move_cost
 
-            # 6: condivisione nella colonia
+            # 6: energy sharing within the colony
             if c.bonds and c.share > 0.0:
                 for b in c.bonds:
                     diff = c.energy - b.energy
@@ -233,12 +233,12 @@ class World:
                         c.energy -= t
                         b.energy += t
 
-            # 8a: morte
+            # 8a: death
             if c.energy <= 0.0 or c.age > cfg.max_age:
                 self.kill(c, cfg.decomp_fraction * (max(c.energy, 0.0) + cfg.body_cost))
                 continue
 
-            # 7: divisione
+            # 7: division
             if c.energy >= c.div_thr:
                 spot = self.random_empty_neighbor(c.x, c.y)
                 if spot is not None:

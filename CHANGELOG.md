@@ -25,6 +25,9 @@ All notable changes to this project are documented here. Format based on
   (`state-of-the-art.md`, `theory.md`, `ROADMAP.md`); README translated.
 - ROADMAP: v0 marked done, F1 in progress, per-phase status lines.
 
+- Viewer panel, `run.py` console output and plot labels, CLI help, and all code
+  comments/docstrings translated to English.
+
 ### Fixed
 - Determinism per seed: `Cell` now hashes by its seed-deterministic `id`, so
   the iteration order of `bonds` sets (colony energy sharing) no longer depends

@@ -1,12 +1,12 @@
-"""Visualizzatore interattivo (pygame).
+"""Interactive viewer (pygame).
 
     python view.py [--seed 1] [--scale 6]
 
-Comandi:
-  SPAZIO  pausa / riprendi        N  un passo (in pausa)
-  + / -   passi per frame         O  mostra/nasconde materia organica
-  S       salva snapshot PNG      R  ricomincia (nuovo seed)
-  clic    ispeziona una cellula   ESC  esci
+Controls:
+  SPACE   pause / resume          N    one step (while paused)
+  + / -   steps per frame         O    show/hide organic matter
+  S       save PNG snapshot       R    restart (new seed)
+  click   inspect a cell          ESC  quit
 """
 import argparse
 import random
@@ -22,7 +22,7 @@ PANEL_W = 260
 
 
 def main():
-    p = argparse.ArgumentParser()
+    p = argparse.ArgumentParser(description="WorldSim interactive viewer")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--scale", type=int, default=6)
     args = p.parse_args()
@@ -59,7 +59,7 @@ def main():
                 elif ev.key == pygame.K_s:
                     name = f"snapshot_{world.step_count:06d}.png"
                     save_png(world, name)
-                    print("Salvato", name)
+                    print("Saved", name)
                 elif ev.key == pygame.K_r:
                     world = World(cfg, seed=random.randrange(1_000_000))
                     selected = None
@@ -83,25 +83,25 @@ def main():
 
         s = world.stats()
         lines = [
-            f"passo        {s['step']}",
-            f"popolazione  {s['population']}",
-            f"  piante     {s['photo']}",
-            f"  decompos.  {s['sapro']}",
-            f"  predatori  {s['pred']}",
-            f"in colonia   {s['in_colony']}",
-            f"lignaggi     {s['lineages']}",
-            f"passi/frame  {steps_per_frame}{'  [PAUSA]' if paused else ''}",
+            f"step         {s['step']}",
+            f"population   {s['population']}",
+            f"  plants     {s['photo']}",
+            f"  decomp.    {s['sapro']}",
+            f"  predators  {s['pred']}",
+            f"in colony    {s['in_colony']}",
+            f"lineages     {s['lineages']}",
+            f"steps/frame  {steps_per_frame}{'  [PAUSED]' if paused else ''}",
             "",
         ]
         if selected is not None:
             if selected.alive:
-                lines += [f"cellula #{selected.id}", f"energia {selected.energy:.1f}  eta {selected.age}",
-                          f"legami {len(selected.bonds)}  strategia {selected.strategy}", ""]
+                lines += [f"cell #{selected.id}", f"energy {selected.energy:.1f}  age {selected.age}",
+                          f"bonds {len(selected.bonds)}  strategy {selected.strategy}", ""]
                 lines += [f"{n:7s} {v:.2f}" for n, v in zip(GENE_NAMES, selected.genes)]
             else:
-                lines.append("(cellula morta)")
+                lines.append("(dead cell)")
         else:
-            lines.append("clic su una cellula")
+            lines.append("click a cell to inspect")
         x0 = cfg.width * sc + 12
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 220)), (x0, 10 + i * 18))

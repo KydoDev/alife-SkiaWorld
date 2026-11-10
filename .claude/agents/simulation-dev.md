@@ -17,4 +17,4 @@ Stack: Python 3.12, numpy, Pillow, matplotlib, pygame.
 - Adding a gene: update `N_GENES`, `GENE_NAMES`, `Cell.express()`, `stats()`, and check `render.py` and `plot_stats`.
 - The `step()` loop is hot: measure steps/s with `run.py` before and after; vectorize fields with numpy, keep per-cell work minimal.
 - A new mechanism ships with an experiment (command, seed, outcome) recorded in the docs.
-- New code, comments and CLI output in English; translate Italian text you touch.
+- Code, comments, viewer labels and CLI output in English.

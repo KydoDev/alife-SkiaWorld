@@ -86,8 +86,7 @@ You are a **Senior Software Architect and ALife researcher**.
 
 <coding_standards>
 - **Language**: all new code, comments, identifiers, docs, commit messages and
-  UI/CLI text are in **English**. Existing Italian comments/CLI output in the
-  engine are known debt: translate them when you touch the surrounding code.
+  UI/CLI text are in **English**.
 - **Readability**: explanatory names; code is read far more than it is written.
 - **Modularity**: single responsibility per module. Refactor functions beyond
   ~50 lines — `World.step()` is the known exception (hot loop, kept inline for

@@ -1,16 +1,16 @@
-"""Conversione del mondo in immagine RGB (numpy), usata da viewer e snapshot."""
+"""World -> RGB image (numpy), used by the viewer and snapshots."""
 import numpy as np
 
-# colori per strategia
-C_PHOTO = np.array([60, 210, 70], dtype=np.float32)    # verde: piante
-C_SAPRO = np.array([170, 90, 230], dtype=np.float32)   # viola: decompositori
-C_PRED = np.array([235, 50, 45], dtype=np.float32)     # rosso: predatori
+# colors per strategy
+C_PHOTO = np.array([60, 210, 70], dtype=np.float32)    # green: plants
+C_SAPRO = np.array([170, 90, 230], dtype=np.float32)   # purple: decomposers
+C_PRED = np.array([235, 50, 45], dtype=np.float32)     # red: predators
 
 
 def render_rgb(world, show_organic=True):
     H, W = world.H, world.W
     img = np.zeros((H, W, 3), dtype=np.float32)
-    # acqua: blu proporzionale alla luce effettiva
+    # water: blue proportional to the effective light
     lum = np.clip(world.light / world.cfg.light_max, 0, 1)
     img[..., 0] = 8 + 20 * lum
     img[..., 1] = 14 + 45 * lum
@@ -26,7 +26,7 @@ def render_rgb(world, show_organic=True):
         ys = np.fromiter((c.y for c in cells), np.int32, n)
         tr = np.array([(c.photo, c.sapro, c.pred) for c in cells], dtype=np.float32)
         col = tr[:, :1] * C_PHOTO + tr[:, 1:2] * C_SAPRO + tr[:, 2:3] * C_PRED
-        # cellule in colonia leggermente più chiare
+        # bonded (colony) cells slightly brighter
         bonded = np.fromiter((1.0 if c.bonds else 0.0 for c in cells), np.float32, n)[:, None]
         col = col * (0.85 + 0.15 * bonded) + 25 * bonded
         img[ys, xs] = col

@@ -1,4 +1,4 @@
-"""WorldSim v0 — cellule con genoma ed energia."""
+"""WorldSim v0 — cells with a genome and energy."""
 from .config import Config
 from .world import World
 
