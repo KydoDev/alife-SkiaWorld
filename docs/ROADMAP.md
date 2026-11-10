@@ -123,8 +123,27 @@ Original scope:
 See the dedicated section. In short: from a fixed vector to a **variable-length genome** with gene duplication and deletion.
 
 ## F5 — Two parents and variation during life
-**Status**: planned
+**Status**: in progress — **F5a two parents done** (2026-11-10); plasticity, learning and horizontal transfer still open (one mechanism at a time).
 
+**F5a — two parents** ([ADR-0007](adr/0007-two-parents-and-save-v5.md)). `--set sex=1`: each cell carries an evolvable propensity `sex_p`; when it divides it may recombine with a genetically close cell within radius 2 (uniform crossover of the 16 fixed genes; the partner gives genes, not energy), at an optional `sex_cost`. `sex_neutral=1` is the control arm (`sex_p` inherited and mutated, no mating). Off by default and then bit-identical to F4 and F3 (full-state fingerprints; a test asserts no mating code runs). A probe before coding found that 85–96% of neighbours are within the species distance, 1–2.5 mutation steps apart, and only 1–6% from another lineage: mates are close relatives.
+
+**Experiment** (`python scripts/f5_experiment.py --steps 10000`, [f5_experiment.csv](f5_experiment.csv); confirmation [f5_confirm.csv](f5_confirm.csv)): arms off / on (cost 0) / on with `sex_cost=1` / neutral; flat world with day/night and seasons, and `examples/volcanic.json`; seeds 1–9; steps 5–10k, descendants only; verdict rule fixed in advance (plan_history).
+
+| Question | Result | Verdict |
+|---|---|---|
+| Is sex selected? `sex_p` on vs neutral, ≥ 8/10 pairs either way | higher in 6/10 (median 0.61 vs 0.50, ranges 0.28–0.80 vs 0.25–0.75) | **no detectable selection** |
+| Same with `sex_cost=1` | 5/10 | no detectable selection |
+| **Positive control**: `sex_cost=4` (80% of a body), [f5_sensitivity.csv](f5_sensitivity.csv); expectation written before running: lower in ≥ 8/10 | lower in 6/10 (median 0.37 vs 0.50) | **did not fire: the assay is blind** |
+| Genetic diversity, on vs off | lower in 8/10 in the main run, 6/10 on new seeds 11–19 | **not confirmed** |
+| Population, species, mutation rate, reserves, colonies, on vs off | no consistent sign (4–7/10) | none |
+
+- **Inconclusive, not neutral.** Recombination happens a lot (partners found in 96–99% of attempts; 28–76% of births sexual with sex on), but the assay cannot see selection on the propensity: even a deliberate cost of 80% of a body per mating did not lower it detectably. Likely reasons: the neutral propensity alone ranges 0.25–0.75 across seeds; ~5000 immigrants per run bring fresh random propensities whose descendants count; 5000 measured steps are few generations. The two sexual arms lean opposite ways (median 0.61 at cost 0, 0.41 at cost 1, 0.37 at cost 4, vs 0.50 neutral), compatible with a small benefit and a larger cost — or with nothing.
+- A candidate reason for a small effect, untested: mates are close relatives (the probe; actual mate distance 0.10–0.14), so recombination may shuffle little.
+- **A first run said "selected against".** The child took the partner's `sex_p` half the time; partners are not chosen by their propensity, so the mean fell by itself in the sexual arms only. The F5a review caught it; the propensity now comes from the dividing parent only. The invalid run (a single 8/10) is consistent with that artefact and is not kept.
+- **Lesson for later phases**: F3, F4 and F5a all hit the same limit (10k steps, 5 seeds, immigration resetting traits). Longer runs without immigration, more seeds or a faster engine (G2) come before more mechanisms that need weak selection to be seen.
+- Not run: sex with more mixing (wider radius, mating across lineages), which is where the roadmap expects combined innovations; and an explicit "cost of males". Separate experiments.
+
+Original scope:
 See the dedicated section: sexual reproduction, plasticity, learning, horizontal gene transfer.
 
 ## F6 — True multicellularity

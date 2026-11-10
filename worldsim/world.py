@@ -9,7 +9,7 @@ import random
 import numpy as np
 
 from .config import Config
-from .species import ORIGIN_IMMIGRANT, ORIGIN_SEED, SpeciesTracker
+from .species import ORIGIN_IMMIGRANT, ORIGIN_SEED, SpeciesTracker, genome_distance
 from .terrain import Terrain, generate_terrain
 
 # Gene indices. New genes are appended so existing indices keep their meaning.
@@ -61,10 +61,10 @@ class Cell:
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
-        "sense", "species", "rules", "rule_fx",
+        "sense", "species", "rules", "rule_fx", "sex_p",
     )
 
-    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=()):
+    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0):
         self.id = cid
         self.x = x
         self.y = y
@@ -72,6 +72,7 @@ class Cell:
         self.age = 0
         self.genes = genes
         self.rules = rules        # F4 rule genes (list of 4-value lists); empty unless open_genome is on
+        self.sex_p = sex_p        # F5a propensity to mate at division; 0 unless sex is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
         # same order across runs AND across save/load, which a set cannot guarantee.
@@ -143,6 +144,7 @@ class World:
         self.deaths = 0
         self.kills = 0
         self.extinctions = 0
+        self.sex_births = 0       # F5a: divisions that recombined with a partner
         self.now = 0              # step being executed (step_count + 1 during step())
         self.tracker = (SpeciesTracker(self.cfg.species_threshold, self.cfg.novelty_activity,
                                        self.cfg.species_prune_peak) if track_species else None)
@@ -180,7 +182,8 @@ class World:
         for i in free[:n]:
             x, y = i % self.W, i // self.W
             cid = self._new_id()
-            cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg)
+            cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg,
+                        sex_p=self.rng.random() if self.cfg.sex else 0.0)
             self._place(cell)
             if self.tracker is not None:
                 self.tracker.on_root(cell, ORIGIN_SEED, self.now)
@@ -244,6 +247,38 @@ class World:
         if rng.random() < cfg.rule_new_rate and len(out) < cfg.max_rules:
             out.append([rng.random() for _ in range(RULE_LEN)])
         return out
+
+    def find_mate(self, c):
+        """F5a: a random cell within mate_radius whose fixed genes are within mate_distance, or None."""
+        cfg, grid, W, H = self.cfg, self.grid, self.W, self.H
+        r, limit = cfg.mate_radius, cfg.mate_distance
+        found, seen = [], set()           # seen: on a narrow world the x-wrap revisits tiles
+        for dy in range(-r, r + 1):
+            y = c.y + dy
+            if not 0 <= y < H:
+                continue
+            for dx in range(-r, r + 1):
+                i = y * W + (c.x + dx) % W
+                if i in seen:
+                    continue
+                seen.add(i)
+                o = grid[i]
+                if o is not None and o is not c and genome_distance(c.genes, o.genes) < limit:
+                    found.append(o)
+        return self.rng.choice(found) if found else None
+
+    def offspring_genes(self, c, mate):
+        """F5a: uniform crossover of the fixed genes (each from either parent), or the parent's own genes."""
+        if mate is None:
+            return c.genes
+        rand = self.rng.random
+        return [a if rand() < 0.5 else b for a, b in zip(c.genes, mate.genes)]
+
+    def offspring_sex_p(self, c):
+        """F5a: the dividing parent's propensity, mutated. Never the mate's: mates are not chosen by their
+        propensity, so taking it half the time would pull the mean towards the population mean by itself
+        (by about share_of_matings / 2 x variance per generation) and fake selection against sex."""
+        return min(1.0, max(0.0, c.sex_p + self.rng.gauss(0.0, c.mut_sigma)))
 
     def sensed_move(self, c, sense=None):
         """F3 directed movement: score staying put and each free neighbour tile, return the best
@@ -381,6 +416,7 @@ class World:
         chem = self.chem if self.has_chem else None
         sensing = cfg.sensing
         open_genome = cfg.open_genome
+        sex_on, mating = cfg.sex, cfg.sex and not cfg.sex_neutral
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -455,12 +491,20 @@ class World:
             if c.energy >= thr:
                 spot = self.random_empty_neighbor(c.x, c.y)
                 if spot is not None:
+                    mate = None
+                    # mating needs enough energy for its cost and the body, so no energy goes negative
+                    if mating and rand() < c.sex_p and c.energy > cfg.sex_cost + cfg.body_cost:
+                        mate = self.find_mate(c)
+                        if mate is not None:
+                            c.energy -= cfg.sex_cost
+                            self.sex_births += 1
                     c.energy -= cfg.body_cost
                     child_e = c.energy * c.child_frac
                     c.energy -= child_e
-                    genes = self.mutate(c.genes, c.mut_sigma)
+                    genes = self.mutate(self.offspring_genes(c, mate) if mating else c.genes, c.mut_sigma)
                     rules = self.mutate_rules(c.rules, c.mut_sigma) if open_genome else ()
-                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules)
+                    sex_p = self.offspring_sex_p(c) if sex_on else 0.0
+                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, sex_p)
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
@@ -485,7 +529,7 @@ class World:
                 if self.grid[i] is None and not self.blocked[i]:
                     cid = self._new_id()
                     cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
-                                self.random_genes(), cid, cfg)
+                                self.random_genes(), cid, cfg, sex_p=rng.random() if cfg.sex else 0.0)
                     self._place(cell)
                     if tracker is not None:
                         tracker.on_root(cell, ORIGIN_IMMIGRANT, self.now)
@@ -510,7 +554,7 @@ class World:
             "energy_cells": round(sum(c.energy for c in cells), 2),
             "organic_total": round(float(self.organic.sum()), 2),
             "births": self.births, "deaths": self.deaths, "kills": self.kills,
-            "extinctions": self.extinctions,
+            "extinctions": self.extinctions, "sex_births": self.sex_births,
             "light_factor": round(self.light_factor(self.step_count), 4),
         }
         if n:
@@ -522,12 +566,13 @@ class World:
                 s["mean_" + name] = round(sum(c.genes[gi] for c in cells) / n, 4)
             s["mean_age"] = round(sum(c.age for c in cells) / n, 1)
             s["rules_mean"] = round(sum(len(c.rules) for c in cells) / n, 3)
+            s["sex_p_mean"] = round(sum(c.sex_p for c in cells) / n, 4)
             s["rules_max"] = max(len(c.rules) for c in cells)
         else:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
-            s["rules_mean"], s["rules_max"] = 0.0, 0
+            s["rules_mean"], s["rules_max"], s["sex_p_mean"] = 0.0, 0, 0.0
         if self.tracker is not None:
             s.update(self.tracker.stats())
         return s

@@ -167,3 +167,95 @@ Main run (2026-11-10): **null** by the rule above — rules on > neutral in 5/10
 in >= 6 pairs. Post-hoc hint: on `volcanic.json` rules on > neutral in 4/5 seeds (mean 1.75 vs 0.82 rules),
 on the flat day/night world 1/5. Confirmatory test: `volcanic.json`, arms on / neutral, new seeds 11 13 15 17
 19. The hint is confirmed if rules on > neutral in >= 4 of 5 new seeds; otherwise it was noise.
+
+
+## F5a Two parents (closed 2026-11-10)
+
+### Checklist
+1. [x] F5a design: two parents (sexual reproduction) only; plasticity, learning, transfer are later steps
+2. [x] Engine: evolvable `Cell.sex_p`, partner search (radius 2), uniform crossover, `sex_cost`; off-world identical
+3. [x] Persistence v5 (sex_p in cells, validated); stats; viewer inspector
+4. [x] Tests: off-world never runs sex code, crossover, partner rules, neutral arm, resume, hostile saves
+5. [x] Experiment `scripts/f5_experiment.py` (4 arms x 2 planets x 5 seeds, 10k steps), verdict, confirmation
+6. [x] ADR-0007, ROADMAP, ARCHITECTURE, CHANGELOG, TEST.md, USER_MANUAL; security review of save parsing
+7. [ ] Local commit; ask the owner before pushing
+
+### Design (item 1)
+ROADMAP F5 lists four mechanisms; one at a time, so F5a is **two parents** only.
+
+- **Evolvable propensity**: with `Config.sex` on, each cell has `sex_p` in [0, 1], the probability of looking
+  for a partner when it divides. Seeded cells and immigrants draw it at random; children inherit it with
+  mutation (`mut_sigma`). Not a 17th gene: like the F4 rules it exists only when the feature is on, so the
+  off-world draws no extra random numbers and stays bit-identical (no G1 recalibration).
+- **Mating at division**: with probability `sex_p` the dividing cell looks at the cells within `mate_radius`
+  (default 2: 24 tiles) for cells whose fixed-gene distance (`genome_distance`) is below `mate_distance`
+  (own Config field, default 0.3; never the tracker's species or threshold) and picks one at random. The
+  partner gives genes only, no energy.
+- **Probe before coding** (2026-11-10, 5000 steps, no sex; flat day/night+seasons and volcanic, seeds 1, 7):
+  85–96% of neighbour pairs are within 0.3, median distance 0.03–0.11 ≈ 1–2.5 mutation steps, only 1–6% of
+  neighbours from another lineage. Mates are close relatives: recombination shuffles the recent mutations of
+  nearby branches (the Fisher–Muller case), a real but weak test. Hence radius 2, to widen the pool; 0.3 still
+  excludes cross-strategy hybrids. The experiment logs partner-found share and mean pair distance.
+- **Recombination**: uniform crossover of the 16 fixed genes (each from either parent, p = 0.5), then the
+  usual mutation; `sex_p` from the dividing parent only, then mutated (see the review note below). Rule genes (F4), if any, come from the
+  dividing parent. Lineage and species bookkeeping follow the dividing parent.
+- **Cost**: the dividing cell pays `sex_cost` (default 0) each time it mates, before splitting its energy (so
+  no energy goes negative); no mate found = asexual division, no cost. A sexual-births counter is saved.
+- **Neutral arm** `sex_neutral`: `sex_p` exists, is inherited and mutates, but mating never happens: the
+  drift baseline for `sex_p`.
+- **Save v5**: each cell row gains `sex_p` (finite, in [0, 1]; 0 when sex is off).
+
+### Experiment and verdict rule (fixed before running)
+`python scripts/f5_experiment.py --steps 10000`: arms off / on (cost 0) / on_cost (`sex_cost=1`, a fifth of
+`body_cost`) / neutral; immigration 0.5; planets: flat with
+day/night and seasons (`day_amplitude=1`, `season_amplitude=0.5`) and `examples/volcanic.json`; seeds
+1, 3, 5, 7, 9. Measured over steps 5–10k on descendants only.
+
+Metrics: mean `sex_p`; share of births that were sexual; population; species and novelty; genetic diversity
+(mean per-gene standard deviation of the fixed genes).
+
+Verdict:
+- **Sex is selected** if mean `sex_p` with sex on (cost 0) exceeds neutral in >= 8 of 10 planet x seed pairs;
+  **selected against** if it is lower in >= 8 of 10; otherwise no detectable selection. The same rule is
+  applied to `on_cost` and reported separately (it separates "no benefit" from "cost outweighs benefit").
+- Any positive verdict is claimed only after a confirmatory run on seeds 11–19 (>= 4 of 5), as in F4: the
+  two-sided 8/10 rule fires by chance about 11% of the time.
+- **Consequences of sex** (on vs off): reported as differences with their spread over seeds, no claim unless
+  the sign agrees in >= 8 of 10 pairs. **No novelty claim**: recombinant children sit further from the
+  dividing parent's species founder, so speciations can rise with no real invention.
+
+### Result of the main run, and a confirmatory test (fixed before running it)
+Main run (2026-11-10): sex_p with sex on (cost 0) lower than neutral in 8/10 pairs -> **selected against** by
+the rule; on_cost lower in 7/10 (no detectable selection); genetic diversity lower with sex than without in
+8/10. Partners were found in 94–98% of attempts, at a mean distance of 0.08–0.13.
+Confirmatory test: all 4 arms, both planets, new seeds 11 13 15 17 19 (10 new pairs). Confirmed if the same
+rule holds on the new pairs: on < neutral in >= 8/10 (selected against); diversity on < off in >= 8/10.
+on_cost is reported with the same rule.
+
+### The main run above is invalid (review, 2026-11-10); re-run
+The F5a review found a transmission artefact: the child took the mate's `sex_p` half the time, and mates are
+not chosen by their propensity, so the mean fell by about (share of matings / 2) x variance per generation with
+no selection at all, in the on arms only. "Selected against" could come from that alone. Fix: `sex_p` is
+inherited from the dividing parent only (test added). Also fixed: an unaffordable `sex_cost` drove energy
+negative (now mating is skipped); consequence metrics are now averaged over the window, not the last step.
+The confirmatory run was stopped before it finished. Re-run on seeds 1–9 with the same verdict rule; then the
+confirmatory test above (seeds 11–19, same rule on the 10 new pairs) for any verdict that is not null.
+
+### Re-run result (2026-11-10) and confirmation
+Re-run with the fix: sex_p on vs neutral higher in 6/10, lower in 4/10 -> **no detectable selection**;
+on_cost 5/10 -> none. The earlier "selected against" was the transmission artefact. Genetic diversity on < off
+in 8/10 -> to confirm (same rule on the 10 new pairs, seeds 11–19, arms off and on); population, species,
+mean_mut, mean_div, in_colony: no consistent sign. Off-world fingerprints still equal the F3/F4 commits.
+
+Confirmation (seeds 11–19, arms off and on): diversity on < off in 6/10 -> **not confirmed**. F5a verdict: null
+on every pre-registered question.
+
+### F5a addendum: sensitivity check (fixed before running, 2026-11-10)
+The `sex_cost=1` arm did not show selection against sex either, so the assay may be blind. Positive control:
+arm `on_cost4` (`sex_cost=4`, just below `div_min - body_cost` = 5 so the affordability guard does not skip
+mating), seeds 1–9, both planets, compared with the existing neutral rows. Expectation: sex_p lower than
+neutral in >= 8/10. If it fires, the assay can detect a cost of that size; if not, every F5a null is
+inconclusive.
+
+Result: lower than neutral in 6/10 (median 0.37 vs 0.50) -> the positive control **did not fire**; every F5a
+null is inconclusive.

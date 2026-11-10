@@ -26,14 +26,14 @@ from worldsim.world import GENE_NAMES, describe_rule
 PANEL_W = 260
 PANEL_TOP = 10
 LINE_H = 18
-# Tallest panel: 12 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene,
+# Tallest panel: 12 stat lines (incl. blank) + 5 cell-header lines (incl. blank, F5a sex_p) + one line per gene,
 # then the colour legend (title + one line per entry + a note) below a blank line.
 LEGEND_LINES = 2 + len(LEGEND) + 2
 N_TRAITS = GENE_NAMES.index("w_light")             # genes before the F3 sensor weights
 GENE_LINES = (N_TRAITS + 1) // 2 + 1 + (len(GENE_NAMES) - N_TRAITS + 1) // 2
 SHOWN_RULES = 3                                     # F4 rule genes listed in the inspector
 RULE_LINES = 1 + SHOWN_RULES
-PANEL_MAX_LINES = 12 + 4 + GENE_LINES + RULE_LINES + LEGEND_LINES
+PANEL_MAX_LINES = 12 + 5 + GENE_LINES + RULE_LINES + LEGEND_LINES
 SWATCH = 10
 
 
@@ -143,7 +143,10 @@ def main():
         if selected is not None:
             if selected.alive:
                 lines += [f"cell #{selected.id}", f"energy {selected.energy:.1f}  age {selected.age}",
-                          f"bonds {len(selected.bonds)}  strategy {selected.strategy}", ""]
+                          f"bonds {len(selected.bonds)}  strategy {selected.strategy}"]
+                if cfg.sex:
+                    lines.append(f"mating propensity {selected.sex_p:.2f}")
+                lines.append("")
                 lines += gene_lines(selected.genes, selected.rules)
             else:
                 lines.append("(dead cell)")

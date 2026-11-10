@@ -2,7 +2,8 @@
 
 Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 4, ...}`.
 Version 2 (F2, ADR-0004) added the static terrain maps and the 10th gene, version 3
-(F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes.
+(F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes,
+version 5 (F5a, ADR-0007) the mating propensity and a sexual-births counter.
 Older saves are rejected (their genomes cannot continue under the new rules).
 JSON is used instead of pickle so a save file shared by someone else can never
 execute code when loaded. Python's float repr round-trips exactly through JSON,
@@ -24,10 +25,10 @@ from .terrain import Terrain
 from .world import N_GENES, RULE_LEN, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 4
-CELL_ROW_LEN = 10
+VERSION = 5
+CELL_ROW_LEN = 11
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
-COUNTERS = ("births", "deaths", "kills", "extinctions")
+COUNTERS = ("births", "deaths", "kills", "extinctions", "sex_births")
 
 
 class SaveFormatError(ValueError):
@@ -43,14 +44,14 @@ def world_to_dict(world: World) -> dict:
         "seed": world.seed,
         "step_count": world.step_count,
         "next_id": world.next_id,
-        "counters": {"births": world.births, "deaths": world.deaths,
+        "counters": {"births": world.births, "deaths": world.deaths, "sex_births": world.sex_births,
                      "kills": world.kills, "extinctions": world.extinctions},
         "rng": {"version": version, "internal": list(internal), "gauss_next": gauss_next},
         "organic": world.organic.tolist(),
         "terrain": _terrain_to_dict(world.terrain),
-        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules]
+        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p]
         "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
-                   [b.id for b in c.bonds], [list(r) for r in c.rules]] for c in world.cells],
+                   [b.id for b in c.bonds], [list(r) for r in c.rules], c.sex_p] for c in world.cells],
         "tracker": world.tracker.to_dict() if world.tracker is not None else None,
     }
 
@@ -127,7 +128,7 @@ def _world_from_dict(d: dict) -> World:
     by_id: dict[int, Cell] = {}
     if any(not isinstance(row, list) or len(row) != CELL_ROW_LEN for row in d["cells"]):
         raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
-    for cid, x, y, energy, age, genes, lineage, species, _, rules in d["cells"]:
+    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p in d["cells"]:
         if not (0 <= x < world.W and 0 <= y < world.H):
             raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
@@ -138,7 +139,9 @@ def _world_from_dict(d: dict) -> World:
             raise SaveFormatError(f"invalid cell #{cid}")
         if not _valid_rules(rules, cfg):
             raise SaveFormatError(f"cell #{cid} has invalid rule genes")
-        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules])
+        if not (_finite(sex_p) and 0.0 <= sex_p <= 1.0) or (sex_p and not cfg.sex):
+            raise SaveFormatError(f"cell #{cid} has an invalid sex_p")
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p)
         c.age = age
         c.species = species
         world._place(c)

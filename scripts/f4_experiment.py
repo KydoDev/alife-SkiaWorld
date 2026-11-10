@@ -18,11 +18,13 @@ import itertools
 import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+import sys
 from pathlib import Path
 
-from worldsim import Config, World
-from worldsim.world import RULE_CONDITIONS, RULE_TARGETS, decode_rule
-from worldsim.worldgen import load_planet
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from worldsim import Config, World  # noqa: E402
+from worldsim.world import RULE_CONDITIONS, RULE_TARGETS, decode_rule  # noqa: E402
+from worldsim.worldgen import load_planet  # noqa: E402
 
 SAMPLE_EVERY = 10
 PLANETS = ["flat_day", "examples/volcanic.json"]

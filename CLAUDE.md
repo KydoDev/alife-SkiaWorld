@@ -93,6 +93,8 @@ runs (same seed, before/after), not only by unit tests.
 - **Open genome (F4)**: `Cell.rules` is a variable-length list of rule genes, used only
   when `cfg.open_genome` is on; with it off no rule code may draw from `rng` (the off-world
   must stay bit-identical). Species are defined on the 16 fixed genes only (ADR-0006).
+- **Two parents (F5a)**: `Cell.sex_p` and mating exist only when `cfg.sex` is on (same
+  rule: no RNG draws when off). Partner choice uses `mate_distance`, never the tracker (ADR-0007).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

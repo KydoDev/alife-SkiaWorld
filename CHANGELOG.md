@@ -6,6 +6,13 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F5a Two parents** (first of the four F5 mechanisms, ADR-0007): `--set sex=1` gives
+  cells an evolvable mating propensity; at division they may recombine (uniform
+  crossover) with a genetically close cell within `mate_radius`, at `sex_cost`; neutral
+  arm `sex_neutral`; save format v5; `sex_births`/`sex_p_mean` stats; propensity in the
+  viewer inspector. Experiment `scripts/f5_experiment.py`: no detectable selection on
+  the propensity and no confirmed consequence — inconclusive, since a positive control
+  (a large mating cost) was not detected either.
 - **F4 Open genome** (roadmap phase complete, ADR-0006): variable-length rule genes
   (condition on own energy or light → sensor weight or division threshold) with
   duplication, deletion, de novo insertion and a per-rule cost, `--set open_genome=1`;
@@ -22,6 +29,11 @@ All notable changes to this project are documented here. Format based on
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
 
 ### Fixed
+- F5a review, before release: the child inherited the partner's mating propensity half
+  the time, a transmission bias that faked selection against sex (first experiment run
+  discarded); an unaffordable `sex_cost` could drive energy negative; partner search
+  counted tiles twice on very narrow worlds. Experiment scripts now run without
+  installing the package.
 - Save loading: malformed rows, huge JSON numbers and other bad content now raise
   `SaveFormatError` instead of crashing with an unrelated exception (F4 security review).
 - G1 *Full ecosystem* milestone fired for an idle player on `volcanic.json` once F3
