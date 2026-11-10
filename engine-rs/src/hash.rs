@@ -67,3 +67,82 @@ fn hex(bytes: &[u8]) -> String {
     }
     s
 }
+
+/// The first field, in state-hash order, where two worlds differ (`None` if the hashed state
+/// is identical). Used to diagnose a golden mismatch against a Python save of the same step
+/// (`scripts/g2_golden.py --dump-step`).
+pub fn first_difference(a: &World, b: &World) -> Option<String> {
+    let scalars = [
+        ("step_count", a.step_count, b.step_count),
+        ("next_id", a.next_id, b.next_id),
+        ("births", a.counters.births, b.counters.births),
+        ("deaths", a.counters.deaths, b.counters.deaths),
+        ("kills", a.counters.kills, b.counters.kills),
+        (
+            "extinctions",
+            a.counters.extinctions,
+            b.counters.extinctions,
+        ),
+        ("sex_births", a.counters.sex_births, b.counters.sex_births),
+    ];
+    if let Some((name, x, y)) = scalars.iter().find(|(_, x, y)| x != y) {
+        return Some(format!("{name}: {x} vs {y}"));
+    }
+    let (ra, rb) = (a.rng.state(), b.rng.state());
+    if let Some(i) = (0..ra.0.len()).find(|&i| ra.0.get(i) != rb.0.get(i)) {
+        return Some(format!("rng word {i}"));
+    }
+    if ra.1.map(f64::to_bits) != rb.1.map(f64::to_bits) {
+        return Some(format!("rng gauss_next: {:?} vs {:?}", ra.1, rb.1));
+    }
+    if a.organic.len() != b.organic.len() {
+        return Some("organic field size".to_string());
+    }
+    if let Some(i) =
+        (0..a.organic.len()).find(|&i| a.organic[i].to_bits() != b.organic[i].to_bits())
+    {
+        let (x, y) = (i % a.width, i / a.width);
+        return Some(format!(
+            "organic[{y}, {x}]: {:e} vs {:e}",
+            a.organic[i], b.organic[i]
+        ));
+    }
+    if a.population() != b.population() {
+        return Some(format!(
+            "population: {} vs {}",
+            a.population(),
+            b.population()
+        ));
+    }
+    for (k, (ca, cb)) in a.cells().zip(b.cells()).enumerate() {
+        let bonds = |w: &World, c: &crate::world::Cell| -> Vec<u64> {
+            c.bonds.iter().map(|&r| w.cell(r).id).collect()
+        };
+        let field = if ca.id != cb.id {
+            "id"
+        } else if (ca.x, ca.y) != (cb.x, cb.y) {
+            "position"
+        } else if ca.energy.to_bits() != cb.energy.to_bits() {
+            "energy"
+        } else if ca.age != cb.age {
+            "age"
+        } else if ca
+            .genes
+            .iter()
+            .zip(&cb.genes)
+            .any(|(p, q)| p.to_bits() != q.to_bits())
+        {
+            "genes"
+        } else if ca.lineage != cb.lineage {
+            "lineage"
+        } else if bonds(a, ca) != bonds(b, cb) {
+            "bonds"
+        } else if ca.sex_p.to_bits() != cb.sex_p.to_bits() {
+            "sex_p"
+        } else {
+            continue;
+        };
+        return Some(format!("cell {k} (id {} vs {}): {field}", ca.id, cb.id));
+    }
+    None
+}

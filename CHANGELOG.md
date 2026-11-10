@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 milestone M2**: the Rust kernel ports `World.step()` for the default flags
+  (terrain, vents, day/night and seasons included) and reproduces Python's state hash at
+  every one of 1000 steps on both golden sets, bit-for-bit (Windows). On a mismatch the
+  test names the first divergent step and, with `scripts/g2_golden.py --dump-step N`, the
+  first differing field.
 - **F5c Horizontal gene transfer** (third F5 mechanism, ADR-0010): `--set hgt=1` gives cells an
   evolvable propensity `hgt_p` to copy one fixed gene from a random neighbour during life (cost
   `hgt_upkeep` x `hgt_p`); neutral arm `hgt_neutral`; save format v7 (`hgt_p` per cell, counters

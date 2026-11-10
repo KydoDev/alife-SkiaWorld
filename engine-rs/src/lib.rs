@@ -5,7 +5,8 @@
 //! IEEE-754 arithmetic. Progress and verification criteria: `docs/G2_PLAN.md`.
 //!
 //! Milestones so far: M1a (crate skeleton, golden vectors), M1b ([`rng`], the CPython
-//! `random.Random` stream) and M1c ([`save`], loading a save, and [`hash`], the state hash).
+//! `random.Random` stream), M1c ([`save`], loading a save, and [`hash`], the state hash) and
+//! M2 ([`world`], `World::step` for the default flags, bit-exact against Python).
 
 pub mod config;
 pub mod hash;

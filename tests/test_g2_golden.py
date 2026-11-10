@@ -73,3 +73,12 @@ def test_stepping_matches_golden_on_the_same_os(request, golden, rng_golden, has
         world.step()
         got = (world.step_count, g2.state_hash(world))
         assert got == (int(row["step"]), row["hash"]), "regenerate the golden files"
+
+
+def test_dump_step_writes_the_save_of_that_step(tmp_path):
+    g2.main(["--seed", "3", "--warmup", "0", "--steps", "3", "--dump-step", "2", "--out", str(tmp_path)])
+    with open(tmp_path / "hashes.csv", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    world = load_world(tmp_path / "step_2.json.gz")
+    assert world.step_count == 2
+    assert g2.state_hash(world) == rows[2]["hash"]
