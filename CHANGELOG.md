@@ -29,6 +29,8 @@ All notable changes to this project are documented here. Format based on
   comments/docstrings translated to English.
 
 ### Fixed
+- Viewer: window height now fits the full cell inspector panel; the last gene
+  line (`mut`) was cut off at the default 64-row world size.
 - Determinism per seed: `Cell` now hashes by its seed-deterministic `id`, so
   the iteration order of `bonds` sets (colony energy sharing) no longer depends
   on memory addresses. Same seed now gives byte-identical `stats.csv`.

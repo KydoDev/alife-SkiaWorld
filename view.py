@@ -19,6 +19,10 @@ from worldsim.render import render_rgb, save_png
 from worldsim.world import GENE_NAMES
 
 PANEL_W = 260
+PANEL_TOP = 10
+LINE_H = 18
+# Tallest panel: 9 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
+PANEL_MAX_LINES = 9 + 4 + len(GENE_NAMES)
 
 
 def main():
@@ -31,7 +35,9 @@ def main():
     world = World(cfg, seed=args.seed)
     sc = args.scale
     pygame.init()
-    screen = pygame.display.set_mode((cfg.width * sc + PANEL_W, cfg.height * sc))
+    # The window must fit both the world and the full inspector panel, whichever is taller.
+    height = max(cfg.height * sc, 2 * PANEL_TOP + PANEL_MAX_LINES * LINE_H)
+    screen = pygame.display.set_mode((cfg.width * sc + PANEL_W, height))
     pygame.display.set_caption("WorldSim v0")
     font = pygame.font.SysFont("consolas", 15)
     clock = pygame.time.Clock()
@@ -104,7 +110,7 @@ def main():
             lines.append("click a cell to inspect")
         x0 = cfg.width * sc + 12
         for i, t in enumerate(lines):
-            screen.blit(font.render(t, True, (220, 220, 220)), (x0, 10 + i * 18))
+            screen.blit(font.render(t, True, (220, 220, 220)), (x0, PANEL_TOP + i * LINE_H))
 
         pygame.display.flip()
         clock.tick(60)
