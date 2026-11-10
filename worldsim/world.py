@@ -190,8 +190,11 @@ class World:
             raise ValueError(f"terrain maps do not match the {W}x{H} world")
         self.terrain = terrain
         rock = terrain.rock
-        rows = np.arange(H, dtype=np.float64)
-        depth = self.cfg.light_max * np.exp(-rows / self.cfg.light_depth)
+        # Transcendentals go through libm (`math`), never numpy's SIMD loops: on AVX-512 CPUs those are not
+        # correctly rounded, so they differ from libm and from the Rust kernel (docs/G2_PLAN.md, M2 on Linux).
+        cfg = self.cfg
+        depth = cfg.light_max * np.array([math.exp(-float(y) / cfg.light_depth) for y in range(H)])
+        self.shade_pow = np.array([math.pow(cfg.shade, float(k)) for k in range(H + 1)])   # shade ** cells above
         # rocks are opaque: no light at or below the first rock in a column
         lit = np.cumsum(rock, axis=0) == 0
         self.base_light = depth[:, None] * terrain.sun[None, :] * lit
@@ -453,13 +456,13 @@ class World:
     def update_light(self):
         """Light = depth attenuation x shading by the cells above x day/season factor."""
         H, W = self.H, self.W
-        occ = np.zeros((H, W), dtype=np.float64)
+        occ = np.zeros((H, W), dtype=np.intp)
         if self.cells:
             xs = np.fromiter((c.x for c in self.cells), dtype=np.int32, count=len(self.cells))
             ys = np.fromiter((c.y for c in self.cells), dtype=np.int32, count=len(self.cells))
-            occ[ys, xs] = 1.0
-        above = np.cumsum(occ, axis=0) - occ
-        self.light = self.base_light * np.power(self.cfg.shade, above)
+            occ[ys, xs] = 1
+        above = np.cumsum(occ, axis=0) - occ          # cells above each tile, 0..H-1
+        self.light = self.base_light * self.shade_pow[above]
         f = self.light_factor()
         if f != 1.0:
             self.light *= f

@@ -178,3 +178,24 @@ def test_load_rejects_bad_terrain_and_cells_on_rock():
 def test_world_rejects_mismatched_terrain():
     with pytest.raises(ValueError):
         World(Config(width=20, height=10), seed=1, terrain=Terrain.flat(10, 10))
+
+
+def test_light_transcendentals_come_from_libm():
+    """G2 regression: depth attenuation and shade ** (cells above) must equal math.exp / math.pow bit for bit.
+    numpy's np.exp / np.power take SIMD paths on AVX-512 CPUs that differ from libm (and from the Rust kernel)
+    by an ULP at some rows (seen on the Linux CI runner: exp at row 36, pow at k = 4, 10, 31, 33)."""
+    import math
+
+    from worldsim.world import Cell
+
+    cfg = Config(width=4, height=64, initial_cells=0)
+    w = World(cfg, seed=1, track_species=False, populate=False)
+    for y in range(cfg.height):                       # a full column: every count of cells above occurs
+        cid = w._new_id()
+        w._place(Cell(cid, 0, y, 40.0, w.random_genes(), cid, cfg))
+    w.update_light()
+    for y in range(cfg.height):
+        depth = cfg.light_max * math.exp(-float(y) / cfg.light_depth)
+        assert w.base_light[y, 1] == depth
+        assert w.light[y, 0] == depth * math.pow(cfg.shade, float(y))
+        assert w.light[y, 1] == depth
