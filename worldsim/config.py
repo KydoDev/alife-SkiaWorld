@@ -20,6 +20,7 @@ _BOUNDS = {
     "max_rules": (0, 64), "rule_div_shift": (0, 1),
     "mate_radius": (1, 5), "mate_distance": (0, 10), "sex_cost": (0, 10),
     "plastic_rate": (0, 1), "plastic_upkeep": (0, 10),
+    "hgt_rate": (0, 1), "hgt_upkeep": (0, 10),
 }
 
 
@@ -96,6 +97,12 @@ class Config:
     plastic_neutral: bool = False    # control arm: plast_p is inherited and mutates, but the diet never moves
     plastic_rate: float = 0.05       # per-step acclimation at plast_p = 1 (time constant >= 1 / rate steps)
     plastic_upkeep: float = 0.05     # cost per step x plast_p (paid in the neutral arm too)
+
+    # --- horizontal gene transfer (F5c). Off by default: genes change only at division ---
+    hgt: bool = False                # cells carry an evolvable propensity hgt_p to copy a neighbour's gene
+    hgt_neutral: bool = False        # control arm: hgt_p is inherited and mutates, but no gene is copied
+    hgt_rate: float = 0.1            # per-step chance of a transfer at hgt_p = 1
+    hgt_upkeep: float = 0.05         # cost per step x hgt_p (paid in the neutral arm too)
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)

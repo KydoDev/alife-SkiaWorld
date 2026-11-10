@@ -98,6 +98,8 @@ runs (same seed, before/after), not only by unit tests.
   rule: no RNG draws when off). Partner choice uses `mate_distance`, never the tracker (ADR-0007).
 - **Plasticity (F5b)**: `Cell.plast_p` and the acclimated `diet` exist only when `cfg.plasticity` is on; the
   diet update uses no RNG and the phenotype is always derived from the diet when on (ADR-0009).
+- **Gene transfer (F5c)**: `Cell.hgt_p` and `transfer_gene()` act only when `cfg.hgt` is on (no RNG when off);
+  a transfer changes the genome for life and re-runs `express()`; species stay as assigned at birth (ADR-0010).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch
