@@ -7,9 +7,10 @@
 import csv
 
 from worldsim.species import ORIGIN_SPECIATION
-from worldsim.world import G_PHOTO, G_PRED, G_SAPRO
+from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO
 
-STRATEGY_RGB = {"photo": (0.24, 0.71, 0.27), "sapro": (0.60, 0.35, 0.90), "pred": (0.88, 0.20, 0.18)}
+STRATEGY_RGB = {"photo": (0.24, 0.71, 0.27), "sapro": (0.60, 0.35, 0.90), "pred": (0.88, 0.20, 0.18),
+                "chemo": (0.16, 0.84, 0.88)}
 
 
 def _pyplot():
@@ -39,6 +40,12 @@ def plot_stats(csv_path, png_path):
     ax.plot(step, [int(r["photo"]) for r in rows], color="#3cb446", label="photosynthesis")
     ax.plot(step, [int(r["sapro"]) for r in rows], color="#9a5ae6", label="decomposers")
     ax.plot(step, [int(r["pred"]) for r in rows], color="#e0322d", label="predators")
+    if "chemo" in rows[0]:
+        ax.plot(step, [int(r["chemo"]) for r in rows], color="#28d6e0", label="chemosynthesis")
+    if "light_factor" in rows[0] and any(r["light_factor"] != "1.0" for r in rows):
+        light_ax = ax.twinx()
+        light_ax.plot(step, [float(r["light_factor"]) for r in rows], color="#d69e2e", lw=0.5, alpha=0.5)
+        light_ax.set_ylabel("light factor", color="#d69e2e")
     ax.set_ylabel("cells")
     ax.legend(loc="upper left")
     ax.set_title("Population by dominant strategy")
@@ -107,16 +114,17 @@ def plot_novelty(csv_path, png_path, per=100, smooth=10):
 
 
 def _founder_color(genes):
-    p, s, d = genes[G_PHOTO], genes[G_SAPRO], genes[G_PRED]
-    tot = (p + s + d) or 1e-9
-    return tuple(min(1.0, (p * a + s * b + d * c) / tot)
-                 for a, b, c in zip(STRATEGY_RGB["photo"], STRATEGY_RGB["sapro"], STRATEGY_RGB["pred"]))
+    shares = [genes[G_PHOTO], genes[G_SAPRO], genes[G_PRED], genes[G_CHEMO] if len(genes) > G_CHEMO else 0.0]
+    tot = sum(shares) or 1e-9
+    colors = [STRATEGY_RGB[k] for k in ("photo", "sapro", "pred", "chemo")]
+    return tuple(min(1.0, sum(w * col[i] for w, col in zip(shares, colors)) / tot) for i in range(3))
 
 
 def plot_species_tree(tracker, final_step, png_path, min_peak=20):
     """Each line is a species from origin to extinction; links join a species to its parent.
     Shows species whose peak reached `min_peak` (or that became established), plus their ancestors.
-    Color = founder strategy mix (green photosynthesis, purple decomposition, red predation)."""
+    Color = founder strategy mix (green photosynthesis, purple decomposition, red predation,
+    cyan chemosynthesis)."""
     plt = _pyplot()
     if plt is None:
         return

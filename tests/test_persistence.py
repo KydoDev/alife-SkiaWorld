@@ -91,3 +91,60 @@ def test_save_file_is_plain_gzip_json(tmp_path):
     save_world(World(small_config(), seed=1), path)
     with gzip.open(path, "rt", encoding="utf-8") as f:
         assert json.load(f)["format"] == "worldsim-save"
+
+
+# ------------------------------------------------- hardening (security review, 2026-11-10)
+def _saved(seed=5):
+    world = World(small_config(), seed=seed)
+    for _ in range(10):
+        world.step()
+    return world_to_dict(world)
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda d: d["config"].update(width=10**9), "invalid config"),
+    (lambda d: d["config"].update(photo_gain=float("nan")), "invalid config"),
+    (lambda d: d["config"].update(width="wide"), "invalid config"),
+    (lambda d: d["counters"].update(births=-1), "counter"),
+    (lambda d: d["cells"][0][5].__setitem__(0, 7.0), "invalid cell"),
+    (lambda d: d["cells"][0].__setitem__(3, float("inf")), "invalid cell"),
+    (lambda d: d["organic"][0].__setitem__(0, -1.0), "organic"),
+])
+def test_load_rejects_hostile_values(mutate, message):
+    d = _saved()
+    mutate(d)
+    with pytest.raises(SaveFormatError, match=message):
+        world_from_dict(d)
+
+
+def test_load_ignores_unknown_counters():
+    d = _saved()
+    d["counters"]["rng"] = "pwned"
+    world = world_from_dict(d)
+    assert not isinstance(world.rng, str)
+
+
+def test_load_rejects_bad_terrain_values():
+    d = _saved()
+    flat = d["organic"]
+    for terrain, message in [
+        ({"rock": [[300] * len(flat[0])] * len(flat), "chem": flat, "sun": [1.0] * len(flat[0])}, "0 and 1"),
+        ({"rock": [[0] * len(flat[0])] * len(flat), "chem": flat, "sun": [-1.0] * len(flat[0])}, "sun"),
+    ]:
+        with pytest.raises(SaveFormatError, match=message):
+            world_from_dict({**d, "terrain": terrain})
+
+
+def test_load_caps_decompressed_size_and_rejects_junk(tmp_path, monkeypatch):
+    from worldsim import persistence
+    path = tmp_path / "w.json.gz"
+    save_world(World(small_config(), seed=1), path)
+    monkeypatch.setattr(persistence, "MAX_SAVE_BYTES", 100)
+    with pytest.raises(SaveFormatError, match="decompresses"):
+        load_world(path)
+    junk = tmp_path / "junk.json.gz"
+    with gzip.open(junk, "wb") as f:
+        f.write(b"{not json")
+    monkeypatch.setattr(persistence, "MAX_SAVE_BYTES", 10**6)
+    with pytest.raises(SaveFormatError, match="not a valid save"):
+        load_world(junk)

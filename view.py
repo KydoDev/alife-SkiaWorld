@@ -2,11 +2,12 @@
 
     python view.py [--seed 1] [--scale 6]
     python view.py --load runs/test1/world_final.json.gz
+    python view.py --planet examples/volcanic.json      # or an image file
 
 Controls:
   SPACE   pause / resume          N    one step (while paused)
   + / -   steps per frame         O    show/hide organic matter
-  S       save PNG snapshot       R    restart (new seed)
+  S       save PNG snapshot       R    restart (new seed, same terrain)
   click   inspect a cell          ESC  quit
 """
 import argparse
@@ -18,13 +19,14 @@ import pygame
 from worldsim import Config, World
 from worldsim.persistence import load_world
 from worldsim.render import render_rgb, save_png
+from worldsim.worldgen import PlanetError, load_planet
 from worldsim.world import GENE_NAMES
 
 PANEL_W = 260
 PANEL_TOP = 10
 LINE_H = 18
-# Tallest panel: 10 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
-PANEL_MAX_LINES = 10 + 4 + len(GENE_NAMES)
+# Tallest panel: 12 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
+PANEL_MAX_LINES = 12 + 4 + len(GENE_NAMES)
 
 
 def main():
@@ -32,11 +34,18 @@ def main():
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--scale", type=int, default=6)
     p.add_argument("--load", metavar="SAVE", help="open a world_*.json.gz save file instead of a new world")
+    p.add_argument("--planet", metavar="FILE", help="generate the world from a planet form (.json) or an image")
     args = p.parse_args()
 
     if args.load:
         world = load_world(args.load)
         cfg = world.cfg
+    elif args.planet:
+        try:
+            cfg, terrain, seed = load_planet(args.planet)
+        except PlanetError as e:
+            raise SystemExit(f"Invalid planet: {e}") from e
+        world = World(cfg, seed=seed, terrain=terrain)
     else:
         cfg = Config()
         world = World(cfg, seed=args.seed)
@@ -45,7 +54,7 @@ def main():
     # The window must fit both the world and the full inspector panel, whichever is taller.
     height = max(cfg.height * sc, 2 * PANEL_TOP + PANEL_MAX_LINES * LINE_H)
     screen = pygame.display.set_mode((cfg.width * sc + PANEL_W, height))
-    pygame.display.set_caption("WorldSim v0")
+    pygame.display.set_caption("WorldSim")
     font = pygame.font.SysFont("consolas", 15)
     clock = pygame.time.Clock()
 
@@ -74,7 +83,7 @@ def main():
                     save_png(world, name)
                     print("Saved", name)
                 elif ev.key == pygame.K_r:
-                    world = World(cfg, seed=random.randrange(1_000_000))
+                    world = World(cfg, seed=random.randrange(1_000_000), terrain=world.terrain)
                     selected = None
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 mx, my = ev.pos
@@ -101,9 +110,11 @@ def main():
             f"  plants     {s['photo']}",
             f"  decomp.    {s['sapro']}",
             f"  predators  {s['pred']}",
+            f"  chemo      {s['chemo']}",
             f"in colony    {s['in_colony']}",
             f"lineages     {s['lineages']}",
             f"species      {s.get('species', '-')}",
+            f"light        {s['light_factor']:.2f}",
             f"steps/frame  {steps_per_frame}{'  [PAUSED]' if paused else ''}",
             "",
         ]

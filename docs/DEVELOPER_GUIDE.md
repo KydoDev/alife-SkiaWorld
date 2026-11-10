@@ -32,12 +32,20 @@ python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 # override any Co
 python run.py --steps 5000 --seed 1 --out runs/a --save-every 1000         # periodic saves
 python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b  # continue a save
 python view.py --load runs/a/world_final.json.gz                           # open a save
+python run.py --planet examples/volcanic.json --steps 5000 --out runs/v   # planet from a form
+python view.py --planet examples/planet.png                               # planet from an image
 ```
 A run writes `config.json`, `stats.csv`, `snap_*.png`, `world_final.json.gz`
 (+ `world_NNNNNN.json.gz`), `stats.png`, and with species tracking (default;
 `--no-species` to disable) `species.csv`, `species_tree.png`, `novelty.png`.
 Species parameters (`species_threshold`, `novelty_activity`, `species_prune_peak`)
-only change the analysis, never the simulation.
+only change the analysis, never the simulation. Every `Config` is range-checked
+(`Config.validate()`); environment fields: `day_length`, `day_amplitude`,
+`year_length`, `season_amplitude`, `rock_fraction`, `vent_count`, `vent_strength`,
+`vent_radius`, `chemo_gain`. A planet form is JSON with `star` (`red_dwarf`, `sun`,
+`blue_giant`), `day_night`, `seasonality`, `ocean_depth`, `seabed_relief`,
+`volcanism`, `mineral_richness`, optional `seed`, `name` and `config` overrides —
+see `examples/`.
 Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter ·
 `S` snapshot · `R` new world · click = inspect a cell.
 

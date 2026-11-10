@@ -29,3 +29,29 @@ Branch: `main` (owner decision 2026-11-10: work on main for now, single commit f
 `python run.py --steps 3000 --seed 1 --out runs/baseline` after the bonds-dict change:
 3000 steps in ~5 s (~600 steps/s), final pop 831 (photo 669, sapro 55, pred 107), colony 633, lineages 49.
 `runs/baseline/stats.csv` is the reference for observer-purity checks (git-ignored, regenerate with the same command).
+
+---
+
+## Closed 2026-11-10
+
+# PLAN — F2 Living environment + world seed
+
+## Checklist
+1. [x] Re-verify F1 exit criterion and record F2 baseline (seed 1, 10k steps, 489 steps/s)
+2. [x] F2a variable light: day/night + seasons (pure function of step, default off) + tests
+3. [x] F2a experiment: does mean_mut rise in a variable environment? (seeds 1, 7)
+4. [x] F2b terrain: rocks honoured in every placement path + tests
+5. [x] F2b vents + chemosynthesis (10th gene `chemo`, 4th strategy) + cross-impact
+6. [x] F2b experiment: do chemo specialists colonise dark vents?
+7. [x] F2c worldgen module: planet from image or JSON form, hashlib seed, own RNG
+8. [x] Save format v2 (terrain maps in the save) + ADR-0004
+9. [x] Security review of image/JSON loading; perf check vs baseline
+10. [x] Docs, CHANGELOG, TEST.md, ROADMAP results; single F2 commit (ask before push)
+
+## Detail
+- Baseline: `runs/f2base` (seed 1, 10k steps): pop 903, species 82, novelty 375, extinctions 0.
+- Adding the `chemo` gene changes every seed's history (one more random draw per genome):
+  F1 numbers stay valid for the F1 commit; re-record baseline after item 5.
+- Terrain generation uses its own RNG seeded from the world seed, never `World.rng`.
+- Rocks: cells never occupy them; they block light like an opaque cell; organic matter
+  ignores them (documented simplification) so energy bookkeeping is unchanged.

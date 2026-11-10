@@ -32,3 +32,5 @@ jobs:
         run: |
           python run.py --steps 300 --seed 1 --out runs/ci --snap-every 300 --save-every 150
           python run.py --resume runs/ci/world_000150.json.gz --steps 150 --out runs/ci-resume --snap-every 150
+          python run.py --planet examples/volcanic.json --steps 200 --out runs/ci-planet --snap-every 200
+          python run.py --planet examples/planet.png --steps 200 --out runs/ci-photo --snap-every 200

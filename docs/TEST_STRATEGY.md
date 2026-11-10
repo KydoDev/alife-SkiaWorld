@@ -28,6 +28,10 @@ The viewer (pygame) is checked manually; there is no user-facing release yet.
 - Bond symmetry; bonds never point to dead cells; `max_bonds` respected.
 - Determinism: same seed → identical stats history.
 - Gene values stay in [0,1] after mutation.
+- F2 environment: light cycles mean-preserving and bit-exact on resume mid-cycle; no cell
+  ever on rock; terrain RNG independent of `World.rng`; custom terrain survives save/load.
+- Untrusted input (planet forms, images, saves): every rejection path from the security
+  review has a regression test (ranges, sizes, formats, gzip bombs, hostile values).
 - Energy bookkeeping: closed system (all sources/sinks off) conserves total energy.
 - Organic matter never negative.
 - Extinction → reseed.

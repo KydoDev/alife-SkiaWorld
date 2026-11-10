@@ -1,12 +1,16 @@
 # Architecture
 
-Last updated: 2026-11-10
+Last updated: 2026-11-10 (F2)
 
 ## Overview
 
 ```mermaid
 flowchart LR
     Config[worldsim/config.py<br/>Config dataclass] --> World[worldsim/world.py<br/>World + Cell]
+    Input[(planet form .json<br/>or image)] --> Gen[worldsim/worldgen.py<br/>planet loader]
+    Gen --> Terrain[worldsim/terrain.py<br/>Terrain maps]
+    Config --> Terrain
+    Terrain --> World
     World -- hooks --> Species[worldsim/species.py<br/>SpeciesTracker observer]
     World <--> Persist[worldsim/persistence.py<br/>save / load]
     World --> Render[worldsim/render.py<br/>world → RGB]
@@ -30,14 +34,29 @@ for batch experiments and `view.py` for interactive observation; `plots.py`
 matter, metabolism, nutrition, reproduction, mutation, immigration). `run.py
 --set KEY=VALUE` overrides any field; the full config is saved with each run.
 
+### `worldsim/terrain.py`
+`Terrain`: static maps — `rock` (cells cannot occupy it; opaque to light),
+`chem` (chemical energy per step, from vents), `sun` (surface light per column),
+`organic` (initial organic matter). `generate_terrain` builds seabed ridges and
+vents from `Config` with its own seed-derived RNG (ADR-0004); defaults are flat.
+
+### `worldsim/worldgen.py`
+World seed from untrusted input: a JSON planet form (star, day/night,
+seasonality, ocean depth, relief, volcanism, minerals, raw `Config` overrides)
+or an image (column brightness → sun, red → chem, blue → organic, edges → rock,
+SHA-256 of the bytes → seed). Size caps and field validation; errors are `PlanetError`.
+
 ### `worldsim/world.py`
 - **Grid**: flat list `grid[y * W + x]` of `Cell | None`. x is toroidal; y is
-  depth (row 0 = lit surface, last row = seabed, closed edges).
-- **Fields** (numpy `(H, W)`): `light` = depth attenuation × `shade` per cell
-  above; `organic` = diffusing, sinking, decaying organic matter.
-- **Cell**: `__slots__` object with a 9-gene genome (`photo`, `sapro`, `pred`,
-  `move`, `div`, `child`, `attach`, `share`, `mut`). `express()` derives the
-  phenotype once at birth.
+  depth (row 0 = lit surface, last row = seabed, closed edges). `blocked[i]`
+  marks rock tiles; every placement path checks it.
+- **Fields** (numpy `(H, W)`): `light` = `base_light` (depth × sun × rock shadow)
+  × `shade` per cell above × `light_factor(t)` (day/night × season, a pure
+  function of the step); `organic` = diffusing, sinking, decaying organic matter;
+  `chem` = static chemical energy.
+- **Cell**: `__slots__` object with a 10-gene genome (`photo`, `sapro`, `pred`,
+  `move`, `div`, `child`, `attach`, `share`, `mut`, `chemo`). `express()` derives
+  the phenotype once at birth; the four feeding genes are normalised shares.
 - **Bonds**: colonies are symmetric `bonds` links between cells, created at
   division with probability `attach`, cleared on death. Stored as an
   insertion-ordered `dict` used as an ordered set: energy sharing iterates it,
@@ -53,12 +72,13 @@ genomes, species tree with pruning of failed lineages, simplified evolutionary
 activity and the novelty counter. Never touches the RNG; the dynamics never read it.
 
 ### `worldsim/persistence.py`
-`save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002).
-Resume is bit-exact.
+`save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
+v2 adds the terrain maps, ADR-0004). Resume is bit-exact.
 
 ### `worldsim/render.py`
-Maps the world to an RGB array: cell color mixes green/purple/red by
-photo/sapro/pred share; background shows light (blue) and organic matter (brown).
+Maps the world to an RGB array: cell color mixes green/purple/red/cyan by
+photo/sapro/pred/chemo share; background shows light (blue), organic matter
+(brown), chemical energy (orange glow) and rock (grey).
 
 ### `run.py` and `plots.py`
 Headless loop: steps, CSV sampling, periodic PNG snapshots and saves
@@ -66,22 +86,24 @@ Headless loop: steps, CSV sampling, periodic PNG snapshots and saves
 `stats.png`, `species_tree.png`, `novelty.png` (`plots.py` reads CSV columns by name).
 
 ### `view.py`
-pygame viewer: pause, single step, speed, organic overlay, snapshot, new world,
-click-to-inspect a cell; `--load` opens a save file.
+pygame viewer: pause, single step, speed, organic overlay, snapshot, new world
+(same terrain), click-to-inspect a cell; `--load` opens a save file, `--planet`
+a planet form or image.
 
 ## Data flows
 
 ### One simulation step (`World.step()`)
-1. Recompute `light` from current occupancy.
+1. Recompute `light` from current occupancy and the day/season factor.
 2. Shuffle cells; for each living cell: age → upkeep → photosynthesis /
-   decomposition → predation (random unbonded neighbor) → movement (unbonded
+   decomposition / chemosynthesis → predation (random unbonded neighbor) → movement (unbonded
    cells only) → energy sharing with bonded cells → death check → division
    (mutated child, optional bond).
 3. Drop dead cells, append newborns, update `organic` (diffuse, sink, decay).
 4. Immigration of random cells; reseed on total extinction.
 
 ### Energy
-The only external input is light. Energy leaves cells as upkeep and movement
+The external inputs are light and, where vents exist, chemical energy (both
+unlimited per tile, limited by space and shading). Energy leaves cells as upkeep and movement
 cost; on death, `decomp_fraction × (energy + body_cost)` becomes organic matter;
 predation splits the prey's energy + body between predator and organic matter.
 
@@ -96,15 +118,20 @@ predation splits the prey's energy + body between predator and organic matter.
   (`random.Random(seed)`), and no iteration order may depend on memory
   addresses — `Cell.__hash__` returns the deterministic cell `id` so `bonds`
   sets iterate identically across runs. Same seed → byte-identical `stats.csv`.
-- **Performance** (2026-11-10, cProfile, ~800 cells): ~540 steps/s with species
+- **Performance**: F2 adds no measurable cost on a flat world (back-to-back on
+  the same machine: F1 303 vs F2 354 steps/s, seed 1, 3k steps; absolute numbers
+  vary ±40% with machine load, so compare runs back-to-back). Rocks add one
+  lookup per neighbour check. F1 profile (cProfile, ~800 cells): ~540 steps/s with species
   tracking, ~560 without. Time split: `step()` body ~30%, `neighbors()` +
   `random_empty_neighbor()` ~17%, `rng.shuffle` ~11%, Gaussian mutation ~12%,
   `update_light` ~8%. Cheapest next win: a precomputed neighbor-index table
   (same iteration order, so determinism is unaffected).
 - **Invariants** (covered by `tests/`): grid ↔ cell list consistency (every
   step), bond symmetry, gene bounds, non-negative organic matter, energy
-  conservation in a closed system, bit-exact resume, tracker purity.
+  conservation in a closed system, bit-exact resume (also mid day/season and with
+  terrain), tracker purity, no cell ever on rock.
 - No network, no secrets. Save files are JSON, never pickle (safe to share).
+  Planet forms, images and saves are untrusted input: bounded and validated.
 
 ## Decisions
 See [`adr/`](./adr/) — decisions are recorded there, not here.

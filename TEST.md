@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-10 — F1 Foundations (working tree before the F1 commit)
+Last run: 2026-11-10 — F2 Living environment + world seed (working tree before the F2 commit)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -8,10 +8,11 @@ Last run: 2026-11-10 — F1 Foundations (working tree before the F1 commit)
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| Unit + integration (`tests/`, 27 tests) | 27 | 0 | 0 | 98.7% (`worldsim/`, excl. render) |
-| Exit demo: seed 1, 10k steps vs resume at 5k (separate processes) | final saves identical, 500/500 stats rows identical | | | |
-| Observer purity: 3000-step run with tracker vs pre-tracker baseline | 300/300 rows identical on existing columns | | | |
-| E2E (viewer, headless screenshot incl. `--load`) | renders, panel complete | | | |
+| Unit + integration (`tests/`, 80 tests) | 80 | 0 | 0 | 98.3% (`worldsim/`, excl. render) |
+| Defaults-off light cycle vs F2 baseline (seed 1, 2000 steps, before the gene change) | 200/200 stats rows identical | | | |
+| CI smoke commands (run, resume, form planet, image planet, resume of an image planet) | all complete | | | |
+| Viewer (headless, `--planet examples/volcanic.json`, 5 frames + screenshot) | renders, panel complete | | | |
+| Perf back-to-back, seed 1, 3k steps: F1 commit vs F2 tree | 303 vs 354 steps/s (no regression) | | | |
 
 Lint: `ruff check .` — clean.
 

@@ -1,0 +1,10 @@
+{
+  "name": "Dim world around a red dwarf",
+  "star": "red_dwarf",
+  "day_night": 0.5,
+  "ocean_depth": 20,
+  "seabed_relief": 0.3,
+  "volcanism": 10,
+  "mineral_richness": 3.0,
+  "config": {"immigration_rate": 0.2}
+}

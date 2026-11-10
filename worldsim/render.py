@@ -5,6 +5,9 @@ import numpy as np
 C_PHOTO = np.array([60, 210, 70], dtype=np.float32)    # green: plants
 C_SAPRO = np.array([170, 90, 230], dtype=np.float32)   # purple: decomposers
 C_PRED = np.array([235, 50, 45], dtype=np.float32)     # red: predators
+C_CHEMO = np.array([40, 215, 225], dtype=np.float32)   # cyan: chemosynthesizers (vents)
+C_ROCK = np.array([92, 88, 84], dtype=np.float32)      # grey: rock
+C_VENT = np.array([255, 120, 20], dtype=np.float32)    # orange glow: chemical energy
 
 
 def render_rgb(world, show_organic=True):
@@ -15,17 +18,22 @@ def render_rgb(world, show_organic=True):
     img[..., 0] = 8 + 20 * lum
     img[..., 1] = 14 + 45 * lum
     img[..., 2] = 30 + 110 * lum
+    if world.has_chem:
+        v = np.clip(world.chem, 0, 1)[..., None] * 0.6
+        img = img * (1 - v) + C_VENT * v
     if show_organic:
         o = np.clip(world.organic / 20.0, 0, 1)[..., None]
         img = img * (1 - 0.8 * o) + np.array([120, 80, 35], dtype=np.float32) * 0.8 * o
+    if world.has_rock:
+        img[world.terrain.rock] = C_ROCK
 
     cells = world.cells
     if cells:
         n = len(cells)
         xs = np.fromiter((c.x for c in cells), np.int32, n)
         ys = np.fromiter((c.y for c in cells), np.int32, n)
-        tr = np.array([(c.photo, c.sapro, c.pred) for c in cells], dtype=np.float32)
-        col = tr[:, :1] * C_PHOTO + tr[:, 1:2] * C_SAPRO + tr[:, 2:3] * C_PRED
+        tr = np.array([(c.photo, c.sapro, c.pred, c.chemo) for c in cells], dtype=np.float32)
+        col = tr[:, :1] * C_PHOTO + tr[:, 1:2] * C_SAPRO + tr[:, 2:3] * C_PRED + tr[:, 3:4] * C_CHEMO
         # bonded (colony) cells slightly brighter
         bonded = np.fromiter((1.0 if c.bonds else 0.0 for c in cells), np.float32, n)[:, None]
         col = col * (0.85 + 0.15 * bonded) + 25 * bonded

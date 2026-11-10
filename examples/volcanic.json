@@ -1,0 +1,10 @@
+{
+  "name": "Volcanic ocean",
+  "seed": 42,
+  "star": "sun",
+  "day_night": 1.0,
+  "seasonality": 0.5,
+  "seabed_relief": 0.2,
+  "volcanism": 6,
+  "mineral_richness": 2.0
+}

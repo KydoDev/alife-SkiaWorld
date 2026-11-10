@@ -1,5 +1,22 @@
 """Simulation parameters. Everything tunable lives here."""
-from dataclasses import dataclass, asdict
+import math
+from dataclasses import asdict, dataclass, fields
+
+MAX_WORLD_TILES = 1_000_000      # width * height cap for any world, including untrusted inputs
+
+# Bounds enforced by `Config.validate()` (inclusive). Fields not listed must be finite and >= 0.
+_BOUNDS = {
+    "width": (2, 10_000), "height": (2, 10_000),
+    "light_depth": (1e-6, math.inf), "vent_radius": (1e-6, math.inf),
+    "day_length": (1, 10**9), "year_length": (1, 10**9),
+    "shade": (0, 1), "day_amplitude": (0, 1), "season_amplitude": (0, 1),
+    "organic_diffusion": (0, 1), "organic_sink": (0, 1), "organic_decay": (0, 1),
+    "decomp_fraction": (0, 1), "sapro_eff": (0, 1), "pred_eff": (0, 1),
+    "rock_fraction": (0, 0.9), "vent_count": (0, 100), "max_bonds": (0, 8),
+    "max_age": (1, 10**9), "mut_min": (0, 1), "mut_max": (0, 1),
+    "immigration_rate": (0, 100), "species_threshold": (1e-9, math.inf),
+    "novelty_activity": (1, 10**12),
+}
 
 
 @dataclass
@@ -14,6 +31,12 @@ class Config:
     light_max: float = 1.0          # light at the surface
     light_depth: float = 30.0       # attenuation length with depth (rows)
     shade: float = 0.7              # light transmitted by each cell above
+    # light cycles (F2): factor = (1 + day_amp*sin(2*pi*t/day)) * (1 + season_amp*sin(2*pi*t/year)).
+    # Mean-preserving, so a cycle changes the variability of light, not its average.
+    day_length: int = 200           # steps per day/night cycle
+    day_amplitude: float = 0.0      # 0 = constant light, 1 = pitch-dark midnight
+    year_length: int = 4000         # steps per year
+    season_amplitude: float = 0.0   # 0 = no seasons; 0.5 = winter gets half the mean light
 
     # --- organic matter ---
     organic_init: float = 0.0
@@ -34,6 +57,13 @@ class Config:
     sapro_rate: float = 1.0          # max organic matter absorbed per step
     sapro_eff: float = 0.8
     pred_eff: float = 0.5
+    chemo_gain: float = 3.0          # energy per step from chemosynthesis at chem = 1 (vents)
+
+    # --- terrain (F2; procedural, from its own seed-derived RNG). Defaults = flat v0 world ---
+    rock_fraction: float = 0.0       # mean seabed rock height, as a fraction of the world height
+    vent_count: int = 0              # hydrothermal vents on top of the seabed
+    vent_strength: float = 2.0       # chemical energy at a vent mouth (1.0 was below the colonisation threshold)
+    vent_radius: float = 4.0         # e-folding distance of the chemical field (tiles)
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)
@@ -59,3 +89,27 @@ class Config:
 
     def to_dict(self):
         return asdict(self)
+
+    def validate(self) -> "Config":
+        """Check types and ranges (configs can come from untrusted saves and planet forms).
+
+        Ints given for float fields are converted. Raises ValueError with a readable message."""
+        for f in fields(self):
+            v, kind = getattr(self, f.name), type(f.default)
+            if kind is float and isinstance(v, int) and not isinstance(v, bool):
+                v = float(v)
+                setattr(self, f.name, v)
+            if not isinstance(v, kind) or (isinstance(v, bool) and kind is not bool):
+                raise ValueError(f"config {f.name} must be {kind.__name__}, got {type(v).__name__}")
+            if kind is bool:
+                continue
+            lo, hi = _BOUNDS.get(f.name, (0, math.inf))
+            if not (math.isfinite(v) and lo <= v <= hi):
+                raise ValueError(f"config {f.name} = {v!r} is outside [{lo}, {hi}]")
+        if self.width * self.height > MAX_WORLD_TILES:
+            raise ValueError(f"world size {self.width}x{self.height} exceeds {MAX_WORLD_TILES} tiles")
+        if self.initial_cells > self.width * self.height:
+            raise ValueError("initial_cells exceeds the number of tiles")
+        if self.div_min > self.div_max or self.mut_min > self.mut_max:
+            raise ValueError("div_min/mut_min must not exceed div_max/mut_max")
+        return self

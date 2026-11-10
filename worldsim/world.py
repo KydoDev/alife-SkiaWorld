@@ -3,26 +3,28 @@
 Headless: no graphics dependencies. The grid is toroidal in x, and y = depth
 (row 0 = lit surface, last row = seabed).
 """
+import math
 import random
 
 import numpy as np
 
 from .config import Config
 from .species import ORIGIN_IMMIGRANT, ORIGIN_SEED, SpeciesTracker
+from .terrain import Terrain, generate_terrain
 
-# Gene indices
-G_PHOTO, G_SAPRO, G_PRED, G_MOVE, G_DIV, G_CHILD, G_ATTACH, G_SHARE, G_MUT = range(9)
-N_GENES = 9
-GENE_NAMES = ["photo", "sapro", "pred", "move", "div", "child", "attach", "share", "mut"]
+# Gene indices. New genes are appended so existing indices keep their meaning.
+G_PHOTO, G_SAPRO, G_PRED, G_MOVE, G_DIV, G_CHILD, G_ATTACH, G_SHARE, G_MUT, G_CHEMO = range(10)
+N_GENES = 10
+GENE_NAMES = ["photo", "sapro", "pred", "move", "div", "child", "attach", "share", "mut", "chemo"]
 
 NEIGH8 = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
-STRATEGIES = ["photo", "sapro", "pred"]
+STRATEGIES = ["photo", "sapro", "pred", "chemo"]
 
 
 class Cell:
     __slots__ = (
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
-        "photo", "sapro", "pred", "photo_k", "sapro_k", "pred_k",
+        "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
         "species",
     )
@@ -52,14 +54,16 @@ class Cell:
     def express(self, cfg):
         """Genotype -> phenotype (derived traits, computed once)."""
         g = self.genes
-        s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] or 1e-9
+        s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO] or 1e-9
         self.photo = g[G_PHOTO] / s
         self.sapro = g[G_SAPRO] / s
         self.pred = g[G_PRED] / s
+        self.chemo = g[G_CHEMO] / s
         e = cfg.spec_exp
         self.photo_k = self.photo ** e
         self.sapro_k = self.sapro ** e
         self.pred_k = self.pred ** e
+        self.chemo_k = self.chemo ** e
         self.move = g[G_MOVE]
         self.div_thr = cfg.div_min + g[G_DIV] * (cfg.div_max - cfg.div_min)
         self.child_frac = 0.2 + 0.6 * g[G_CHILD]
@@ -70,25 +74,25 @@ class Cell:
 
     @property
     def strategy(self):
-        t = (self.photo, self.sapro, self.pred)
+        t = (self.photo, self.sapro, self.pred, self.chemo)
         return STRATEGIES[t.index(max(t))]
 
 
 class World:
     def __init__(self, cfg: Config | None = None, seed: int | None = None,
-                 track_species: bool = True, populate: bool = True):
-        """`populate=False` builds an empty world (used by `persistence.load_world`)."""
-        self.cfg = cfg or Config()
+                 track_species: bool = True, populate: bool = True, terrain: Terrain | None = None):
+        """`populate=False` builds an empty world (used by `persistence.load_world`).
+        `terrain=None` generates it from `Config` (flat by default)."""
+        self.cfg = (cfg or Config()).validate()
         self.seed = seed
         self.rng = random.Random(seed)
         W, H = self.cfg.width, self.cfg.height
         self.W, self.H = W, H
         self.grid = [None] * (W * H)
         self.cells: list[Cell] = []
-        self.organic = np.full((H, W), self.cfg.organic_init, dtype=np.float64)
-        rows = np.arange(H, dtype=np.float64)
-        self.base_light = self.cfg.light_max * np.exp(-rows / self.cfg.light_depth)
-        self.light = np.tile(self.base_light[:, None], (1, W))
+        self.set_terrain(terrain if terrain is not None else generate_terrain(self.cfg, seed))
+        self.organic = self.terrain.organic.copy()
+        self.light = self.base_light.copy()
         self.step_count = 0
         self.next_id = 0
         self.births = 0
@@ -102,11 +106,32 @@ class World:
             self.seed_population(self.cfg.initial_cells)
 
     # ------------------------------------------------------------------ setup
+    def set_terrain(self, terrain: Terrain):
+        """Install the static maps and everything derived from them."""
+        H, W = self.H, self.W
+        shapes = (terrain.rock.shape, terrain.chem.shape, terrain.organic.shape, terrain.sun.shape)
+        if shapes != ((H, W), (H, W), (H, W), (W,)):
+            raise ValueError(f"terrain maps do not match the {W}x{H} world")
+        self.terrain = terrain
+        rock = terrain.rock
+        rows = np.arange(H, dtype=np.float64)
+        depth = self.cfg.light_max * np.exp(-rows / self.cfg.light_depth)
+        # rocks are opaque: no light at or below the first rock in a column
+        lit = np.cumsum(rock, axis=0) == 0
+        self.base_light = depth[:, None] * terrain.sun[None, :] * lit
+        self.blocked = rock.ravel().tolist()            # flat list: fast per-tile lookup in the hot loop
+        self.has_rock = bool(rock.any())
+        self.chem = terrain.chem
+        self.has_chem = bool(terrain.chem.any())
+        # organic matter does not sink into rock (it settles on the seabed instead)
+        self.sink_mask = (~rock[1:]).astype(np.float64) if self.has_rock else None
+
     def random_genes(self):
         return [self.rng.random() for _ in range(N_GENES)]
 
     def seed_population(self, n):
-        free = [i for i, c in enumerate(self.grid) if c is None]
+        blocked = self.blocked
+        free = [i for i, c in enumerate(self.grid) if c is None and not blocked[i]]
         self.rng.shuffle(free)
         for i in free[:n]:
             x, y = i % self.W, i // self.W
@@ -136,7 +161,12 @@ class World:
 
     def random_empty_neighbor(self, x, y):
         grid, W = self.grid, self.W
-        free = [(nx, ny) for nx, ny in self.neighbors(x, y) if grid[ny * W + nx] is None]
+        if self.has_rock:
+            blocked = self.blocked
+            free = [(nx, ny) for nx, ny in self.neighbors(x, y)
+                    if grid[ny * W + nx] is None and not blocked[ny * W + nx]]
+        else:
+            free = [(nx, ny) for nx, ny in self.neighbors(x, y) if grid[ny * W + nx] is None]
         return self.rng.choice(free) if free else None
 
     def random_prey(self, c):
@@ -165,8 +195,23 @@ class World:
             self.tracker.on_death(c, self.now)
 
     # ------------------------------------------------------------ fields
+    def light_factor(self, t=None):
+        """Global light multiplier at step `t` (default: the current step): day/night x season.
+
+        A pure function of the step index, so cycles add no save state."""
+        cfg = self.cfg
+        if cfg.day_amplitude == 0.0 and cfg.season_amplitude == 0.0:
+            return 1.0
+        t = self.now if t is None else t
+        f = 1.0
+        if cfg.day_amplitude:
+            f *= 1.0 + cfg.day_amplitude * math.sin(2.0 * math.pi * t / cfg.day_length)
+        if cfg.season_amplitude:
+            f *= 1.0 + cfg.season_amplitude * math.sin(2.0 * math.pi * t / cfg.year_length)
+        return f
+
     def update_light(self):
-        """Light = depth attenuation x shading by the cells above."""
+        """Light = depth attenuation x shading by the cells above x day/season factor."""
         H, W = self.H, self.W
         occ = np.zeros((H, W), dtype=np.float64)
         if self.cells:
@@ -174,7 +219,10 @@ class World:
             ys = np.fromiter((c.y for c in self.cells), dtype=np.int32, count=len(self.cells))
             occ[ys, xs] = 1.0
         above = np.cumsum(occ, axis=0) - occ
-        self.light = self.base_light[:, None] * np.power(self.cfg.shade, above)
+        self.light = self.base_light * np.power(self.cfg.shade, above)
+        f = self.light_factor()
+        if f != 1.0:
+            self.light *= f
 
     def update_organic(self):
         cfg, o = self.cfg, self.organic
@@ -186,6 +234,8 @@ class World:
         o += cfg.organic_diffusion * ((up + down + left + right) * 0.25 - o)
         # sinking toward the seabed
         moved = o[:-1] * cfg.organic_sink
+        if self.sink_mask is not None:
+            moved *= self.sink_mask
         o[:-1] -= moved
         o[1:] += moved
         # decay
@@ -197,6 +247,7 @@ class World:
         grid, W = self.grid, self.W
         org, light = self.organic, self.light
         tracker = self.tracker
+        chem = self.chem if self.has_chem else None
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -222,6 +273,8 @@ class World:
                     take = min(avail, cfg.sapro_rate * c.sapro_k)
                     org[y, x] = avail - take
                     e += cfg.sapro_eff * take
+            if chem is not None and c.chemo_k > 0.0:
+                e += cfg.chemo_gain * c.chemo_k * chem[y, x]
             c.energy = e
 
             # 4: predation
@@ -286,7 +339,7 @@ class World:
                 k += 1
             for _ in range(k):
                 i = rng.randrange(self.W * self.H)
-                if self.grid[i] is None:
+                if self.grid[i] is None and not self.blocked[i]:
                     cid = self._new_id()
                     cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
                                 self.random_genes(), cid, cfg)
@@ -308,13 +361,14 @@ class World:
         s = {
             "step": self.step_count,
             "population": n,
-            "photo": 0, "sapro": 0, "pred": 0,
+            "photo": 0, "sapro": 0, "pred": 0, "chemo": 0,
             "in_colony": 0,
             "lineages": len({c.lineage for c in cells}),
             "energy_cells": round(sum(c.energy for c in cells), 2),
             "organic_total": round(float(self.organic.sum()), 2),
             "births": self.births, "deaths": self.deaths, "kills": self.kills,
             "extinctions": self.extinctions,
+            "light_factor": round(self.light_factor(self.step_count), 4),
         }
         if n:
             for c in cells:

@@ -4,6 +4,8 @@ Examples:
     python run.py --steps 5000 --seed 1 --out runs/test1
     python run.py --steps 5000 --seed 1 --out runs/test1 --save-every 1000
     python run.py --resume runs/test1/world_003000.json.gz --steps 2000 --out runs/test1b
+    python run.py --planet examples/volcanic.json --steps 5000 --out runs/volcanic
+    python run.py --planet photo.jpg --steps 5000 --out runs/photo
 
 Outputs in --out: config.json, stats.csv, snap_NNNNNN.png, world_final.json.gz
 (plus world_NNNNNN.json.gz with --save-every), stats.png, and with species
@@ -19,6 +21,7 @@ from plots import plot_novelty, plot_species_tree, plot_stats, write_species_csv
 from worldsim import Config, World
 from worldsim.persistence import load_world, save_world
 from worldsim.render import save_png
+from worldsim.worldgen import PlanetError, load_planet
 
 
 def build_config(args):
@@ -46,6 +49,8 @@ def main():
     p.add_argument("--save-every", type=int, default=0, help="also save the world every N steps (0 = final only)")
     p.add_argument("--resume", metavar="SAVE", help="continue from a world_*.json.gz save file")
     p.add_argument("--no-species", action="store_true", help="disable species tracking")
+    p.add_argument("--planet", metavar="FILE",
+                   help="generate the world from a planet form (.json) or an image; form fields override --set")
     p.add_argument("--width", type=int, default=None)
     p.add_argument("--height", type=int, default=None)
     p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
@@ -53,11 +58,18 @@ def main():
     args = p.parse_args()
 
     if args.resume:
-        if args.seed is not None or args.set or args.width or args.height or args.no_species:
+        if args.seed is not None or args.set or args.width or args.height or args.no_species or args.planet:
             raise SystemExit("--resume continues the saved world as-is: "
-                             "--seed/--set/--width/--height/--no-species are not allowed")
+                             "--seed/--set/--width/--height/--no-species/--planet are not allowed")
         world = load_world(args.resume)
         meta = {"resumed_from": args.resume, "resumed_at_step": world.step_count}
+    elif args.planet:
+        try:
+            cfg, terrain, seed = load_planet(args.planet, build_config(args), args.seed)
+        except PlanetError as e:
+            raise SystemExit(f"Invalid planet: {e}") from e
+        world = World(cfg, seed=seed, track_species=not args.no_species, terrain=terrain)
+        meta = {"planet": args.planet}
     else:
         seed = 1 if args.seed is None else args.seed
         world = World(build_config(args), seed=seed, track_species=not args.no_species)
@@ -87,7 +99,7 @@ def main():
                 s = world.stats()
                 species = f" species={s['species']:4d} novelty={s['novelty']}" if "species" in s else ""
                 print(f"[{st:6d}] pop={s['population']:5d} photo={s['photo']:5d} "
-                      f"sapro={s['sapro']:5d} pred={s['pred']:5d} colony={s['in_colony']:5d} "
+                      f"sapro={s['sapro']:5d} pred={s['pred']:5d} chemo={s['chemo']:4d} colony={s['in_colony']:5d} "
                       f"lineages={s['lineages']:3d} extinctions={s['extinctions']}{species} "
                       f"({time.time() - t0:.0f}s)", flush=True)
     elapsed = time.time() - t0

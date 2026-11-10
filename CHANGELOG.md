@@ -6,6 +6,18 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F2 Living environment + world seed** (roadmap phase complete, ADR-0004):
+  - Light cycles: `day_length`, `day_amplitude`, `year_length`, `season_amplitude`
+    (mean-preserving; `World.light_factor(t)`, `light_factor` stats column, viewer line).
+  - Terrain (`worldsim/terrain.py`): rocky seabed (`rock_fraction`), hydrothermal vents
+    (`vent_count`, `vent_strength`, `vent_radius`), per-column sunlight; own seed-derived RNG.
+  - 10th gene `chemo` (chemosynthesis, `chemo_gain`), a fourth feeding strategy:
+    cyan in renders and charts, `chemo` stats column.
+  - World seed (`worldsim/worldgen.py`): `run.py/view.py --planet` from a JSON form or an
+    image; `examples/` with two forms and a sample image.
+  - `Config.validate()`: type and range checks for every parameter.
+  - Tests: `tests/test_environment.py`, `tests/test_worldgen.py`, hardening tests.
+  - Experiments and figures in ROADMAP (variable light, vents, planet from an image).
 - **F1 Foundations** (roadmap phase complete):
   - Save/load (`worldsim/persistence.py`, ADR-0002): versioned gzip JSON,
     validated on load, bit-exact resume. `run.py --save-every`, `--resume`,
@@ -35,6 +47,16 @@ All notable changes to this project are documented here. Format based on
 - Graphify knowledge graph setup (`.graphifyignore`; output git-ignored).
 
 ### Changed
+- Save format v2: stores terrain maps; v1 saves are rejected. Same seed gives a different
+  history than F1 (one more gene per genome).
+- `view.py`: `R` restarts on the same terrain; window title "WorldSim".
+- CI smoke run also generates planets from a form and an image.
+
+### Security
+- Planet forms, images and saves are treated as untrusted (review 2026-11-10): bounded
+  config values, file-size and decompressed-size caps (gzip bombs), image format whitelist
+  (PNG/JPEG/WEBP/BMP/GIF) and pixel cap, counter whitelist, finite/range checks on maps,
+  cells and organic matter.
 - `Cell.bonds` is an insertion-ordered dict (ordered set) instead of a set, so
   energy-sharing order survives save/load.
 - Research and design docs translated to English and renamed

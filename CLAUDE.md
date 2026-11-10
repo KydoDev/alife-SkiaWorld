@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 <project_context>
 <name>WorldSim</name>
 <description>
-Artificial-life simulation in Python: cells with a 9-gene genome (values in
+Artificial-life simulation in Python: cells with a 10-gene genome (values in
 [0,1]) live on a 2D grid, feed, divide with mutation and die. There is **no
 explicit fitness** — selection is implicit (whatever gets energy and reproduces
 spreads). Public, open-source, non-commercial hobby/research project; the
@@ -20,9 +20,12 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
   - `render.py` — world → RGB image (Pillow).
   - `species.py` — species tracker (pure observer: speciation, tree, novelty).
   - `persistence.py` — save/load (gzip JSON, bit-exact resume).
+  - `terrain.py` — static maps (rock, vents, sun); own seed-derived RNG.
+  - `worldgen.py` — planet from a JSON form or an image (untrusted input).
 - **run.py**: headless runner → stats, snapshots, saves, species outputs.
 - **plots.py**: matplotlib charts (outside the headless engine).
-- **view.py**: interactive viewer (pygame), `--load` a save.
+- **view.py**: interactive viewer (pygame), `--load` a save, `--planet` a form/image.
+- **examples/**: sample planet forms and image.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
 - **runs/**: simulation output (git-ignored).
@@ -40,6 +43,7 @@ python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 --set immigration
 python run.py --steps 5000 --seed 1 --out runs/a --save-every 1000      # periodic saves
 python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b
 python view.py --load runs/a/world_final.json.gz
+python run.py --planet examples/volcanic.json --steps 5000 --out runs/v   # or an image
 
 pytest                                    # all tests (with coverage gate)
 pytest tests/test_world.py::test_name     # a single test
@@ -77,6 +81,11 @@ runs (same seed, before/after), not only by unit tests.
 - **Species tracker** (`world.tracker`) is a pure observer fed by hooks in
   seeding, immigration, division and `kill()`. It must never call `World.rng`
   and the dynamics must never read it (tests enforce this).
+- **Environment (F2)**: `light_factor(t)` (day/night × season) is a pure function
+  of the step; `Terrain` maps are static and stored in saves (ADR-0004). Every
+  placement path must check `blocked` (rock). New genes are appended, never inserted.
+- **Untrusted input**: planet files and saves may come from others. `Config.validate()`
+  bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Save state**: anything new that affects the dynamics (Cell slot, field, RNG
   use, ordering) must go into `persistence.py` and bump its `VERSION`; the
   bit-exact resume test catches omissions.

@@ -41,8 +41,33 @@ Without these tools you cannot tell what is going on as the system grows.
 **Exit criterion**: I can re-run a simulation, see its species tree and a "novelty over time" chart.
 
 ## F2 — Living environment + world seed
-**Status**: planned
+**Status**: done (2026-11-10). Light cycles, rocky seabed, hydrothermal vents with a 10th gene `chemo` (chemosynthesis), and a world generated from a planet form or an image ([ADR-0004](adr/0004-terrain-and-save-v2.md)). All off by default: the default `Config` is still the flat v0 world, but adding the gene changed every seed's history, so F1 numbers reproduce only at the F1 commit.
 
+**Experiment A — variable light** (seeds 1 and 7, 20k steps, `--set day_amplitude=1 --set season_amplitude=0.5` vs constant light; repeated with `--set immigration_rate=0` as a control; means over steps 16–20k):
+
+| Pair | mean `mut` const → var | `div` (reserves) const → var | novelty, steps 10–20k |
+|---|---|---|---|
+| seed 1 | 0.057 → 0.116 | 0.047 → 0.199 | 132 → 217 |
+| seed 7 | 0.045 → 0.117 | 0.046 → 0.099 | 123 → 172 |
+| seed 1, no immigration | 0.028 → 0.038 | 0.025 → 0.120 | 117 → 162 |
+| seed 7, no immigration | 0.027 → 0.159 | 0.029 → 0.065 | 94 → 217 |
+
+- **Mutation rate stays higher** in a variable environment in 4/4 pairs, but weakly once confounds are removed: nightly population crashes let random immigrants (mean `mut` 0.5) weigh more, and within established lineages (≥ 20 cells) the gap at step 20k is small and inconsistent (0.036 → 0.050, 0.029 → 0.026, 0.021 → 0.025, 0.028 → 0.050). Answer: *partly, not robustly*.
+- **Reserves arise** (the clearest effect, 4/4): cells divide at a much higher energy threshold, i.e. they store energy to survive the night. No spores yet (there is no dormancy mechanism to evolve).
+- **More novelty** in 4/4 pairs; the population oscillates daily (≈ 200–1400 cells) with no extinctions.
+
+**Experiment B — vents** (seeds 1 and 7, 20k steps, `--set rock_fraction=0.2 --set vent_count=4`):
+with `vent_strength=1` chemosynthetic colonies appear (up to 54 cells) but never last; with `vent_strength=2, vent_radius=4` (now the defaults) a stable chemosynthetic niche of 100–280 cells holds in the dark at the vents on both seeds — a threshold effect. Novelty rises (seed 1: 517 flat → 754).
+
+**World seed**: `run.py --planet examples/volcanic.json` (form) or `--planet photo.png` (image: column brightness → sunlight, red → minerals/vents, blue → nutrients, edges → rock walls, SHA-256 → seed). Inputs are untrusted and validated (security review 2026-11-10).
+
+![variable light](f2_variable_light_stats.png)
+
+![vents](f2_vents.png) ![planet from an image](f2_planet.png)
+
+Open: alternative chemistries (silicon/ammonia presets) and catastrophes from the form are deferred to G1, where they become player verbs.
+
+Original scope:
 - Day/night cycle and **seasons** (variable light).
 - Heterogeneous terrain: rocks, mineral-rich zones, hydrothermal vents (chemical energy, not just light).
 - **World generated from an input** (photo or form, see the dedicated section).
