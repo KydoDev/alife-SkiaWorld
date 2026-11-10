@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
-- **G1 "Planet in a jar" prototype** (awaiting playtest): `game.py` front-end and
+- **G1 "Planet in a jar" prototype** (owner playtest passed 2026-11-10): `game.py` front-end and
   `worldsim/play.py` rules — divine-energy budget, tools (nutrients, meteorite,
   mountain, dig, volcano), five milestones calibrated against idle and scripted
   players, replayable action log. `docs/USER_MANUAL.md`. `view.py` exposes
