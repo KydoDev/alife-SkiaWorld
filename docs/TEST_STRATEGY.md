@@ -47,6 +47,12 @@ The viewer (pygame) is checked manually; there is no user-facing release yet.
 Small worlds (`40×20`, 80 cells), explicit seeds, ≤300 steps; `tmp_path` for save files. No fixtures yet;
 a saved-world fixture will come with F1 save/load.
 
+**G2 golden vectors** (`engine-rs/tests/golden/default/`, from `scripts/g2_golden.py`): a v5 save, CPython RNG
+draws and a per-step state hash (definition in [G2_PLAN.md](G2_PLAN.md)). `tests/test_g2_golden.py` checks the
+portable parts on every OS (integer RNG paths, `random()`, hash of the loaded save) and the stepped hashes only on
+the OS that made them, because `gauss`/`pow`/`sin` come from the platform maths library (ADR-0008). A change to the
+default dynamics regenerates them in the same PR. The Rust crate checks them with `cargo test` (CI job `rust-core`).
+
 ## Known gaps
 - Energy accounting with sources/sinks on (light income vs upkeep) is not tested; only the closed system is.
 - `run.py`, `plots.py` and `view.py` have no automated tests beyond the CI smoke runs

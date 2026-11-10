@@ -30,6 +30,7 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
 - **examples/**: sample planet forms and image.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
+- **engine-rs/**: Rust core (G2 port, ADR-0008), crate `worldsim-core`; golden vectors in `tests/golden/`.
 - **runs/**: simulation output (git-ignored).
 </structure>
 </project_context>

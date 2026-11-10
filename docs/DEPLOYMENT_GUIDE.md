@@ -15,6 +15,8 @@ Runs on every PR and on pushes to `main`:
 1. **secrets** — gitleaks over full history.
 2. **lint-test** — `ruff check .`, `pytest` (coverage gate in `pyproject.toml`),
    and a 300-step headless smoke run of `run.py`.
+3. **rust-core** — in `engine-rs/`: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`
+   (G2 golden vectors; ADR-0008).
 
 Dependabot (`.github/dependabot.yml`) opens weekly grouped updates for pip and
 GitHub Actions.
