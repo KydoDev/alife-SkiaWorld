@@ -1,7 +1,13 @@
-"""Headless run: simulate N steps, save CSV statistics, PNG snapshots and a plot.
+"""Headless run: simulate N steps and write statistics, snapshots, saves and charts.
 
-Example:
+Examples:
     python run.py --steps 5000 --seed 1 --out runs/test1
+    python run.py --steps 5000 --seed 1 --out runs/test1 --save-every 1000
+    python run.py --resume runs/test1/world_003000.json.gz --steps 2000 --out runs/test1b
+
+Outputs in --out: config.json, stats.csv, snap_NNNNNN.png, world_final.json.gz
+(plus world_NNNNNN.json.gz with --save-every), stats.png, and with species
+tracking: species.csv, species_tree.png, novelty.png.
 """
 import argparse
 import csv
@@ -9,60 +15,13 @@ import json
 import os
 import time
 
+from plots import plot_novelty, plot_species_tree, plot_stats, write_species_csv
 from worldsim import Config, World
+from worldsim.persistence import load_world, save_world
 from worldsim.render import save_png
 
 
-def plot_stats(csv_path, png_path):
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print("matplotlib not installed: plot skipped")
-        return
-    rows = list(csv.DictReader(open(csv_path, encoding="utf-8")))
-    if not rows:
-        return
-    step = [int(r["step"]) for r in rows]
-    fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
-    ax = axes[0]
-    ax.plot(step, [int(r["photo"]) for r in rows], color="#3cb446", label="photosynthesis")
-    ax.plot(step, [int(r["sapro"]) for r in rows], color="#9a5ae6", label="decomposers")
-    ax.plot(step, [int(r["pred"]) for r in rows], color="#e0322d", label="predators")
-    ax.set_ylabel("cells")
-    ax.legend(loc="upper left")
-    ax.set_title("Population by dominant strategy")
-    ax = axes[1]
-    for g in ["move", "attach", "share", "mut", "div"]:
-        ax.plot(step, [float(r["mean_" + g]) for r in rows], label=g)
-    ax.set_ylabel("mean gene value")
-    ax.legend(loc="upper left", ncol=5)
-    ax = axes[2]
-    pop = [max(int(r["population"]), 1) for r in rows]
-    ax.plot(step, [int(r["in_colony"]) / p for r, p in zip(rows, pop)], label="% in colony")
-    ax.plot(step, [int(r["lineages"]) / 400 for r in rows], label="lineages / 400")
-    ax.set_ylabel("fraction")
-    ax.set_xlabel("step")
-    ax.legend(loc="upper left")
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=110)
-    plt.close(fig)
-
-
-def main():
-    p = argparse.ArgumentParser(description="WorldSim v0 headless")
-    p.add_argument("--steps", type=int, default=3000)
-    p.add_argument("--seed", type=int, default=1)
-    p.add_argument("--out", default="runs/default")
-    p.add_argument("--stats-every", type=int, default=10)
-    p.add_argument("--snap-every", type=int, default=500)
-    p.add_argument("--width", type=int, default=None)
-    p.add_argument("--height", type=int, default=None)
-    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
-                   help="override a Config parameter, e.g. --set photo_gain=2")
-    args = p.parse_args()
-
+def build_config(args):
     cfg = Config()
     if args.width:
         cfg.width = args.width
@@ -73,12 +32,41 @@ def main():
         if not hasattr(cfg, k):
             raise SystemExit(f"Unknown parameter: {k}")
         cur = getattr(cfg, k)
-        setattr(cfg, k, type(cur)(v) if not isinstance(cur, bool) else v.lower() in ("1", "true", "si", "yes"))
+        setattr(cfg, k, type(cur)(v) if not isinstance(cur, bool) else v.lower() in ("1", "true", "yes"))
+    return cfg
+
+
+def main():
+    p = argparse.ArgumentParser(description="WorldSim headless runner")
+    p.add_argument("--steps", type=int, default=3000, help="steps to simulate (after the resume point, if any)")
+    p.add_argument("--seed", type=int, default=None, help="RNG seed for a new world (default 1)")
+    p.add_argument("--out", default="runs/default")
+    p.add_argument("--stats-every", type=int, default=10)
+    p.add_argument("--snap-every", type=int, default=500)
+    p.add_argument("--save-every", type=int, default=0, help="also save the world every N steps (0 = final only)")
+    p.add_argument("--resume", metavar="SAVE", help="continue from a world_*.json.gz save file")
+    p.add_argument("--no-species", action="store_true", help="disable species tracking")
+    p.add_argument("--width", type=int, default=None)
+    p.add_argument("--height", type=int, default=None)
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="override a Config parameter, e.g. --set photo_gain=2")
+    args = p.parse_args()
+
+    if args.resume:
+        if args.seed is not None or args.set or args.width or args.height or args.no_species:
+            raise SystemExit("--resume continues the saved world as-is: "
+                             "--seed/--set/--width/--height/--no-species are not allowed")
+        world = load_world(args.resume)
+        meta = {"resumed_from": args.resume, "resumed_at_step": world.step_count}
+    else:
+        seed = 1 if args.seed is None else args.seed
+        world = World(build_config(args), seed=seed, track_species=not args.no_species)
+        meta = {}
+
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "config.json"), "w", encoding="utf-8") as f:
-        json.dump({"seed": args.seed, **cfg.to_dict()}, f, indent=2)
+        json.dump({"seed": world.seed, **meta, **world.cfg.to_dict()}, f, indent=2)
 
-    world = World(cfg, seed=args.seed)
     csv_path = os.path.join(args.out, "stats.csv")
     writer = None
     t0 = time.time()
@@ -92,15 +80,25 @@ def main():
                     writer = csv.DictWriter(f, fieldnames=list(s.keys()))
                     writer.writeheader()
                 writer.writerow(s)
+            if args.save_every and st % args.save_every == 0:
+                save_world(world, os.path.join(args.out, f"world_{st:06d}.json.gz"))
             if st % args.snap_every == 0:
                 save_png(world, os.path.join(args.out, f"snap_{st:06d}.png"))
                 s = world.stats()
+                species = f" species={s['species']:4d} novelty={s['novelty']}" if "species" in s else ""
                 print(f"[{st:6d}] pop={s['population']:5d} photo={s['photo']:5d} "
                       f"sapro={s['sapro']:5d} pred={s['pred']:5d} colony={s['in_colony']:5d} "
-                      f"lineages={s['lineages']:3d} extinctions={s['extinctions']} "
+                      f"lineages={s['lineages']:3d} extinctions={s['extinctions']}{species} "
                       f"({time.time() - t0:.0f}s)", flush=True)
+    elapsed = time.time() - t0
+
+    save_world(world, os.path.join(args.out, "world_final.json.gz"))
     plot_stats(csv_path, os.path.join(args.out, "stats.png"))
-    print("Done:", args.out)
+    if world.tracker is not None:
+        write_species_csv(world.tracker, os.path.join(args.out, "species.csv"))
+        plot_species_tree(world.tracker, world.step_count, os.path.join(args.out, "species_tree.png"))
+        plot_novelty(csv_path, os.path.join(args.out, "novelty.png"))
+    print(f"Done: {args.out} ({args.steps / max(elapsed, 1e-9):.0f} steps/s)")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import random
 import numpy as np
 
 from .config import Config
+from .species import ORIGIN_IMMIGRANT, ORIGIN_SEED, SpeciesTracker
 
 # Gene indices
 G_PHOTO, G_SAPRO, G_PRED, G_MOVE, G_DIV, G_CHILD, G_ATTACH, G_SHARE, G_MUT = range(9)
@@ -23,6 +24,7 @@ class Cell:
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "photo_k", "sapro_k", "pred_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
+        "species",
     )
 
     def __init__(self, cid, x, y, energy, genes, lineage, cfg):
@@ -32,15 +34,18 @@ class Cell:
         self.energy = energy
         self.age = 0
         self.genes = genes
-        self.bonds = set()
+        # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
+        # iterates it, so its order is part of the simulation state: a dict keeps the
+        # same order across runs AND across save/load, which a set cannot guarantee.
+        self.bonds: dict[Cell, None] = {}
         self.alive = True
         self.lineage = lineage
+        self.species = 0          # set by SpeciesTracker; never read by the dynamics
         self.express(cfg)
 
     def __hash__(self):
         # Hash by the world-unique, seed-deterministic id rather than the default
-        # id()-based hash: iteration order of `bonds` sets (energy sharing) must not
-        # depend on memory addresses, or the same seed yields different histories.
+        # id()-based hash, so nothing keyed by cells depends on memory addresses.
         # Equality stays identity, which is consistent because ids are unique.
         return self.id
 
@@ -70,7 +75,9 @@ class Cell:
 
 
 class World:
-    def __init__(self, cfg: Config | None = None, seed: int | None = None):
+    def __init__(self, cfg: Config | None = None, seed: int | None = None,
+                 track_species: bool = True, populate: bool = True):
+        """`populate=False` builds an empty world (used by `persistence.load_world`)."""
         self.cfg = cfg or Config()
         self.seed = seed
         self.rng = random.Random(seed)
@@ -88,7 +95,11 @@ class World:
         self.deaths = 0
         self.kills = 0
         self.extinctions = 0
-        self.seed_population(self.cfg.initial_cells)
+        self.now = 0              # step being executed (step_count + 1 during step())
+        self.tracker = (SpeciesTracker(self.cfg.species_threshold, self.cfg.novelty_activity,
+                                       self.cfg.species_prune_peak) if track_species else None)
+        if populate:
+            self.seed_population(self.cfg.initial_cells)
 
     # ------------------------------------------------------------------ setup
     def random_genes(self):
@@ -100,7 +111,10 @@ class World:
         for i in free[:n]:
             x, y = i % self.W, i // self.W
             cid = self._new_id()
-            self._place(Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg))
+            cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg)
+            self._place(cell)
+            if self.tracker is not None:
+                self.tracker.on_root(cell, ORIGIN_SEED, self.now)
 
     # --------------------------------------------------------------- helpers
     def _new_id(self):
@@ -142,11 +156,13 @@ class World:
         c.alive = False
         self.grid[c.y * self.W + c.x] = None
         for b in c.bonds:
-            b.bonds.discard(c)
+            b.bonds.pop(c, None)
         c.bonds.clear()
         if organic_amount > 0:
             self.organic[c.y, c.x] += organic_amount
         self.deaths += 1
+        if self.tracker is not None:
+            self.tracker.on_death(c, self.now)
 
     # ------------------------------------------------------------ fields
     def update_light(self):
@@ -180,6 +196,8 @@ class World:
         cfg, rng = self.cfg, self.rng
         grid, W = self.grid, self.W
         org, light = self.organic, self.light
+        tracker = self.tracker
+        self.now = self.step_count + 1
         self.update_light()
         light = self.light
 
@@ -250,11 +268,15 @@ class World:
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
+                    if tracker is not None:
+                        tracker.on_birth(child, c, self.now)
                     if rand() < c.attach and len(c.bonds) < cfg.max_bonds:
-                        c.bonds.add(child)
-                        child.bonds.add(c)
+                        c.bonds[child] = None
+                        child.bonds[c] = None
 
-        self.cells = [c for c in cells if c.alive] + newborns
+        # Newborns can be eaten in their birth step: filter them too, or dead ghosts
+        # stay in `cells` for a step (double-counted energy, phantom shading).
+        self.cells = [c for c in cells if c.alive] + [c for c in newborns if c.alive]
         self.update_organic()
         self.step_count += 1
 
@@ -266,12 +288,18 @@ class World:
                 i = rng.randrange(self.W * self.H)
                 if self.grid[i] is None:
                     cid = self._new_id()
-                    self._place(Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
-                                     self.random_genes(), cid, cfg))
+                    cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
+                                self.random_genes(), cid, cfg)
+                    self._place(cell)
+                    if tracker is not None:
+                        tracker.on_root(cell, ORIGIN_IMMIGRANT, self.now)
 
         if not self.cells and cfg.reseed_on_extinction:
             self.extinctions += 1
             self.seed_population(cfg.initial_cells)
+
+        if tracker is not None:
+            tracker.end_step(self.step_count)
 
     # ------------------------------------------------------------- stats
     def stats(self):
@@ -300,6 +328,8 @@ class World:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
+        if self.tracker is not None:
+            s.update(self.tracker.stats())
         return s
 
     def cell_at(self, x, y):

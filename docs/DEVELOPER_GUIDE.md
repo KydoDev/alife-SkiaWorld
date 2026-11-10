@@ -29,7 +29,15 @@ WorldSim needs none today. If a key is ever needed, add it empty to
 python view.py                                                 # interactive viewer
 python run.py --steps 10000 --seed 1 --out runs/test1          # headless run
 python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 # override any Config field
+python run.py --steps 5000 --seed 1 --out runs/a --save-every 1000         # periodic saves
+python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b  # continue a save
+python view.py --load runs/a/world_final.json.gz                           # open a save
 ```
+A run writes `config.json`, `stats.csv`, `snap_*.png`, `world_final.json.gz`
+(+ `world_NNNNNN.json.gz`), `stats.png`, and with species tracking (default;
+`--no-species` to disable) `species.csv`, `species_tree.png`, `novelty.png`.
+Species parameters (`species_threshold`, `novelty_activity`, `species_prune_peak`)
+only change the analysis, never the simulation.
 Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter ·
 `S` snapshot · `R` new world · click = inspect a cell.
 

@@ -1,0 +1,103 @@
+"""Save and load a complete world state (ADR-0002).
+
+Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 1, ...}`.
+JSON is used instead of pickle so a save file shared by someone else can never
+execute code when loaded. Python's float repr round-trips exactly through JSON,
+so a resumed run continues bit-for-bit like an uninterrupted one.
+
+Everything the dynamics depend on is stored verbatim: the RNG state (including
+the cached Gaussian), the order of `World.cells` (the step shuffles it in place)
+and the insertion order of every `Cell.bonds` (energy sharing iterates it).
+"""
+import gzip
+import json
+
+import numpy as np
+
+from .config import Config
+from .species import SpeciesTracker
+from .world import N_GENES, Cell, World
+
+FORMAT = "worldsim-save"
+VERSION = 1
+
+
+class SaveFormatError(ValueError):
+    pass
+
+
+def world_to_dict(world: World) -> dict:
+    version, internal, gauss_next = world.rng.getstate()
+    return {
+        "format": FORMAT,
+        "version": VERSION,
+        "config": world.cfg.to_dict(),
+        "seed": world.seed,
+        "step_count": world.step_count,
+        "next_id": world.next_id,
+        "counters": {"births": world.births, "deaths": world.deaths,
+                     "kills": world.kills, "extinctions": world.extinctions},
+        "rng": {"version": version, "internal": list(internal), "gauss_next": gauss_next},
+        "organic": world.organic.tolist(),
+        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order]]
+        "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
+                   [b.id for b in c.bonds]] for c in world.cells],
+        "tracker": world.tracker.to_dict() if world.tracker is not None else None,
+    }
+
+
+def world_from_dict(d: dict) -> World:
+    if d.get("format") != FORMAT:
+        raise SaveFormatError("not a WorldSim save file")
+    if d.get("version") != VERSION:
+        raise SaveFormatError(f"unsupported save version {d.get('version')!r} (expected {VERSION})")
+
+    cfg = Config(**d["config"])  # unknown keys raise TypeError
+    world = World(cfg, seed=d["seed"], track_species=d["tracker"] is not None, populate=False)
+    world.step_count = d["step_count"]
+    world.now = world.step_count
+    world.next_id = d["next_id"]
+    for k, v in d["counters"].items():
+        setattr(world, k, v)
+    rng = d["rng"]
+    world.rng.setstate((rng["version"], tuple(rng["internal"]), rng["gauss_next"]))
+
+    organic = np.asarray(d["organic"], dtype=np.float64)
+    if organic.shape != (world.H, world.W):
+        raise SaveFormatError(f"organic field has shape {organic.shape}, expected {(world.H, world.W)}")
+    world.organic = organic
+
+    by_id: dict[int, Cell] = {}
+    for cid, x, y, energy, age, genes, lineage, species, _ in d["cells"]:
+        if not (0 <= x < world.W and 0 <= y < world.H):
+            raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
+        if world.grid[y * world.W + x] is not None:
+            raise SaveFormatError(f"two cells at ({x}, {y})")
+        if len(genes) != N_GENES or cid in by_id:
+            raise SaveFormatError(f"invalid cell #{cid}")
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg)
+        c.age = age
+        c.species = species
+        world._place(c)
+        by_id[cid] = c
+    for row in d["cells"]:
+        cell = by_id[row[0]]
+        for bid in row[8]:
+            if bid not in by_id:
+                raise SaveFormatError(f"cell #{row[0]} bonded to missing cell #{bid}")
+            cell.bonds[by_id[bid]] = None
+
+    if d["tracker"] is not None:
+        world.tracker = SpeciesTracker.from_dict(d["tracker"])
+    world.update_light()
+    return world
+
+
+def save_world(world: World, path) -> None:
+    with gzip.open(path, "wt", encoding="utf-8") as f:
+        json.dump(world_to_dict(world), f, separators=(",", ":"))
+
+
+def load_world(path) -> World:
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        return world_from_dict(json.load(f))

@@ -6,6 +6,20 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F1 Foundations** (roadmap phase complete):
+  - Save/load (`worldsim/persistence.py`, ADR-0002): versioned gzip JSON,
+    validated on load, bit-exact resume. `run.py --save-every`, `--resume`,
+    always a `world_final.json.gz`; `view.py --load`.
+  - Species tracking (`worldsim/species.py`, ADR-0003): threshold speciation,
+    species tree with pruning, simplified evolutionary activity and novelty.
+    `species.csv`, `species_tree.png`, `novelty.png`; new `stats.csv` columns
+    `species`, `speciations`, `novelty`, `mean_species_activity`; viewer shows
+    the species count. Config: `species_threshold`, `novelty_activity`,
+    `species_prune_peak`.
+  - `plots.py` (charts moved out of `run.py`); `run.py` reports steps/s.
+  - Profiling results in ARCHITECTURE; tests for persistence and species.
+- Energy-conservation test on a closed system; grid consistency now checked
+  after every step.
 - Project governance (init-skia-project v1.5.0): `CLAUDE.md`, `.agents/AGENTS.md`,
   Claude subagents in `.claude/agents/` (senior-architect, code-review-security,
   qa-specialist, doc-keeper, product-manager, simulation-dev).
@@ -21,6 +35,8 @@ All notable changes to this project are documented here. Format based on
 - Graphify knowledge graph setup (`.graphifyignore`; output git-ignored).
 
 ### Changed
+- `Cell.bonds` is an insertion-ordered dict (ordered set) instead of a set, so
+  energy-sharing order survives save/load.
 - Research and design docs translated to English and renamed
   (`state-of-the-art.md`, `theory.md`, `ROADMAP.md`); README translated.
 - ROADMAP: v0 marked done, F1 in progress, per-phase status lines.
@@ -29,6 +45,8 @@ All notable changes to this project are documented here. Format based on
   comments/docstrings translated to English.
 
 ### Fixed
+- Engine: a newborn eaten in its birth step stayed in the cell list as a dead
+  ghost for one step (double-counted energy and population, phantom shading).
 - Viewer: window height now fits the full cell inspector panel; the last gene
   line (`mut`) was cut off at the default 64-row world size.
 - Determinism per seed: `Cell` now hashes by its seed-deterministic `id`, so

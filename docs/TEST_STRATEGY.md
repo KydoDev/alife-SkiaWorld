@@ -28,16 +28,22 @@ The viewer (pygame) is checked manually; there is no user-facing release yet.
 - Bond symmetry; bonds never point to dead cells; `max_bonds` respected.
 - Determinism: same seed → identical stats history.
 - Gene values stay in [0,1] after mutation.
-- Energy bookkeeping (no energy created outside light) — *to add*.
+- Energy bookkeeping: closed system (all sources/sinks off) conserves total energy.
 - Organic matter never negative.
 - Extinction → reseed.
+- Save/load: resume from file is bit-exact vs. an uninterrupted run (two split
+  points, per-cell comparison incl. bond order); invalid files are rejected.
+- Species tracker is a pure observer (identical history with tracking on/off and
+  with different thresholds); species counts match living cells; ancestry intact
+  after pruning; novelty counts only speciation-born species.
 - Columns of `stats()` that `run.py` reads by name.
 - Every fixed bug: regression test first, failing.
 
 ## Test data
-Small worlds (`40×20`, 80 cells), explicit seeds, ≤200 steps. No fixtures yet;
+Small worlds (`40×20`, 80 cells), explicit seeds, ≤300 steps; `tmp_path` for save files. No fixtures yet;
 a saved-world fixture will come with F1 save/load.
 
 ## Known gaps
-- No energy-conservation test yet (needs an accounting of light income per step).
-- `run.py` and `view.py` have no automated tests beyond the CI smoke run.
+- Energy accounting with sources/sinks on (light income vs upkeep) is not tested; only the closed system is.
+- `run.py`, `plots.py` and `view.py` have no automated tests beyond the CI smoke runs
+  (headless run + resume). Charts are checked by eye.

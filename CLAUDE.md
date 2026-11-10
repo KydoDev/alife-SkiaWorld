@@ -18,8 +18,11 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
   - `config.py` — `Config` dataclass: **every** tunable parameter lives here.
   - `world.py` — grid, `Cell`, step loop, stats.
   - `render.py` — world → RGB image (Pillow).
-- **run.py**: headless runner → `stats.csv`, PNG snapshots, `stats.png` (matplotlib).
-- **view.py**: interactive viewer (pygame).
+  - `species.py` — species tracker (pure observer: speciation, tree, novelty).
+  - `persistence.py` — save/load (gzip JSON, bit-exact resume).
+- **run.py**: headless runner → stats, snapshots, saves, species outputs.
+- **plots.py**: matplotlib charts (outside the headless engine).
+- **view.py**: interactive viewer (pygame), `--load` a save.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
 - **runs/**: simulation output (git-ignored).
@@ -34,14 +37,17 @@ pip install -r requirements.txt -r requirements-dev.txt
 python view.py                                                   # interactive viewer
 python run.py --steps 10000 --seed 1 --out runs/test1            # headless run
 python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 --set immigration_rate=0
+python run.py --steps 5000 --seed 1 --out runs/a --save-every 1000      # periodic saves
+python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b
+python view.py --load runs/a/world_final.json.gz
 
 pytest                                    # all tests (with coverage gate)
 pytest tests/test_world.py::test_name     # a single test
 ruff check .                              # lint
 ```
 `--set KEY=VALUE` accepts any `Config` field (type inferred from the default).
-`run.py` writes `config.json` (seed + params), `stats.csv`, `snap_NNNNNN.png`,
-`stats.png` into `--out`. Behavioural changes are judged by comparing headless
+`run.py` writes `config.json`, `stats.csv`, `snap_*.png`, `world_*.json.gz`,
+`stats.png`, `species.csv`, `species_tree.png`, `novelty.png` into `--out`. Behavioural changes are judged by comparing headless
 runs (same seed, before/after), not only by unit tests.
 </commands>
 
@@ -66,10 +72,16 @@ runs (same seed, before/after), not only by unit tests.
 - **Determinism**: all randomness goes through `self.rng` (`random.Random(seed)`).
   Never use the global `random` or `np.random` in the engine, and never let
   iteration order depend on memory addresses (`Cell.__hash__` returns `id`).
-- `stats()` returns the dict that becomes one `stats.csv` row; `plot_stats` in
-  `run.py` reads some columns by name.
-- Performance today: ~500 steps/s with ~900 cells; Python's practical ceiling
-  is a few thousand cells.
+- `stats()` returns the dict that becomes one `stats.csv` row; `plots.py`
+  reads some columns by name.
+- **Species tracker** (`world.tracker`) is a pure observer fed by hooks in
+  seeding, immigration, division and `kill()`. It must never call `World.rng`
+  and the dynamics must never read it (tests enforce this).
+- **Save state**: anything new that affects the dynamics (Cell slot, field, RNG
+  use, ordering) must go into `persistence.py` and bump its `VERSION`; the
+  bit-exact resume test catches omissions.
+- Performance: ~540 steps/s with ~800 cells (profile in ARCHITECTURE);
+  Python's practical ceiling is a few thousand cells.
 </architecture>
 
 <ai_identity>

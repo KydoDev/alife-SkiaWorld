@@ -49,6 +49,11 @@ class Config:
     # --- immigration (random cells appear: keeps diversity up) ---
     immigration_rate: float = 0.5    # new cells per step (e.g. 0.5 = one every 2 steps)
 
+    # --- observation (species tracking; never read by the dynamics) ---
+    species_threshold: float = 0.3   # genome distance from the founder that starts a new species
+    novelty_activity: int = 1000     # population-steps after which a species counts as established
+    species_prune_peak: int = 5      # extinct childless species below this peak size are forgotten
+
     # --- safety ---
     reseed_on_extinction: bool = True
 

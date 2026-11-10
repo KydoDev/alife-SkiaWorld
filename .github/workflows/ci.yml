@@ -29,4 +29,6 @@ jobs:
       - run: ruff check .
       - run: pytest   # coverage gate configured in pyproject.toml
       - name: Headless smoke run
-        run: python run.py --steps 300 --seed 1 --out runs/ci --snap-every 300
+        run: |
+          python run.py --steps 300 --seed 1 --out runs/ci --snap-every 300 --save-every 150
+          python run.py --resume runs/ci/world_000150.json.gz --steps 150 --out runs/ci-resume --snap-every 150

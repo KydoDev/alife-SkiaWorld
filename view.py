@@ -1,6 +1,7 @@
 """Interactive viewer (pygame).
 
     python view.py [--seed 1] [--scale 6]
+    python view.py --load runs/test1/world_final.json.gz
 
 Controls:
   SPACE   pause / resume          N    one step (while paused)
@@ -15,24 +16,30 @@ import numpy as np
 import pygame
 
 from worldsim import Config, World
+from worldsim.persistence import load_world
 from worldsim.render import render_rgb, save_png
 from worldsim.world import GENE_NAMES
 
 PANEL_W = 260
 PANEL_TOP = 10
 LINE_H = 18
-# Tallest panel: 9 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
-PANEL_MAX_LINES = 9 + 4 + len(GENE_NAMES)
+# Tallest panel: 10 stat lines (incl. blank) + 4 cell-header lines (incl. blank) + one line per gene.
+PANEL_MAX_LINES = 10 + 4 + len(GENE_NAMES)
 
 
 def main():
     p = argparse.ArgumentParser(description="WorldSim interactive viewer")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--scale", type=int, default=6)
+    p.add_argument("--load", metavar="SAVE", help="open a world_*.json.gz save file instead of a new world")
     args = p.parse_args()
 
-    cfg = Config()
-    world = World(cfg, seed=args.seed)
+    if args.load:
+        world = load_world(args.load)
+        cfg = world.cfg
+    else:
+        cfg = Config()
+        world = World(cfg, seed=args.seed)
     sc = args.scale
     pygame.init()
     # The window must fit both the world and the full inspector panel, whichever is taller.
@@ -96,6 +103,7 @@ def main():
             f"  predators  {s['pred']}",
             f"in colony    {s['in_colony']}",
             f"lineages     {s['lineages']}",
+            f"species      {s.get('species', '-')}",
             f"steps/frame  {steps_per_frame}{'  [PAUSED]' if paused else ''}",
             "",
         ]

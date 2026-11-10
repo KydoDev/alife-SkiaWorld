@@ -24,7 +24,15 @@ python run.py --steps 10000 --seed 1 --out runs/test1
 
 # override a parameter on the fly
 python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 --set immigration_rate=0
+
+# save every 1000 steps, resume a save, open a save in the viewer
+python run.py --steps 5000 --seed 1 --out runs/a --save-every 1000
+python run.py --resume runs/a/world_003000.json.gz --steps 2000 --out runs/b
+python view.py --load runs/a/world_final.json.gz
 ```
+
+Each run also tracks **species** and writes a species tree and a "novelty over time" chart
+(see [F1 results](docs/ROADMAP.md)).
 
 Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter · `S` snapshot · `R` new world · click = inspect a cell.
 
@@ -47,8 +55,11 @@ The only energy source is light, which fades with depth and is shaded by the cel
 worldsim/
   config.py   parameters (everything tunable)
   world.py    engine: grid, cells, step cycle, statistics
+  species.py  species tracking, tree, novelty (pure observer)
+  persistence.py  save / load (gzip JSON, bit-exact resume)
   render.py   world -> RGB image
-run.py        headless run + CSV + plot
+run.py        headless run: CSV, snapshots, saves, charts
+plots.py      matplotlib charts
 view.py       pygame viewer
 tests/        pytest suite (engine invariants)
 docs/         research, design, governance

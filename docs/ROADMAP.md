@@ -23,7 +23,13 @@ F1 Foundations ──► F2 Living environment + world seed ──► G1 "Planet
 **Status**: done (2026-11). Cells with a 9-gene genome, energy, light, organic matter, colonies; headless runner and pygame viewer. See [design-v0.md](design-v0.md).
 
 ## F1 — Foundations (before adding biology)
-**Status**: in progress — regression test suite in place and determinism per seed fixed (2026-11-10). Remaining: save/load, species tracking, novelty metrics, energy-conservation test, profiling.
+**Status**: done (2026-11-10). Determinism per seed, bit-exact save/resume ([ADR-0002](adr/0002-save-format.md)), species tracking and simplified evolutionary activity ([ADR-0003](adr/0003-species-definition.md)), energy-conservation and invariant tests, profiling (~540 steps/s at ~800 cells, see ARCHITECTURE).
+
+**Result** (seed 1, 10k steps, `python run.py --steps 10000 --seed 1 --save-every 5000`): resuming from step 5000 in a separate process reproduces the straight run exactly. Novelty is high for ~2500 steps (~10 newly established species / 100 steps), then drops roughly tenfold after step ~4500, while extant species settle around 80 and mean species activity keeps rising: **the v0 system stabilizes** — the signal the F4 criterion looks for. Two engine bugs were found on the way (id-based set ordering broke determinism; newborns eaten at birth stayed as ghosts).
+
+![species tree](f1_species_tree.png)
+
+![novelty](f1_novelty.png)
 
 Without these tools you cannot tell what is going on as the system grows.
 - **Saving/loading** the world and **determinism** (same seed → same history).
