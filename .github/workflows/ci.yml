@@ -62,8 +62,7 @@ jobs:
       - name: G2 Linux diagnostic (throwaway, do not merge)
         working-directory: .
         run: |
-          grep -o -w 'avx512[a-z]*' /proc/cpuinfo | sort -u | tr '
-' ' '; echo
+          grep -o -w 'avx512[a-z]*' /proc/cpuinfo | sort -u | paste -sd ' ' -
           python -c "import numpy; numpy.show_runtime()"
           python scripts/g2_linux_diag.py
           python scripts/g2_golden.py --seed 1 --warmup 200 --steps 9 --dump-step 209 --out engine-rs/target/g2-dumps/default
