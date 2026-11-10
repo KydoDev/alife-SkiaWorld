@@ -10,11 +10,15 @@ Documentation starts at [`docs/INDEX.md`](docs/INDEX.md):
 - Theory (why this is not a genetic algorithm): [`docs/theory.md`](docs/theory.md)
 - Roadmap (simulation + game): [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - Contributing: [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
+- How to play and use the tools: [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md)
 
 ## Quick start
 
 ```bash
 ./scripts/bootstrap-dev.sh        # or .\scripts\bootstrap-dev.ps1 on Windows — once per clone
+
+# play: "planet in a jar" prototype (shape the planet, reach 5 milestones)
+python game.py
 
 # interactive viewer
 python view.py
@@ -68,10 +72,12 @@ worldsim/
   persistence.py  save / load (gzip JSON, bit-exact resume)
   terrain.py  static maps: rocks, vents, sunlight per column
   worldgen.py planet from a JSON form or an image
+  play.py     game rules: interventions, budget, milestones (headless)
   render.py   world -> RGB image
 run.py        headless run: CSV, snapshots, saves, charts
 plots.py      matplotlib charts
 view.py       pygame viewer
+game.py       "planet in a jar" game prototype (G1)
 tests/        pytest suite (engine invariants)
 examples/     sample planets (forms, image)
 docs/         research, design, governance

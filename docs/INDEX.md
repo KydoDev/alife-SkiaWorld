@@ -28,6 +28,9 @@ What gets tested, at which level, and the coverage gate CI enforces.
 ### [Deployment Guide](./DEPLOYMENT_GUIDE.md)
 CI pipeline and how the project is distributed.
 
+### [User Manual](./USER_MANUAL.md)
+How to play *Planet in a jar*, use the viewer and runner, and make planets.
+
 ## Research and design
 
 ### [State of the art](./state-of-the-art.md)

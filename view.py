@@ -33,21 +33,21 @@ PANEL_MAX_LINES = 12 + 4 + len(GENE_NAMES) + LEGEND_LINES
 SWATCH = 10
 
 
-def main():
-    p = argparse.ArgumentParser(description="WorldSim interactive viewer")
+def add_world_args(p):
+    """World-selection options shared by the viewer and the game."""
     p.add_argument("--seed", type=int, default=None, help="RNG seed (default 1; a planet has its own)")
     p.add_argument("--scale", type=int, default=6)
     p.add_argument("--load", metavar="SAVE", help="open a world_*.json.gz save file instead of a new world")
     p.add_argument("--planet", metavar="FILE", help="generate the world from a planet form (.json) or an image")
     p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                    help="override a Config parameter (form fields win over --set with --planet)")
-    args = p.parse_args()
 
+
+def create_world(args):
     if args.load:
         if args.set or args.planet or args.seed is not None:
             raise SystemExit("--load opens the saved world as-is: --set/--planet/--seed are not allowed")
-        world = load_world(args.load)
-        cfg = world.cfg
+        return load_world(args.load)
     else:
         try:
             base = Config().apply_overrides(args.set)
@@ -58,6 +58,15 @@ def main():
         except (PlanetError, ValueError) as e:
             raise SystemExit(f"Invalid world: {e}") from e
         world = World(cfg, seed=seed, terrain=terrain)
+    return world
+
+
+def main():
+    p = argparse.ArgumentParser(description="WorldSim interactive viewer")
+    add_world_args(p)
+    args = p.parse_args()
+    world = create_world(args)
+    cfg = world.cfg
     sc = args.scale
     pygame.init()
     # The window must fit both the world and the full inspector panel, whichever is taller.

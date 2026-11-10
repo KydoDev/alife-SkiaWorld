@@ -182,8 +182,12 @@ An ALife simulation is fascinating to watch for 10 minutes and then gets boring.
 
 ### Game phases
 - **G1 (after F2)**: playable prototype in Python/pygame. Photo or form → planet, 3–4 interventions, 5 milestones. Check whether it is fun **before** investing in the port.
-  - **Status**: planned
-  - Deliverable: docs/USER_MANUAL.md (user manual for the viewer/game)
+  - **Status**: prototype ready (2026-11-10), **awaiting the owner's playtest** — the exit criterion ("is it fun?") cannot be checked by tests.
+  - Built: `game.py` + `worldsim/play.py`. Planet from a form or photo (`--planet`), divine-energy budget, 5 tools (nutrients, meteorite, mountain, dig, volcano) and 5 milestones (abyss, full ecosystem, giant organism, survivors, divided ocean). Manual: [USER_MANUAL.md](USER_MANUAL.md).
+  - Design rule: interventions are RNG-free instant edits of saved state, so games stay deterministic and replayable (`play.replay`), and save/resume stays bit-exact.
+  - **Milestone calibration** (scripted players, 2026-11-10): an *idle* player reaches **no** milestone in 6000 steps on any example planet. On `examples/volcanic.json` all five were reached: a simple scripted player got abyss (350), divided ocean (2325), full ecosystem (9025) and giant organism (12 500); survivors needs an aimed meteor shower (5 meteorites at step 5000 killed 34% of life; recovered at 5240), while the bot's unaimed shower killed too few. Scripted players reach only 1–3 on the flat default world, `red_dwarf` and `planet.png`: giant colonies and stable decomposer specialists need day/night, seasons and several vents. Hence `game.py` starts on the volcanic planet. First drafts that fired on their own (predators ≥ 50, 50% in colonies, 25 new species, population dips on day/night planets) were replaced. A code review then fixed a survivor check that could fire without any recovery, replay stalling on late actions, vents weakening each other, and toast/drag glitches in the UI.
+  - Found on the way: the *Nutrients* tool barely matters on the default world (organic matter is not limiting there, ~10⁵ units lie on the seabed) — a candidate to rethink after the playtest.
+  - Deliverable: docs/USER_MANUAL.md — done.
 - **G2 (after F3)**: engine port and visualization in Unity.
   - **Status**: planned
 - **G3**: UI, tree of life, progression, saves, sharing.

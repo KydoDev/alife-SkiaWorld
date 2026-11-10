@@ -18,6 +18,9 @@ flowchart LR
     Render --> Run
     Plots[plots.py<br/>matplotlib charts] --> Run
     World --> View[view.py<br/>pygame viewer]
+    World <--> Play[worldsim/play.py<br/>game rules]
+    Play --> Game[game.py<br/>planet in a jar]
+    Render --> Game
     Render --> View
     Run --> Out[(runs/&lt;name&gt;/<br/>config.json · stats.csv · species.csv<br/>world_*.json.gz · PNGs)]
 ```
@@ -84,6 +87,18 @@ photo/sapro/pred/chemo share; background shows light (blue), organic matter
 Headless loop: steps, CSV sampling, periodic PNG snapshots and saves
 (`--save-every`), `--resume`, final save, `species.csv`, and charts:
 `stats.png`, `species_tree.png`, `novelty.png` (`plots.py` reads CSV columns by name).
+
+### `worldsim/play.py` (G1)
+Game rules, headless: interventions (`add_nutrients`, `meteorite`, `raise_rock`,
+`dig`, `add_vent`) are instant, RNG-free edits of saved state applied between
+steps (terrain edits rebuild derived maps via `set_terrain`); `Game` adds the
+divine-energy budget, an action log (`replay` reproduces a game) and five
+milestones checked every `check_every` steps. `GameRules` holds costs and
+thresholds; it never changes the simulation itself.
+
+### `game.py`
+pygame front-end of `Game`: tool selection, click/drag to act, budget bar,
+milestone list, toasts, colour key. Reuses `view.add_world_args/create_world`.
 
 ### `view.py`
 pygame viewer: pause, single step, speed, organic overlay, snapshot, new world

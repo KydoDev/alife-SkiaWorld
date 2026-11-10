@@ -26,6 +26,7 @@ WorldSim needs none today. If a key is ever needed, add it empty to
 
 ## Running
 ```bash
+python game.py                                                 # play the G1 prototype
 python view.py                                                 # interactive viewer
 python run.py --steps 10000 --seed 1 --out runs/test1          # headless run
 python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 # override any Config field

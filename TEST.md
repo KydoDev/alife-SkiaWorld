@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-10 — F2 Living environment + world seed (working tree before the F2 commit)
+Last run: 2026-11-10 — G1 "Planet in a jar" prototype (working tree before the G1 commit)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -8,13 +8,14 @@ Last run: 2026-11-10 — F2 Living environment + world seed (working tree before
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| Unit + integration (`tests/`, 80 tests) | 80 | 0 | 0 | 98.3% (`worldsim/`, excl. render) |
-| Defaults-off light cycle vs F2 baseline (seed 1, 2000 steps, before the gene change) | 200/200 stats rows identical | | | |
-| CI smoke commands (run, resume, form planet, image planet, resume of an image planet) | all complete | | | |
-| Viewer (headless, `--planet examples/volcanic.json`, 5 frames + screenshot) | renders, panel complete | | | |
-| Perf back-to-back, seed 1, 3k steps: F1 commit vs F2 tree | 303 vs 354 steps/s (no regression) | | | |
+| Unit + integration (`tests/`, 99 tests) | 99 | 0 | 0 | 98.7% (`worldsim/`, excl. render) |
+| Idle-player control: no interventions, 6000 steps (default, volcanic, red_dwarf, planet.png, default seed 7) | 0 milestones on every planet | | | |
+| Scripted player, `examples/volcanic.json` | 4/5 milestones; survivors verified with an aimed shower (step 5240) | | | |
+| Scripted player, default / red_dwarf / planet.png | 1–3 of 5 (documented as harder planets) | | | |
+| Game (headless pygame, scripted clicks: volcano, meteorite, mountain drag, inspect) | renders, panel and toasts complete | | | |
 
 Lint: `ruff check .` — clean.
+Not covered by tests: whether the game is fun (owner playtest = G1 exit criterion).
 
 ## Failures
 None.

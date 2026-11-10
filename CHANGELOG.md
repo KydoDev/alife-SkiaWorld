@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G1 "Planet in a jar" prototype** (awaiting playtest): `game.py` front-end and
+  `worldsim/play.py` rules — divine-energy budget, tools (nutrients, meteorite,
+  mountain, dig, volcano), five milestones calibrated against idle and scripted
+  players, replayable action log. `docs/USER_MANUAL.md`. `view.py` exposes
+  `add_world_args`/`create_world` for reuse.
 - **F2 Living environment + world seed** (roadmap phase complete, ADR-0004):
   - Light cycles: `day_length`, `day_amplitude`, `year_length`, `season_amplitude`
     (mean-preserving; `World.light_factor(t)`, `light_factor` stats column, viewer line).

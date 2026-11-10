@@ -22,9 +22,11 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
   - `persistence.py` — save/load (gzip JSON, bit-exact resume).
   - `terrain.py` — static maps (rock, vents, sun); own seed-derived RNG.
   - `worldgen.py` — planet from a JSON form or an image (untrusted input).
+  - `play.py` — G1 game rules: interventions, budget, milestones (headless, RNG-free).
 - **run.py**: headless runner → stats, snapshots, saves, species outputs.
 - **plots.py**: matplotlib charts (outside the headless engine).
 - **view.py**: interactive viewer (pygame), `--load` a save, `--planet` a form/image, `--set`; colour legend in the panel.
+- **game.py**: "planet in a jar" game prototype (pygame front-end of `play.py`).
 - **examples/**: sample planet forms and image.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
@@ -37,6 +39,7 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
 ./scripts/bootstrap-dev.ps1          # (or .sh) once per clone: hooks, deps, graph
 pip install -r requirements.txt -r requirements-dev.txt
 
+python game.py                                                   # play the G1 prototype
 python view.py                                                   # interactive viewer
 python run.py --steps 10000 --seed 1 --out runs/test1            # headless run
 python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 --set immigration_rate=0
@@ -86,6 +89,9 @@ runs (same seed, before/after), not only by unit tests.
   placement path must check `blocked` (rock). New genes are appended, never inserted.
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
+- **Interventions (G1)** edit the world only between steps, use no RNG and only touch
+  saved state; after a terrain edit call `set_terrain`, then drop dead cells. Milestones
+  must not fire for an idle player (check with a no-intervention run).
 - **Save state**: anything new that affects the dynamics (Cell slot, field, RNG
   use, ordering) must go into `persistence.py` and bump its `VERSION`; the
   bit-exact resume test catches omissions.
