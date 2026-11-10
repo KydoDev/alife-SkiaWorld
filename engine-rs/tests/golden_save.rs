@@ -1,5 +1,5 @@
 //! M1c: the kernel loads the golden start saves and their state hash equals Python's step-0 row
-//! of `hashes.csv`; malformed saves are refused with an error, never a panic.
+//! of `hashes.csv`; malformed or hostile saves are refused with an error, never a panic.
 
 mod common;
 
@@ -8,7 +8,7 @@ use flate2::read::GzDecoder;
 use serde_json::{json, Value};
 use std::io::Read;
 use worldsim_core::hash::state_hash;
-use worldsim_core::save::{load_world, world_from_gzip, world_from_json, world_from_value};
+use worldsim_core::save::{load_world, world_from_gzip, world_from_json};
 
 #[test]
 fn start_save_hash_matches_python() {
@@ -40,15 +40,8 @@ fn base_save() -> Value {
     serde_json::from_str(&text).expect("json")
 }
 
-fn refused(save: &Value, expected: &str) {
-    match world_from_value(save) {
-        Ok(_) => panic!("save accepted, expected an error containing {expected:?}"),
-        Err(e) => assert!(
-            e.message().contains(expected),
-            "error {:?} does not mention {expected:?}",
-            e.message()
-        ),
-    }
+fn load(save: &Value) -> Result<worldsim_core::world::World, worldsim_core::SaveError> {
+    world_from_json(&serde_json::to_vec(save).expect("json"))
 }
 
 fn with(edit: impl FnOnce(&mut Value)) -> Value {
@@ -57,11 +50,26 @@ fn with(edit: impl FnOnce(&mut Value)) -> Value {
     save
 }
 
+/// Index of a cell row with no bonds, and its id.
+fn lonely_cell(save: &Value) -> (usize, Value) {
+    let cells = save["cells"].as_array().expect("cells");
+    let i = cells
+        .iter()
+        .position(|c| c[8].as_array().is_some_and(Vec::is_empty))
+        .expect("an unbonded cell");
+    (i, cells[i][0].clone())
+}
+
+#[test]
+fn the_unmodified_base_save_loads() {
+    load(&base_save()).expect("base save");
+}
+
 #[test]
 fn malformed_saves_are_refused() {
-    let first_cell = |s: &mut Value| s["cells"][0].clone();
+    const BAD: &str = "not a valid save file";
     let cases: Vec<(Value, &str)> = vec![
-        (json!([1, 2]), "not a WorldSim save"),
+        (json!([1, 2]), BAD),
         (
             with(|s| s["format"] = json!("other")),
             "not a WorldSim save",
@@ -92,29 +100,40 @@ fn malformed_saves_are_refused() {
             with(|s| s["config"]["sensing"] = json!(1)),
             "sensing must be bool",
         ),
+        (with(|s| s["config"]["shade"] = json!([0.7])), BAD),
         (
             with(|s| s["config"]["div_min"] = json!(100.0)),
             "div_min/mut_min",
         ),
         (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
-        (
-            with(|s| s["counters"]["births"] = json!(-1)),
-            "invalid counter \"births\"",
-        ),
-        (
-            with(|s| s["counters"]["kills"] = json!(true)),
-            "invalid counter \"kills\"",
-        ),
+        (with(|s| s["seed"] = json!(1.5)), BAD),
         (
             with(|s| {
-                s["rng"]["internal"]
-                    .as_array_mut()
-                    .unwrap()
-                    .pop()
-                    .map(|_| ())
-                    .unwrap()
+                s.as_object_mut().unwrap().remove("tracker");
             }),
-            "625",
+            "missing field `tracker`",
+        ),
+        (
+            with(|s| s["step_count"] = json!(1u64 << 63)),
+            "exceeds 2^62",
+        ),
+        (with(|s| s["next_id"] = json!(3)), "above next_id"),
+        (with(|s| s["counters"]["births"] = json!(-1)), BAD),
+        (with(|s| s["counters"]["kills"] = json!(true)), BAD),
+        (
+            with(|s| s["counters"]["deaths"] = json!(u64::MAX)),
+            "exceeds 2^62",
+        ),
+        (with(|s| s["rng"]["version"] = json!(3.0)), BAD),
+        (
+            with(|s| {
+                s["rng"]["internal"].as_array_mut().unwrap().pop();
+            }),
+            "624 words, expected 625",
+        ),
+        (
+            with(|s| s["rng"]["internal"].as_array_mut().unwrap().push(json!(1))),
+            "list longer than 625",
         ),
         (
             with(|s| s["rng"]["internal"][624] = json!(625)),
@@ -123,6 +142,12 @@ fn malformed_saves_are_refused() {
         (
             with(|s| s["rng"]["internal"][0] = json!(1u64 << 32)),
             "exceeds 32 bits",
+        ),
+        (
+            with(|s| {
+                s["rng"].as_object_mut().unwrap().remove("gauss_next");
+            }),
+            "missing field `gauss_next`",
         ),
         (
             with(|s| s["organic"][0][0] = json!(-1.0)),
@@ -135,61 +160,103 @@ fn malformed_saves_are_refused() {
             "does not match",
         ),
         (
-            with(|s| s["terrain"] = json!({"rock": [], "chem": [], "sun": []})),
-            "terrain maps",
+            with(|s| s["organic"][0] = json!(vec![0.0; 10_001])),
+            "larger than any valid world",
         ),
-        (with(|s| s["terrain"] = json!(3)), "invalid terrain"),
-        (with(|s| s["cells"][0] = json!([1, 2, 3])), "13 fields"),
+        (
+            with(|s| s["terrain"] = json!({"rock": [], "chem": [], "sun": []})),
+            "does not match",
+        ),
+        (
+            with(|s| s["terrain"] = json!({"rock": [[2]], "chem": [], "sun": []})),
+            "only 0 and 1",
+        ),
+        (with(|s| s["terrain"] = json!(3)), BAD),
+        (with(|s| s["cells"][0] = json!([1, 2, 3])), BAD),
+        (
+            with(|s| s["cells"][0].as_array_mut().unwrap().push(json!(0))),
+            BAD,
+        ),
         (with(|s| s["cells"][0][1] = json!(160)), "outside the grid"),
-        (with(|s| s["cells"][0][2] = json!(-1)), "outside the grid"),
+        (with(|s| s["cells"][0][2] = json!(-1)), BAD),
+        (with(|s| s["cells"][0][1] = json!(1.0)), BAD),
         (
             with(|s| {
-                let c = first_cell(s);
+                let c = s["cells"][0].clone();
                 s["cells"][1][1] = c[1].clone();
                 s["cells"][1][2] = c[2].clone();
             }),
             "occupied",
         ),
         (with(|s| s["cells"][0][5][3] = json!(1.01)), "invalid cell"),
-        (with(|s| s["cells"][0][5] = json!([0.5])), "invalid cell"),
-        (with(|s| s["cells"][0][3] = json!("lots")), "invalid cell"),
+        (with(|s| s["cells"][0][5] = json!([0.5])), BAD),
+        (with(|s| s["cells"][0][3] = json!("lots")), BAD),
+        (with(|s| s["cells"][0][4] = json!(u64::MAX)), "exceeds 2^62"),
         (
             with(|s| {
-                let id = first_cell(s)[0].clone();
+                let id = s["cells"][0][0].clone();
                 s["cells"][1][0] = id;
             }),
             "invalid cell",
         ),
         (
             with(|s| s["cells"][0][9] = json!([[0.5, 0.5, 0.5, 0.5]])),
-            "rule genes",
+            "list longer than 0",
         ),
         (with(|s| s["cells"][0][10] = json!(0.5)), "sex_p"),
         (with(|s| s["cells"][0][11] = json!(0.5)), "plast_p"),
-        (with(|s| s["cells"][0][12] = json!([0.3, 0.3, 0.4])), "diet"),
+        (
+            with(|s| s["cells"][0][12] = json!([0.3, 0.3, 0.4])),
+            "list longer than 0",
+        ),
         (
             with(|s| s["cells"][0][8] = json!([999_999_999])),
             "bonded to missing",
         ),
         (
+            with(|s| s["cells"][0][8] = json!(vec![1; 9])),
+            "list longer than 8",
+        ),
+        (
             with(|s| {
-                let id = first_cell(s)[0].clone();
-                s["cells"][0][8] = json!([id]);
+                let (i, id) = lonely_cell(s);
+                s["cells"][i][8] = json!([id]);
             }),
             "self or duplicate",
         ),
         (
             with(|s| {
-                let id = s["cells"][1][0].clone();
-                s["cells"][0][8] = json!([id]);
-                s["cells"][1][8] = json!([]);
+                let (i, _) = lonely_cell(s);
+                let other = if i == 0 { 1 } else { 0 };
+                let id = s["cells"][other][0].clone();
+                s["cells"][i][8] = json!([id]);
             }),
             "not symmetric",
         ),
     ];
     for (save, expected) in &cases {
-        refused(save, expected);
+        match load(save) {
+            Ok(_) => panic!("save accepted, expected an error containing {expected:?}"),
+            Err(e) => assert!(
+                e.message().contains(expected),
+                "error {:?} does not mention {expected:?}",
+                e.message()
+            ),
+        }
     }
+}
+
+#[test]
+fn ignored_parts_are_skipped() {
+    // Unknown top-level keys and extra counters are skipped, as in Python; the tracker is
+    // observer state the kernel never reads.
+    let save = with(|s| {
+        s["future_key"] = json!({"a": [1, 2, 3]});
+        s["counters"]["hgt_events"] = json!(0);
+        s["tracker"] = json!({"anything": [1, {"x": null}]});
+    });
+    let world = load(&save).expect("save with ignored parts");
+    assert_eq!(state_hash(&world), hashes("default")[0].2);
 }
 
 #[test]
@@ -204,6 +271,7 @@ fn bad_bytes_are_refused() {
     );
     let err = world_from_gzip(&gz, 1000).expect_err("decompressed size cap");
     assert!(err.message().contains("more than 1000 bytes"));
+    assert!(load_world(golden_dir("default").join("no_such_file.json.gz")).is_err());
 }
 
 /// Cheap fuzzing: corrupt single bytes of the decompressed JSON; every outcome must be an

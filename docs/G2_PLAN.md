@@ -135,12 +135,18 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `hashes.csv` identical to the committed ones, and `WORLDSIM_GOLDEN_DIR=target/golden-local cargo test` passes.
 - M2 open question (Linux vs Windows-made stepped hashes): settled by the same decision.
 - **M1c** (2026-11-10, Windows 11, rustc 1.98.1): `engine-rs/src/save.rs` loads a v6 gzip JSON save
-  (dependencies `flate2`, `serde_json` with `float_roundtrip` for exact float parsing, `sha2`);
+  (dependencies `flate2`, `serde` + `serde_json` with `float_roundtrip` for exact float parsing, `sha2`);
   `engine-rs/src/hash.rs` implements the state hash. `cargo test` → `tests/golden_save.rs`: the step-0 hash
   equals Python's `hashes.csv` start row on both sets (default: step 200, 225 cells; volcanic). Validation
   follows `persistence.py` and `Config.validate()` (512 MiB decompressed cap, unknown or missing config keys,
-  bounds, grid/rock/duplicate checks, RNG state); 34 malformed-save cases and 300 single-byte corruptions
-  return errors, never panics. Deliberately stricter than Python: integer fields that the hash packs as `u64`
-  must be non-negative integers, rock must be 0/1 integers, bonds must be symmetric with no duplicates or
-  self-bonds, every config key must be present. Saves with `sensing`, `open_genome`, `sex` or `plasticity` on
-  are refused until M5; the species tracker is ignored (observer state).
+  bounds, grid/rock/duplicate checks, RNG state); ~50 malformed-save cases and 300 single-byte corruptions
+  return errors, never panics. A security review (`@code-review-security`) of the first version found that a
+  generic JSON tree costs ~27× the text (a 512 MiB save could exhaust memory and abort the host), that an
+  oversized bond list made load and step quadratic, and that u64 counters from a save could overflow. Fixed
+  before the PR: the save is deserialized into typed, **capped** structures (every list has a maximum length,
+  maps share a 10⁶-element budget, the tracker and unknown keys are skipped unstored), at most 8 bonds per
+  cell, every counter/id/age ≤ 2⁶², `next_id` ≥ every cell id, and the file is streamed through the
+  decompressor. Deliberately stricter than Python (listed in `save.rs`): those bounds, rock as 0/1 integers,
+  symmetric bonds without duplicates or self-bonds, every config key present, seed None/int/str, RNG version
+  the integer 3 and words ≤ 32 bits. Saves with `sensing`, `open_genome`, `sex` or `plasticity` on are refused
+  until M5; the species tracker is skipped, not validated (observer state, never read).

@@ -12,6 +12,8 @@ crate-type = ["rlib", "cdylib"]
 # Saves are gzip JSON (worldsim/persistence.py). `float_roundtrip` makes float parsing exact,
 # so every float of a save (written with Python's shortest repr) is read back bit for bit.
 flate2 = "1"
+# Typed deserialization: the save is parsed straight into bounded structures (no JSON tree).
+serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = "0.10"
 
