@@ -1,72 +1,74 @@
-# La teoria dietro WorldSim
+# The theory behind WorldSim
 
-> Perché WorldSim non è un algoritmo genetico, e quali idee di biologia teorica ed ecologia lavorano dentro il codice.
+Last updated: 2026-11-10
 
-## 1. La radice comune: l'algoritmo darwiniano
+> Why WorldSim is not a genetic algorithm, and which ideas from theoretical biology and ecology are at work inside the code.
 
-Dennett descrive l'evoluzione come un **algoritmo** indipendente dal substrato. Le condizioni di Lewontin dicono che c'è evoluzione ovunque ci siano:
+## 1. The common root: the Darwinian algorithm
 
-1. **variazione**: gli individui differiscono;
-2. **ereditarietà**: i figli somigliano ai genitori;
-3. **riproduzione differenziale**: alcune varianti lasciano più discendenti.
+Dennett describes evolution as a substrate-independent **algorithm**. Lewontin's conditions state that evolution occurs wherever there is:
 
-In WorldSim corrispondono a: genoma di 9 numeri → copia con mutazione gaussiana → l'energia decide chi si divide.
+1. **variation**: individuals differ;
+2. **heredity**: offspring resemble their parents;
+3. **differential reproduction**: some variants leave more descendants.
 
-## 2. Algoritmo genetico vs vita artificiale
+In WorldSim these map to: a 9-number genome → copy with Gaussian mutation → energy decides who divides.
 
-| | Algoritmo genetico (Holland) | Vita artificiale con selezione implicita (Tierra, Avida, WorldSim) |
+## 2. Genetic algorithm vs artificial life
+
+| | Genetic algorithm (Holland) | Artificial life with implicit selection (Tierra, Avida, WorldSim) |
 |---|---|---|
-| Scopo | **Ottimizzare**: trovare la soluzione migliore | **Esplorare**: vedere cosa emerge |
-| Fitness | **Esogena**: una funzione scritta dal programmatore | **Endogena**: chi si riproduce in quel mondo, in quel momento |
-| Selezione | Esterna: si ordinano i candidati e si tengono i migliori | Interna: si muore di fame, si viene mangiati, si resta senza spazio |
-| Tempo | Generazioni sincronizzate | Nascite e morti sovrapposte, in continuo |
-| Mondo | Non esiste, c'è solo il voto | È tutto: risorse, spazio, altri organismi |
-| Fine | Quando si trova la soluzione | Mai, idealmente |
+| Purpose | **Optimize**: find the best solution | **Explore**: see what emerges |
+| Fitness | **Exogenous**: a function written by the programmer | **Endogenous**: whoever reproduces in that world, at that moment |
+| Selection | External: candidates are ranked and the best are kept | Internal: you starve, get eaten, run out of space |
+| Time | Synchronized generations | Overlapping births and deaths, continuously |
+| World | Does not exist; there is only the score | It is everything: resources, space, other organisms |
+| End | When the solution is found | Never, ideally |
 
-Entrambi appartengono al **calcolo evolutivo**. Il nome preciso di WorldSim è **modello individual-based (agent-based) evolutivo**, nel campo dell'Artificial Life.
+Both belong to **evolutionary computation**. The precise name for WorldSim is an **evolutionary individual-based (agent-based) model**, within the field of Artificial Life.
 
-## 3. Concetti che operano nel sistema
+## 3. Concepts at work in the system
 
-### Paesaggio adattativo dinamico
-Nei GA il paesaggio di fitness è fisso e l'evoluzione "scala colline". In WorldSim il paesaggio lo **costruiscono gli organismi**: molte piante rendono conveniente predare, molti predatori rendono conveniente altro. È la **selezione dipendente dalla frequenza**; nella forma estrema è la **Regina Rossa** (Van Valen): evolvere di continuo per restare fermi.
+### Dynamic adaptive landscape
+In GAs the fitness landscape is fixed and evolution "climbs hills". In WorldSim the landscape is **built by the organisms**: many plants make predation pay off, many predators make something else pay off. This is **frequency-dependent selection**; in its extreme form it is the **Red Queen** (Van Valen): evolving continuously just to stay in place.
 
-### Nicchie e compromessi
-**Esclusione competitiva** (Gause): due specie che usano la stessa risorsa non coesistono a lungo. In WorldSim le risorse sono tre (luce, materia organica, altre cellule) e i **trade-off** sono imposti dall'esponente `p^spec_exp`: un generalista è mediocre in tutto. Infatti alzando `spec_exp` da 1.5 a 2 le strategie si sono separate.
+### Niches and trade-offs
+**Competitive exclusion** (Gause): two species using the same resource do not coexist for long. In WorldSim there are three resources (light, organic matter, other cells) and the **trade-offs** are imposed by the exponent `p^spec_exp`: a generalist is mediocre at everything. Indeed, raising `spec_exp` from 1.5 to 2 made the strategies separate.
 
-### Predatore-preda
-Le oscillazioni piante/predatori sono la versione a individui di **Lotka-Volterra**. Con individui spazialmente espliciti emergono effetti che le equazioni non vedono (es. colonie legate che non possono essere predate dall'interno).
+### Predator–prey
+The plant/predator oscillations are the individual-based version of **Lotka–Volterra**. With spatially explicit individuals, effects emerge that the equations cannot see (e.g. bonded colonies that cannot be preyed upon from the inside).
 
-### Termodinamica
-La vita è una **struttura dissipativa** (Prigogine): ordine mantenuto consumando un flusso di energia. Per questo in WorldSim l'energia si conserva: entra solo dalla luce, esce solo dal metabolismo. Senza un flusso vincolato non c'è pressione selettiva.
+### Thermodynamics
+Life is a **dissipative structure** (Prigogine): order maintained by consuming a flow of energy. This is why energy is conserved in WorldSim: it enters only from light and leaves only through metabolism. Without a constrained flow there is no selective pressure.
 
-### Evoluzione dell'evolvibilità
-Il tasso di mutazione è un gene. Mutare molto aiuta a esplorare ma rovina i figli di chi è già adattato; oltre la **soglia di errore** (Eigen) l'informazione si degrada più veloce di quanto la selezione la conservi. In ambiente stabile vince chi copia fedelmente: è ciò che si osserva nella v0 (`mut` cala). Previsione: con ambienti variabili il tasso dovrebbe risalire.
+### Evolution of evolvability
+The mutation rate is a gene. Mutating a lot helps exploration but ruins the offspring of those already adapted; beyond the **error threshold** (Eigen) information degrades faster than selection can preserve it. In a stable environment faithful copiers win: this is what is observed in v0 (`mut` decreases). Prediction: in variable environments the rate should rise again.
 
-### Transizioni evolutive maggiori
-Maynard Smith & Szathmáry: momenti in cui replicatori indipendenti diventano parti di un'unità superiore (geni → cromosomi, cellule → organismi, organismi → società). Le colonie della v0 sono il primo gradino; il salto vero richiede **divisione del lavoro** tra cellule dello stesso organismo.
+### Major evolutionary transitions
+Maynard Smith & Szathmáry: moments when independent replicators become parts of a higher-level unit (genes → chromosomes, cells → organisms, organisms → societies). The v0 colonies are the first step; the real leap requires **division of labor** among cells of the same organism.
 
-### Emergenza
-Nessuna regola dice "formate colonie" o "stratificatevi per profondità": sono comportamenti **emergenti** da regole locali + selezione.
+### Emergence
+No rule says "form colonies" or "stratify by depth": these behaviors are **emergent** from local rules + selection.
 
-## 4. Il problema aperto: l'evoluzione open-ended
+## 4. The open problem: open-ended evolution
 
-Quasi ogni simulazione converge a un equilibrio e smette di inventare; la biosfera no. È la questione centrale dell'ALife (**open-ended evolution**).
+Almost every simulation converges to an equilibrium and stops inventing; the biosphere does not. This is the central question of ALife (**open-ended evolution**).
 
-- **Come si misura**: *activity statistics* di Bedau & Packard (innovazioni che compaiono e persistono); metriche **MODES** (change, novelty, complexity, ecology).
-- **Cosa la favorirebbe** (ipotesi):
-  - ambiente che cambia, anche per effetto degli organismi stessi (niche construction);
-  - **rappresentazione genetica aperta**: genoma a lunghezza variabile, regole o programmi invece di un vettore fisso;
-  - interazioni ricche tra organismi (coevoluzione, comunicazione).
+- **How it is measured**: Bedau & Packard's *activity statistics* (innovations that appear and persist); the **MODES** metrics (change, novelty, complexity, ecology).
+- **What would favor it** (hypotheses):
+  - an environment that changes, including as an effect of the organisms themselves (niche construction);
+  - **open genetic representation**: variable-length genome, rules or programs instead of a fixed vector;
+  - rich interactions between organisms (coevolution, communication).
 
-WorldSim v0 ha un genoma di 9 numeri fissi: lo spazio delle forme è **chiuso per costruzione**, quindi non può essere open-ended. È la direzione naturale delle prossime versioni (vedi [`roadmap.md`](roadmap.md)).
+WorldSim v0 has a genome of 9 fixed numbers: the space of forms is **closed by construction**, so it cannot be open-ended. This is the natural direction for the next versions (see [`ROADMAP.md`](ROADMAP.md)).
 
-## Letture
+## Reading list
 
-- D. Dennett, *L'idea pericolosa di Darwin*.
-- J. Holland, *Adaptation in Natural and Artificial Systems* (l'origine dei GA).
+- D. Dennett, *Darwin's Dangerous Idea*.
+- J. Holland, *Adaptation in Natural and Artificial Systems* (the origin of GAs).
 - T. Ray, *An approach to the synthesis of life* (Tierra, 1991).
 - Lenski, Ofria, Pennock, Adami, *The evolutionary origin of complex features*, Nature 2003 (Avida).
 - J. Maynard Smith, E. Szathmáry, *The Major Transitions in Evolution*.
 - M. Bedau et al., *Open problems in artificial life*, Artificial Life 2000.
 - T. Taylor et al., *Open-Ended Evolution: Perspectives from the OEE Workshop in York*, Artificial Life 2016.
-- Stato dell'arte dei progetti: [`stato-dell-arte.md`](stato-dell-arte.md).
+- State of the art of existing projects: [`state-of-the-art.md`](state-of-the-art.md).

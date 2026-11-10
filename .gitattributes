@@ -1,0 +1,26 @@
+# Normalize line endings: LF in repo, native on checkout
+* text=auto
+
+# Always LF
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf
+
+# Git hooks have no extension: force LF or `#!/bin/sh\r` breaks on Windows checkouts
+.githooks/* text eol=lf
+
+# Always CRLF (Windows-only scripts)
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary — never diff/merge as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.7z binary

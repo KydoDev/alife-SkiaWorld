@@ -1,0 +1,15 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=worldsim --cov-report=term-missing --cov-fail-under=90"
+
+[tool.coverage.run]
+omit = ["worldsim/render.py"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+# zip() over parallel lists built from the same rows; strict= adds noise, not safety.
+ignore = ["B905"]

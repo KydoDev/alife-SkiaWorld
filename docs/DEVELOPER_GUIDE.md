@@ -1,0 +1,57 @@
+# Developer Guide
+
+Last updated: 2026-11-10
+
+**`./scripts/bootstrap-dev.ps1` (Windows) or `./scripts/bootstrap-dev.sh` — run once per clone.**
+
+## What the bootstrap does
+1. `git config core.hooksPath .githooks` — enables the committed hooks:
+   `pre-commit` (secret scan) and `post-commit` (background knowledge-graph refresh).
+   Git hooks do not survive a clone; this line is what makes them real.
+2. `pip install -r requirements.txt -r requirements-dev.txt`.
+3. `pre-commit install` if the `pre-commit` framework is available (gitleaks,
+   ruff, whitespace checks); otherwise the hook's inline fallback scan runs.
+4. Builds the Graphify knowledge graph if `graphify-out/graph.json` is missing
+   (`--code-only` unless an LLM API key is set).
+
+## One-off machine installs
+- Python 3.12+.
+- `pip install pre-commit` — full secret scanning and linting on commit.
+- `uv tool install graphifyy` then `graphify install` — knowledge graph used by
+  AI agents to orient cheaply in the codebase (optional; agents fall back to search).
+
+## Secrets
+WorldSim needs none today. If a key is ever needed, add it empty to
+`.env.example` and put the real value in `.env` (git-ignored).
+
+## Running
+```bash
+python view.py                                                 # interactive viewer
+python run.py --steps 10000 --seed 1 --out runs/test1          # headless run
+python run.py --steps 5000 --out runs/test2 --set pred_eff=0.7 # override any Config field
+```
+Viewer keys: `SPACE` pause · `N` one step · `+/-` speed · `O` organic matter ·
+`S` snapshot · `R` new world · click = inspect a cell.
+
+## Tests and lint
+```bash
+pytest                                   # full suite, coverage gate from pyproject.toml
+pytest tests/test_world.py::test_name    # single test
+ruff check .                             # lint
+```
+See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
+the previous content into `test_history.md` first).
+
+## Experiments
+A new mechanism lands with an experiment: the `run.py` command, the seed(s),
+and the outcome, recorded in the relevant design doc or ROADMAP phase. Compare
+the same seed before and after a change.
+
+## Standards and conventions
+[`CLAUDE.md`](../CLAUDE.md) is the authority. In short: English for all new
+code/docs, every tunable in `Config`, all randomness through `World.rng`,
+Conventional Commits (`feat(engine): ...`), small PRs into a protected `main`
+(CI must pass, no force-push — branch protection should be enabled on GitHub).
+
+Target: a new contributor goes from clone to a running viewer in under 30
+minutes following only this document.

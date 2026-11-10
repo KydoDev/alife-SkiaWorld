@@ -1,0 +1,3 @@
+# Tracked but not worth graphing
+docs/*.png
+runs/

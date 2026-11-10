@@ -3,7 +3,6 @@
 Headless: nessuna dipendenza grafica. La griglia ha x toroidale e y = profondità
 (riga 0 = superficie illuminata, ultima riga = fondale).
 """
-import math
 import random
 
 import numpy as np

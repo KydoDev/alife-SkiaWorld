@@ -1,0 +1,27 @@
+#!/bin/sh
+# Block secrets from entering the repository.
+if command -v pre-commit >/dev/null 2>&1 && [ -f .pre-commit-config.yaml ]; then
+  exec pre-commit run --hook-stage pre-commit
+fi
+
+# Fallback scan — a floor, not a ceiling. CI runs gitleaks regardless.
+# The NUL-separated file list never touches a shell variable, and the decision
+# is made on grep's OUTPUT, not the pipeline's exit status.
+HITS=$(git diff --cached --name-only --diff-filter=ACM -z \
+  | xargs -0 -r grep -nIE \
+  -e 'Password[[:space:]]*=[[:space:]]*[^;"[:space:]]{6,}' \
+  -e '(sk|pk)-(live|test)-[A-Za-z0-9]{16,}' \
+  -e 'AKIA[0-9A-Z]{16}' \
+  -e 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' \
+  -e 'AccountKey=[A-Za-z0-9+/=]{40,}' \
+  2>/dev/null)
+
+if [ -n "$HITS" ]; then
+  echo "$HITS"
+  echo
+  echo "pre-commit: possible secret detected above. Commit blocked."
+  echo "Move it to environment variables (.env, git-ignored)."
+  echo "If this is a false positive: git commit --no-verify"
+  exit 1
+fi
+exit 0

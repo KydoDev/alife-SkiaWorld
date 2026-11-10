@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refresh the Graphify knowledge graph incrementally, in the background.
+# Must never block, fail, or slow down a commit.
+command -v graphify >/dev/null 2>&1 || exit 0
+[ -d graphify-out ] || exit 0   # no graph yet — bootstrap builds it, not this hook
+# `git rev-parse --git-path` works inside linked worktrees where `.git` is a file.
+LOCK=$(git rev-parse --git-path graphify-update.lock)
+[ -e "$LOCK" ] && exit 0        # an update is already running
+( touch "$LOCK"
+  graphify . --update >/dev/null 2>&1
+  rm -f "$LOCK" ) &
+exit 0

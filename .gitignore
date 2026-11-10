@@ -1,5 +1,56 @@
+# --- Common ---
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+nul
+
+# IDE / editors
+.idea/
+.vs/
+.vscode/
+*.swp
+
+# Logs and temp
+*.log
+tmp/
+temp/
+
+# AI agent working files (session-local, never shared)
+.nextPrompt
+.gemini/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Graphify knowledge graph — generated, refreshed by .githooks/post-commit.
+# `.graphifyignore` IS committed (configuration, not output).
+graphify-out/
+
+# Local-only docs
+docs/local/
+
+# Secrets — the example file is committed, real values never are
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+secrets.json
+
+# --- Python ---
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# --- WorldSim ---
+# Simulation outputs (run.py --out) and viewer snapshots
 runs/
 snapshot_*.png
-.venv/

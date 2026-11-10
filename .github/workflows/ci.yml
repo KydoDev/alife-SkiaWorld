@@ -1,0 +1,32 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # gitleaks needs history to scan the diff
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest   # coverage gate configured in pyproject.toml
+      - name: Headless smoke run
+        run: python run.py --steps 300 --seed 1 --out runs/ci --snap-every 300

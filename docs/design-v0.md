@@ -1,62 +1,64 @@
-# WorldSim v0 — Cellule con genoma ed energia
+# WorldSim v0 — Cells with genome and energy
 
-> Obiettivo v0: un mondo 2D minimale in cui **strategie di vita diverse emergono e convivono** senza fitness esplicita. Successo = ecosistema stabile con almeno 2 strategie (es. produttori + predatori/decompositori) dopo migliaia di passi.
+Last updated: 2026-11-10
 
-## Principi
-- **Semplice prima, poi strati.** Niente fisica dettagliata: griglia, energia, regole locali.
-- **Nessuna fitness.** Sopravvive chi si riproduce; l'unica fonte di energia è la luce.
-- **Energia conservata.** Ogni joule viene dalla luce e finisce in metabolismo; il resto circola (corpi → materia organica → decompositori).
-- **Headless first.** Motore separato dal visualizzatore (portabile poi su JAX/Rust/Unity).
+> v0 goal: a minimal 2D world in which **different life strategies emerge and coexist** without explicit fitness. Success = a stable ecosystem with at least 2 strategies (e.g. producers + predators/decomposers) after thousands of steps.
 
-## Il mondo
-- Griglia **W×H** (default 160×100). Asse x toroidale (si riavvolge), y = profondità: riga 0 = superficie, ultima riga = fondale.
-- **Luce**: massima in superficie, cala esponenzialmente con la profondità **e** viene schermata da ogni cellula sopra (`shade^n`). → competizione per la luce.
-- **Materia organica**: campo continuo per casella. Viene da cellule morte / prede non digerite, si **diffonde**, **affonda** lentamente e decade.
+## Principles
+- **Simple first, then layers.** No detailed physics: grid, energy, local rules.
+- **No fitness.** Whoever reproduces survives; the only energy source is light.
+- **Conserved energy.** Every joule comes from light and ends up in metabolism; the rest circulates (bodies → organic matter → decomposers).
+- **Headless first.** Engine separate from the viewer (later portable to JAX/Rust/Unity).
 
-## La cellula
-Occupa una casella. Stato: energia, età, genoma, legami con vicine (colonia).
+## The world
+- **W×H** grid (default 160×100). The x axis is toroidal (wraps around), y = depth: row 0 = surface, last row = seabed.
+- **Light**: maximal at the surface, decays exponentially with depth **and** is shaded by every cell above (`shade^n`). → competition for light.
+- **Organic matter**: a continuous field per tile. It comes from dead cells / undigested prey, **diffuses**, slowly **sinks** and decays.
 
-### Genoma (9 geni in [0,1], ereditati con mutazione gaussiana)
-| # | Gene | Effetto |
+## The cell
+Occupies one tile. State: energy, age, genome, bonds with neighbors (colony).
+
+### Genome (9 genes in [0,1], inherited with Gaussian mutation)
+| # | Gene | Effect |
 |---|---|---|
-| 0 | `photo` | affinità fotosintesi |
-| 1 | `sapro` | affinità decomposizione (mangia materia organica) |
-| 2 | `pred` | affinità predazione (mangia cellule vicine) |
-| 3 | `move` | probabilità di muoversi per passo (solo se non legata) |
-| 4 | `div` | soglia di energia per dividersi |
-| 5 | `child` | frazione di energia data al figlio |
-| 6 | `attach` | probabilità che il figlio resti attaccato → colonia |
-| 7 | `share` | quanta energia condivide con le cellule legate |
-| 8 | `mut` | intensità delle mutazioni dei figli (**il tasso di mutazione evolve**) |
+| 0 | `photo` | photosynthesis affinity |
+| 1 | `sapro` | decomposition affinity (eats organic matter) |
+| 2 | `pred` | predation affinity (eats neighboring cells) |
+| 3 | `move` | probability of moving per step (only if not bonded) |
+| 4 | `div` | energy threshold for dividing |
+| 5 | `child` | fraction of energy given to the offspring |
+| 6 | `attach` | probability that the offspring stays attached → colony |
+| 7 | `share` | how much energy it shares with bonded cells |
+| 8 | `mut` | mutation strength in the offspring (**the mutation rate evolves**) |
 
-I tre geni trofici sono **normalizzati** (photo+sapro+pred = 1) e il guadagno usa `p^1.5`: specializzarsi conviene, essere generalisti costa. → trade-off da cui nascono "piante", "funghi", "predatori".
+The three trophic genes are **normalized** (photo+sapro+pred = 1) and the gain uses `p^1.5`: specializing pays off, being a generalist costs. → a trade-off from which "plants", "fungi" and "predators" arise.
 
-### Ciclo di un passo (ordine casuale tra le cellule)
-1. **Metabolismo**: paga `base_cost + pred·pred_upkeep + move·move_upkeep` (avere bocca e muscoli costa anche quando non li usi).
-2. **Fotosintesi**: `+ photo_gain · photo^1.5 · luce(casella)`.
-3. **Decomposizione**: prende materia organica dalla casella, `+ sapro_eff · presa`.
-4. **Predazione**: con probabilità `pred^1.5` attacca una vicina **non legata a sé**: ottiene `pred_eff ·` (energia + corpo) della preda; il resto diventa organico.
-5. **Movimento**: se non legata, con probabilità `move` va in una casella libera adiacente (costo).
-6. **Condivisione**: cede energia alle cellule legate più povere (`share`).
-7. **Divisione**: se energia ≥ soglia e c'è una casella libera: paga il **costo del corpo**, il figlio riceve `child` dell'energia rimasta e un genoma mutato; con probabilità `attach` restano legati.
-8. **Morte**: energia ≤ 0 o età massima → energia residua + corpo diventano materia organica.
+### Step cycle (random order across cells)
+1. **Metabolism**: pays `base_cost + pred·pred_upkeep + move·move_upkeep` (having a mouth and muscles costs even when you don't use them).
+2. **Photosynthesis**: `+ photo_gain · photo^1.5 · light(tile)`.
+3. **Decomposition**: takes organic matter from the tile, `+ sapro_eff · intake`.
+4. **Predation**: with probability `pred^1.5` attacks a neighbor **not bonded to itself**: gains `pred_eff ·` (energy + body) of the prey; the rest becomes organic matter.
+5. **Movement**: if not bonded, with probability `move` moves to a free adjacent tile (at a cost).
+6. **Sharing**: gives energy to poorer bonded cells (`share`).
+7. **Division**: if energy ≥ threshold and there is a free tile: pays the **body cost**, the offspring receives `child` of the remaining energy and a mutated genome; with probability `attach` they stay bonded.
+8. **Death**: energy ≤ 0 or maximum age → residual energy + body become organic matter.
 
-## Immigrazione
-Ogni passo compaiono in media 0.5 cellule con genoma casuale in caselle libere. Senza immigrazione le nicchie "lontane" (es. decompositori nel buio) non vengono mai raggiunte, perché le forme intermedie non sopravvivono. È un'aggiunta standard in ALife per mantenere la diversità; si spegne con `--set immigration_rate=0`.
+## Immigration
+Each step, on average 0.5 cells with a random genome appear in free tiles. Without immigration, "distant" niches (e.g. decomposers in the dark) are never reached, because the intermediate forms do not survive. It is a standard addition in ALife to maintain diversity; it can be turned off with `--set immigration_rate=0`.
 
-## Taratura v0 (valori in `config.py`)
-Griglia 160×64 · 400 cellule iniziali con energia 40 · `photo_gain` 3 · `spec_exp` 2 · `pred_eff` 0.5 · `organic_sink` 0.01 · `body_cost` 5 · `max_age` 600 · immigrazione 0.5/passo.
-Primi tentativi: con `photo_gain` 1 la popolazione collassava; con `spec_exp` 1.5 dominavano gli ibridi pianta-predatore; con sedimentazione 0.05 la materia organica finiva subito sul fondale, irraggiungibile.
+## v0 tuning (values in `config.py`)
+Grid 160×64 · 400 initial cells with energy 40 · `photo_gain` 3 · `spec_exp` 2 · `pred_eff` 0.5 · `organic_sink` 0.01 · `body_cost` 5 · `max_age` 600 · immigration 0.5/step.
+First attempts: with `photo_gain` 1 the population collapsed; with `spec_exp` 1.5 plant–predator hybrids dominated; with sedimentation 0.05 organic matter immediately ended up on the seabed, out of reach.
 
-## Osservazione
-- **Colori**: verde = fotosintesi, viola = decomposizione, rosso = predazione (mix in base al genoma). Sfondo: blu = luce, marrone = materia organica.
-- **Statistiche** (CSV): popolazione, conteggio per strategia dominante, tratti medi, % cellule in colonia, lignaggi sopravvissuti, energia e organico totali.
-- **Snapshot PNG** periodici + grafico delle popolazioni.
+## Observation
+- **Colors**: green = photosynthesis, purple = decomposition, red = predation (mixed according to the genome). Background: blue = light, brown = organic matter.
+- **Statistics** (CSV): population, count per dominant strategy, mean traits, % of cells in colonies, surviving lineages, total energy and organic matter.
+- Periodic **PNG snapshots** + population chart.
 
-## Fuori scope v0 (prossimi strati)
-1. Sensori + scelte direzionali (muoversi verso cibo/luce) → mini-cervello.
-2. Specializzazione nelle colonie (cellule diverse nello stesso organismo) → multicellularità vera.
-3. Segnali chimici tra cellule → comunicazione → base per il sociale.
-4. Stagioni / ciclo giorno-notte, ambienti eterogenei.
-5. Albero filogenetico e identificazione automatica delle "specie".
-6. Port del motore su JAX o Rust per scalare a milioni di cellule.
+## Out of scope for v0 (next layers)
+1. Sensors + directional choices (moving towards food/light) → mini-brain.
+2. Specialization within colonies (different cells in the same organism) → true multicellularity.
+3. Chemical signals between cells → communication → basis for the social layer.
+4. Seasons / day-night cycle, heterogeneous environments.
+5. Phylogenetic tree and automatic identification of "species".
+6. Port of the engine to JAX or Rust to scale to millions of cells.
