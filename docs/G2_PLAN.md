@@ -6,18 +6,18 @@ reference lab. This file is the G2 working plan (kept apart from `PLAN.md`, whic
 the F-phase experiments).
 
 ## Checklist
-1. [x] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a v5 save
+1. [x] M0 Golden vectors: `scripts/g2_golden.py` writes RNG draws + per-step state hashes from a save
 2. [x] M1a Rust crate skeleton in `engine-rs/`, `cargo test` green, CI job
 3. [x] M1b CPython-compatible RNG in Rust (MT19937, random, randbelow, shuffle, choice, randrange, gauss)
-4. [ ] M1c Load a v5 save in Rust; state hash at step 0 equals Python's
+4. [ ] M1c Load a save (current `SAVE_VERSION`) in Rust; state hash at step 0 equals Python's
 5. [ ] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [ ] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [ ] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
-8. [ ] M5 Port the optional flags (sensing, open_genome, sex), terrain/planet input, interventions
+8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
 
 ## Scope of the first milestone (M0–M2)
-Default flags only: `sensing`, `open_genome`, `sex` off; species tracker off (it is a
+Default flags only: `sensing`, `open_genome`, `sex`, `plasticity` off; species tracker off (it is a
 pure observer and does not affect the dynamics, ADR-0003). Flat default world first, then
 `examples/volcanic.json` (terrain + vents + day/night) as the second golden case.
 
@@ -27,7 +27,7 @@ images (the Rust side only reads saves, which already contain the terrain maps).
 ## Golden data (M0)
 `scripts/g2_golden.py [--planet FILE] --seed S --warmup W --steps N --out engine-rs/tests/golden/<name>/`
 writes (sets committed: `default`, flat world; `volcanic`, `examples/volcanic.json`):
-- `start.json.gz` — a v5 save at step 0 (or after a warm-up, so colonies and organic
+- `start.json.gz` — a save (current `SAVE_VERSION`) at step 0 (or after a warm-up, so colonies and organic
   matter exist);
 - `rng.json` — from a fixed state: 1000 × `random()`, `randrange(n)` for several `n`
   (including non-powers of two), `shuffle` of `range(50)`, `choice`, 1000 × `gauss(0, σ)`
@@ -70,6 +70,21 @@ engine of this branch's base, `d0e0a3d`), so the default-flags target of M0–M2
 fail on the v5 `start.json.gz`. Fix then: regenerate the golden sets (the hashes should not change, since
 the hash excludes the version; check that they don't) and have the Rust loader read the version current at
 that point (`SAVE_VERSION` in `engine-rs/src/lib.rs`).
+**Done** with F5b on main (`6f0d770`): golden sets regenerated as v6, `hashes.csv` unchanged, Rust
+`SAVE_VERSION = 6`. Later F-phases follow the same rule (see "Rules for the port").
+
+## Parallel work with the F-phases (reviewed 2026-11-10)
+G2 and the F-phase plan run in parallel on these terms:
+- **New F mechanisms stay behind a flag, off by default, with no RNG draws when off** (the existing rule). They
+  cost the port nothing until M5.
+- **No change to the default dynamics while M2 is open**: no new gene, no change to the default step order or
+  RNG use, no recalibration of defaults. If one is needed, it waits for M2 or lands with regenerated golden
+  sets and a note here.
+- **A save-format bump** (a new cell slot, as F5a/F5b did) regenerates both golden sets in the same PR, checks
+  that `hashes.csv` is unchanged, and bumps `SAVE_VERSION` in `engine-rs/src/lib.rs`. The Rust loader
+  (M1c onwards) then reads the new row, ignoring the flagged fields while their flag is off.
+- G2 milestones touch only `engine-rs/`, `scripts/g2_golden.py`, `tests/test_g2_golden.py`, this file, the G2
+  section of ROADMAP and CHANGELOG/Unreleased; the shared files are the usual merge points.
 
 ## Golden sets per platform (decided 2026-11-10)
 `gauss` and the stepped hashes go through the platform maths library (`log`, `cos`, `sin`, `pow`, `exp`), so

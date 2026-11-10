@@ -125,6 +125,10 @@ All notable changes to this project are documented here. Format based on
 - Graphify knowledge graph setup (`.graphifyignore`; output git-ignored).
 
 ### Changed
+- `docs/G2_PLAN.md`: M1c and the golden data no longer name a fixed save version (current
+  `SAVE_VERSION`); M5 lists F5b `plasticity` and later flagged F-phases; new section on running
+  G2 in parallel with the F-phases (flagged features only, default dynamics frozen while M2
+  is open, save bumps regenerate the golden sets).
 - Save format v2: stores terrain maps; v1 saves are rejected. Same seed gives a different
   history than F1 (one more gene per genome).
 - `view.py`: `R` restarts on the same terrain; window title "WorldSim".
