@@ -18,7 +18,8 @@ Numbered, append-only records of the decisions that shaped the system:
 [0002 save format](./adr/0002-save-format.md) ·
 [0003 species and novelty](./adr/0003-species-definition.md) ·
 [0004 terrain and save v2](./adr/0004-terrain-and-save-v2.md) ·
-[0005 sensor genes and save v3](./adr/0005-sensor-genes-and-save-v3.md).
+[0005 sensor genes and save v3](./adr/0005-sensor-genes-and-save-v3.md) ·
+[0006 rule genome and save v4](./adr/0006-rule-genome-and-save-v4.md).
 
 ### [Developer Guide](./DEVELOPER_GUIDE.md)
 Bootstrap, running locally, tests, contribution rules.

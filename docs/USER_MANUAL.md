@@ -1,6 +1,6 @@
 # User Manual
 
-Last updated: 2026-11-10 (F3 sensors)
+Last updated: 2026-11-10 (F4 open genome)
 
 WorldSim has three programs:
 
@@ -84,11 +84,14 @@ python view.py --planet examples/volcanic.json    # a planet form or image
 python view.py --set day_amplitude=1 --set vent_count=4
 python view.py --load runs/a/world_final.json.gz  # open a save
 python view.py --set sensing=1                    # cells steer by their senses (F3)
+python view.py --set sensing=1 --set open_genome=1  # cells evolve their own rules (F4)
 ```
 Keys: `SPACE` pause · `N` one step while paused · `+/-` speed · `O` organic
 matter · `S` snapshot PNG · `R` new seed on the same terrain · click to inspect
 a cell (its genes; *sensor weights* from −1 = avoids to +1 = seeks light, organic matter,
-chemical energy, kin, strangers, danger — they only act with `--set sensing=1`) · `ESC` quit.
+chemical energy, kin, strangers, danger — they only act with `--set sensing=1`; with
+`--set open_genome=1` also its first *rules*, e.g. `light<0.20 w_light +0.80` = "when it is
+darker than 0.2 here, seek light more") · `ESC` quit.
 
 ## Headless runs (`run.py`)
 ```bash
@@ -98,6 +101,8 @@ python run.py --resume runs/v/world_003000.json.gz --steps 2000 --out runs/v2
 ```
 The output folder gets `stats.csv`, `stats.png`, `species_tree.png`,
 `novelty.png`, `species.csv`, snapshots and saves (written at the end of a run).
+Saves are tied to the genome format: a save from an older version (before the F4 rule
+genes) is refused with a clear message, so re-run instead of resuming it.
 
 ## Colours
 | Colour | Meaning |

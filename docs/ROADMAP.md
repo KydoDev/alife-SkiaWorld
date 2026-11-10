@@ -101,8 +101,25 @@ Original scope:
 - Experiment: do hunting, fleeing, day/night vertical migrations emerge?
 
 ## F4 — Open genome (growing the number of genes)
-**Status**: planned
+**Status**: done (2026-11-10). Besides its 16 fixed genes a cell can carry a variable-length list of **rule genes** — *when (always / own energy above or below t / light here above or below t), add intensity w to a sensor weight or to the division threshold* — that mutate, **duplicate**, get deleted and arise de novo at division, at a cost per rule ([ADR-0006](adr/0006-rule-genome-and-save-v4.md)). `--set open_genome=1` (off by default, and then bit-identical to F3: checked against the F3 commit by fingerprint and by re-running two F3 arms; a test asserts no rule code runs); `--set rules_neutral=1` is the control arm in which rules vary and cost the same but do nothing. Species stay defined on the fixed genes, so genome growth cannot inflate novelty. Entry criterion ("stalls even in a variable environment") waived by the owner, not met. Speed cost: none measurable with the feature off; small with rules on (not precisely measured; the `steps_per_s` column in the CSVs was taken under parallel load and is not a benchmark).
 
+**Experiment** (`python scripts/f4_experiment.py --steps 10000`, [f4_experiment.csv](f4_experiment.csv), rule types in [f4_experiment_rule_types.csv](f4_experiment_rule_types.csv)): arms F3 / rules on / rules neutral, all with sensing and immigration 0.5; flat world with day/night and `examples/volcanic.json`; seeds 1 3 5 7 9; steps 5–10k, descendants only. Verdict rule fixed in advance (PLAN, now in plan_history).
+
+| Question | Result | Verdict |
+|---|---|---|
+| Do rules earn their keep? (rule count on > neutral in ≥ 8/10 pairs) | 5/10: flat 1/5 (mean 0.93 vs 0.88 rules), volcanic 4/5 (1.75 vs 0.82) | **no** overall |
+| Confirmatory, volcanic only, new seeds 11–19 (hypothesis written before running: ≥ 4/5) | 5/5 (mean 1.84 vs 0.98), [f4_confirm_volcanic.csv](f4_confirm_volcanic.csv) | **yes on the volcanic planet** |
+| Is a rule type selected? (same type in the top 3 enriched in ≥ 6/10 pairs) | none: the most frequent appears in 3/10 (`light< → div +`, divide later in the dark); conditional rules ≈ 0.8 of all rules in both arms, the share expected by chance | **no** |
+| Does novelty change? (fixed genes) | flat: F3 295, on 248, neutral 260; volcanic 497 / 510 / 554 (means at 10k) | no effect |
+
+- **Rules pay off on the volcanic planet**: selection keeps about twice as many rules as drift does (9/10 volcanic seeds across both runs). On the flat day/night world rule count matched drift in 4/5 seeds; that is no evidence of an effect, not a confirmed absence (5 seeds, not re-tested).
+- **Mechanism unknown.** It does not look like conditional behaviour: the share of conditional rules on the volcanic planet is at or below the 0.8 expected by chance (0.63–0.80 on vs 0.72–0.86 neutral in the main run). Candidates, untested: *dosage* (the on arm reaches 10–15 rules in 4/5 seeds vs 5–8 neutral, and stacked rules push a weight beyond ±1); *division rules* (rules targeting the division threshold average 0.22 of all rules with rules on vs 0.14 neutral across the 10 volcanic seeds, more in 6/10 — the trait F2 found under the clearest selection); and *population size* (volcanic populations are about twice the flat ones, so selection beats drift more easily).
+- **No single behaviour type**: each seed enriches different rule types (dividing later or earlier by light, avoiding organic matter in the dark, avoiding kin when well fed…). Rules seem to be used as diverse, lineage-specific tweaks rather than converging on one strategy; with 5–10 seeds and ~1–3 rules per cell this cannot be resolved further.
+- Genomes stay small (mean 1–3 rules, max 2–15 of 16) under `rule_upkeep=0.01`: no bloat.
+- Novelty is unchanged, as designed: the tracker ignores rules. Measuring rule innovation as such (new rule types established in lineages) is the open step before claiming more open-endedness.
+- Next candidates (one at a time): a rule-aware novelty measure; letting rules read other rules (regulatory network, level 3, toward F6).
+
+Original scope:
 See the dedicated section. In short: from a fixed vector to a **variable-length genome** with gene duplication and deletion.
 
 ## F5 — Two parents and variation during life

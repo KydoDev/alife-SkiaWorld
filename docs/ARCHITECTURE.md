@@ -66,6 +66,11 @@ SHA-256 of the bytes → seed). Size caps and field validation; errors are `Plan
   each free neighbour tile (light, organic, chemical energy, kin/stranger/danger
   densities, radius 1) and moves to the best; otherwise movement is a random walk
   (ADR-0005).
+- **Open genome (F4)**: with `Config.open_genome`, a cell also carries `rules`, a
+  variable-length list of rule genes `(condition, threshold, target, intensity)`.
+  `rule_effects()` applies the active ones once per cell per step (extra sensor weight,
+  or a shifted division threshold); `mutate_rules()` mutates, duplicates, deletes and
+  adds rules at division. Off by default with no RNG draws; species ignore rules (ADR-0006).
 - **Bonds**: colonies are symmetric `bonds` links between cells, created at
   division with probability `attach`, cleared on death. Stored as an
   insertion-ordered `dict` used as an ordered set: energy sharing iterates it,
@@ -82,7 +87,7 @@ activity and the novelty counter. Never touches the RNG; the dynamics never read
 
 ### `worldsim/persistence.py`
 `save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
-v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005). Resume is bit-exact.
+v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006). Resume is bit-exact.
 
 ### `worldsim/render.py`
 Maps the world to an RGB array: cell color mixes green/purple/red/cyan by

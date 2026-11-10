@@ -21,7 +21,7 @@ from worldsim import Config, World
 from worldsim.persistence import load_world
 from worldsim.render import LEGEND, render_rgb, save_png
 from worldsim.worldgen import PlanetError, load_planet
-from worldsim.world import GENE_NAMES
+from worldsim.world import GENE_NAMES, describe_rule
 
 PANEL_W = 260
 PANEL_TOP = 10
@@ -31,7 +31,9 @@ LINE_H = 18
 LEGEND_LINES = 2 + len(LEGEND) + 2
 N_TRAITS = GENE_NAMES.index("w_light")             # genes before the F3 sensor weights
 GENE_LINES = (N_TRAITS + 1) // 2 + 1 + (len(GENE_NAMES) - N_TRAITS + 1) // 2
-PANEL_MAX_LINES = 12 + 4 + GENE_LINES + LEGEND_LINES
+SHOWN_RULES = 3                                     # F4 rule genes listed in the inspector
+RULE_LINES = 1 + SHOWN_RULES
+PANEL_MAX_LINES = 12 + 4 + GENE_LINES + RULE_LINES + LEGEND_LINES
 SWATCH = 10
 
 
@@ -142,7 +144,7 @@ def main():
             if selected.alive:
                 lines += [f"cell #{selected.id}", f"energy {selected.energy:.1f}  age {selected.age}",
                           f"bonds {len(selected.bonds)}  strategy {selected.strategy}", ""]
-                lines += gene_lines(selected.genes)
+                lines += gene_lines(selected.genes, selected.rules)
             else:
                 lines.append("(dead cell)")
         else:
@@ -159,13 +161,18 @@ def main():
     pygame.quit()
 
 
-def gene_lines(genes):
-    """Inspector text: trait genes two per line, then the sensor genes as signed weights (2g - 1)."""
+def gene_lines(genes, rules=()):
+    """Inspector text: trait genes two per line, the sensor genes as signed weights (2g - 1), then the first
+    F4 rule genes, if any."""
     def pairs(items):
         return ["  ".join(items[i:i + 2]) for i in range(0, len(items), 2)]
     traits = [f"{n:7s}{v:.2f}" for n, v in zip(GENE_NAMES[:N_TRAITS], genes)]
     sensors = [f"{n[2:]:9s}{2 * v - 1:+.2f}" for n, v in zip(GENE_NAMES[N_TRAITS:], genes[N_TRAITS:])]
-    return pairs(traits) + ["sensor weights:"] + pairs(sensors)
+    lines = pairs(traits) + ["sensor weights:"] + pairs(sensors)
+    if rules:
+        more = f" (first {SHOWN_RULES})" if len(rules) > SHOWN_RULES else ""
+        lines += [f"rules {len(rules)}{more}:"] + [" " + describe_rule(r) for r in rules[:SHOWN_RULES]]
+    return lines
 
 
 def draw_swatch(screen, color, x, y):

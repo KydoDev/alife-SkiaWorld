@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F4 Open genome** (roadmap phase complete, ADR-0006): variable-length rule genes
+  (condition on own energy or light → sensor weight or division threshold) with
+  duplication, deletion, de novo insertion and a per-rule cost, `--set open_genome=1`;
+  neutral control arm `rules_neutral`; save format v4; `rules_mean`/`rules_max` stats;
+  rules in the viewer inspector. Experiment `scripts/f4_experiment.py`: pre-registered
+  verdict null overall; rules earn their keep on the volcanic planet (confirmed on new
+  seeds, mechanism unknown), no effect seen on the flat one (5 seeds); no single rule
+  type selected; novelty unchanged.
 - **F3 Sensors and behavior** (roadmap phase complete, ADR-0005): six sensor genes
   (`w_light`, `w_organic`, `w_chem`, `w_kin`, `w_stranger`, `w_danger`) and directed
   movement with `--set sensing=1` (`sense_noise`, `sense_upkeep`); off by default.
@@ -14,6 +22,8 @@ All notable changes to this project are documented here. Format based on
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
 
 ### Fixed
+- Save loading: malformed rows, huge JSON numbers and other bad content now raise
+  `SaveFormatError` instead of crashing with an unrelated exception (F4 security review).
 - G1 *Full ecosystem* milestone fired for an idle player on `volcanic.json` once F3
   changed the random stream (natural vents supplied the chemosynthesizers). Only
   chemosynthesizers around vents the player opened count now.

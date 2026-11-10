@@ -107,3 +107,63 @@ Branch: `main` (owner decision 2026-11-10: work on main for now, single commit f
 - Control: same engine with `sensing=False` (sensor genes drift neutrally). Selection signature: `mean_w_*`
   leaving 0.5 with sensing on and staying near 0.5 with it off. Immigration-off arm against the F2a confound.
 - Sensing is computed only after the movement gate passes; signed weights precomputed in `express()`.
+
+
+## F4 Open genome (closed 2026-11-10)
+
+### Checklist
+1. [x] F4 design: rule genome, mutation operators, neutral arm, metrics and verdict rule fixed before running
+2. [x] Engine: `Cell.rules`, rule expression, mutation (point/dup/del/de novo), upkeep, cap; off-world bit-identical
+3. [x] Persistence v4 (rules in cells, validated); stats columns; viewer inspector
+4. [x] Tests: off-world identity, operators, effects, neutral arm, resume, hostile saves
+5. [x] Experiment `scripts/f4_experiment.py` (3 arms x 2 planets x 5 seeds, 10k steps) and verdict
+6. [x] ADR-0006, ROADMAP, ARCHITECTURE, CHANGELOG, TEST.md, USER_MANUAL; security review of save parsing
+7. [ ] Local commit; ask the owner before pushing
+
+### Design (item 1)
+Roadmap level 2: "if I perceive X then I do Y with intensity Z", with the number of genes decided by evolution.
+
+- **Representation**: the 16 fixed genes stay as they are. A cell also carries `rules`, a variable-length list
+  of rule genes, each 4 values in [0, 1]: `(condition, threshold, target, intensity)`.
+  - condition (5): always · own energy above / below threshold · light at own tile above / below threshold
+    (energy normalised by `div_max`, light by `light_max`; light covers both depth and day/night).
+  - target (7): one of the 6 F3 sensor weights (movement), or the division threshold.
+  - intensity: `2v − 1`. While the condition holds, the rule adds it to that sensor weight, or shifts the
+    division threshold by `intensity × rule_div_shift × (div_max − div_min)`.
+  - Conditions depend only on the mover's own state, so active rules collapse into effective weights once per
+    cell per step (cheap); cells with no rules take the F3 path unchanged.
+- **Mutation at division** (only when `open_genome` is on, so the off-world draws no extra random numbers):
+  point mutation of every rule value with the cell's `mut_sigma`; then with `rule_dup_rate` duplicate a random
+  rule (inserted next to it), `rule_del_rate` delete one, `rule_new_rate` add a random new rule (the de novo
+  source: seeded cells and immigrants start with no rules). Hard cap `max_rules`.
+- **Cost**: `rule_upkeep` per rule per step, so genomes do not bloat for free.
+- **Neutral arm** `rules_neutral`: rules exist, mutate, duplicate, delete and cost the same, but have no effect.
+- **Species** stay defined on the 16 fixed genes (tracker untouched): genome growth cannot inflate novelty.
+  Rule innovation is measured separately.
+- **Save v4**: each cell row gains its rules; loader checks count ≤ `max_rules`, 4 values each, all in [0, 1].
+
+Assumptions to confirm: fixed vocabulary of conditions and targets (open in number and combination, not in
+kind); movement rules act only with `sensing` on (the experiment runs with sensing on in every arm).
+Entry criterion: the roadmap's "stalls even in a variable environment" was not shown (F2 novelty rose; F3
+modest). The owner chose F4 on 2026-11-10; recorded in the ADR.
+
+### Experiment and verdict rule (fixed before running)
+`python scripts/f4_experiment.py --steps 10000`: arms F3 (open_genome off) / on / neutral, all with
+`sensing=1`, immigration 0.5; planets: flat with day/night (`day_amplitude=1`) and `examples/volcanic.json`;
+seeds 1, 3, 5, 7, 9. Measured over steps 5–10k on descendants only.
+
+Metrics: mean rule count; share of rules with a condition other than *always*; per rule type
+(condition × target) frequency; fixed-gene novelty and species; population; steps/s.
+
+Verdict:
+- **Rules earn their keep** if the mean rule count with rules on exceeds neutral in ≥ 8 of 10 planet × seed
+  pairs.
+- **A behaviour is selected** if the same rule type (condition × target, with the sign of its mean intensity)
+  is among the 3 most enriched on vs neutral in ≥ 6 of 10 pairs.
+- Otherwise the result is null, reported as such.
+
+### Result of the main run, and a confirmatory test (fixed before running it)
+Main run (2026-11-10): **null** by the rule above — rules on > neutral in 5/10 pairs; no rule type in the top 3
+in >= 6 pairs. Post-hoc hint: on `volcanic.json` rules on > neutral in 4/5 seeds (mean 1.75 vs 0.82 rules),
+on the flat day/night world 1/5. Confirmatory test: `volcanic.json`, arms on / neutral, new seeds 11 13 15 17
+19. The hint is confirmed if rules on > neutral in >= 4 of 5 new seeds; otherwise it was noise.

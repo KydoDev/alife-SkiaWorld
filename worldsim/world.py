@@ -36,22 +36,42 @@ def _view(top, bottom):
 VIEWS = {(top, bottom): _view(top, bottom) for top in (False, True) for bottom in (False, True)}
 STRATEGIES = ["photo", "sapro", "pred", "chemo"]
 
+# F4 rule genes: 4 values in [0, 1] = (condition, threshold, target, intensity). While the condition on the
+# cell's own state holds, the rule adds its intensity (2v - 1) to a sensor weight or shifts the division threshold.
+RULE_CONDITIONS = ("always", "energy>", "energy<", "light>", "light<")
+RULE_TARGETS = (*GENE_NAMES[G_W_LIGHT:G_W_DANGER + 1], "div")
+RULE_DIV = len(RULE_TARGETS) - 1
+RULE_LEN = 4
+
+
+def decode_rule(r):
+    """Rule gene -> (condition index, threshold, target index, intensity in [-1, 1])."""
+    return (min(len(RULE_CONDITIONS) - 1, int(r[0] * len(RULE_CONDITIONS))), r[1],
+            min(len(RULE_TARGETS) - 1, int(r[2] * len(RULE_TARGETS))), 2.0 * r[3] - 1.0)
+
+
+def describe_rule(r):
+    cond, thr, target, w = decode_rule(r)
+    when = "always" if cond == 0 else f"{RULE_CONDITIONS[cond]}{thr:.2f}"
+    return f"{when} {RULE_TARGETS[target]} {w:+.2f}"
+
 
 class Cell:
     __slots__ = (
         "id", "x", "y", "energy", "age", "genes", "bonds", "alive", "lineage",
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
-        "sense", "species",
+        "sense", "species", "rules", "rule_fx",
     )
 
-    def __init__(self, cid, x, y, energy, genes, lineage, cfg):
+    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=()):
         self.id = cid
         self.x = x
         self.y = y
         self.energy = energy
         self.age = 0
         self.genes = genes
+        self.rules = rules        # F4 rule genes (list of 4-value lists); empty unless open_genome is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
         # same order across runs AND across save/load, which a set cannot guarantee.
@@ -90,6 +110,11 @@ class Cell:
         self.sense = tuple(2.0 * v - 1.0 for v in g[G_W_LIGHT:G_W_DANGER + 1])
         if cfg.sensing:
             self.upkeep += cfg.sense_upkeep * sum(abs(w) for w in self.sense) / len(self.sense)
+        self.rule_fx = ()
+        if cfg.open_genome:
+            self.upkeep += cfg.rule_upkeep * len(self.rules)
+            if not cfg.rules_neutral:
+                self.rule_fx = tuple(decode_rule(r) for r in self.rules)
 
     @property
     def strategy(self):
@@ -188,7 +213,39 @@ class World:
             free = [(nx, ny) for nx, ny in self.neighbors(x, y) if grid[ny * W + nx] is None]
         return self.rng.choice(free) if free else None
 
-    def sensed_move(self, c):
+    def rule_effects(self, c, light_here):
+        """F4: apply the rules whose condition holds for this cell now. Returns the effective sensor weights
+        and the shift of the division threshold (energy units). Conditions read only the cell's own state
+        (energy / div_max, light here / light_max), so this runs once per cell per step."""
+        cfg = self.cfg
+        e = c.energy / cfg.div_max
+        lt = light_here / cfg.light_max if cfg.light_max > 0 else 0.0
+        sense, div = list(c.sense), 0.0
+        for cond, thr, target, w in c.rule_fx:
+            if (cond == 0 or (cond == 1 and e > thr) or (cond == 2 and e < thr)
+                    or (cond == 3 and lt > thr) or (cond == 4 and lt < thr)):
+                if target == RULE_DIV:
+                    div += w
+                else:
+                    sense[target] += w
+        return sense, div * cfg.rule_div_shift * (cfg.div_max - cfg.div_min)
+
+    def mutate_rules(self, rules, sigma):
+        """F4 variation of the rule genes: point mutation of every value, then possibly one duplication
+        (the copy next to the original), one deletion and one new random rule, within max_rules."""
+        cfg, rng = self.cfg, self.rng
+        g = rng.gauss
+        out = [[min(1.0, max(0.0, v + g(0.0, sigma))) for v in r] for r in rules]
+        if rng.random() < cfg.rule_dup_rate and out and len(out) < cfg.max_rules:
+            i = rng.randrange(len(out))
+            out.insert(i + 1, list(out[i]))
+        if rng.random() < cfg.rule_del_rate and out:
+            del out[rng.randrange(len(out))]
+        if rng.random() < cfg.rule_new_rate and len(out) < cfg.max_rules:
+            out.append([rng.random() for _ in range(RULE_LEN)])
+        return out
+
+    def sensed_move(self, c, sense=None):
         """F3 directed movement: score staying put and each free neighbour tile, return the best
         destination, or None to stay.
 
@@ -215,7 +272,7 @@ class World:
                 social.append((dx, dy, o.lineage == c.lineage, o.pred))
         if len(cands) == 1:
             return None
-        wl, wo, wc, wk, ws, wd = c.sense
+        wl, wo, wc, wk, ws, wd = c.sense if sense is None else sense
         light, org = self.light, self.organic
         chem = self.chem if self.has_chem else None
         inv_l = 1.0 / cfg.light_max if cfg.light_max > 0 else 0.0
@@ -323,6 +380,7 @@ class World:
         tracker = self.tracker
         chem = self.chem if self.has_chem else None
         sensing = cfg.sensing
+        open_genome = cfg.open_genome
         self.now = self.step_count + 1
         self.update_light()
         light = self.light
@@ -351,6 +409,9 @@ class World:
             if chem is not None and c.chemo_k > 0.0:
                 e += cfg.chemo_gain * c.chemo_k * chem[y, x]
             c.energy = e
+            fx = c.rule_fx                       # F4: active rules, evaluated once per step
+            if fx:
+                sense, div_shift = self.rule_effects(c, light[y, x])
 
             # 4: predation
             if c.pred_k > 0.0 and rand() < c.pred_k:
@@ -363,7 +424,10 @@ class World:
 
             # 5: movement (unbonded cells only); F3 sensing steers it, otherwise a random walk
             if not c.bonds and c.move > 0.0 and rand() < c.move:
-                dest = self.sensed_move(c) if sensing else self.random_empty_neighbor(x, y)
+                if sensing:
+                    dest = self.sensed_move(c, sense if fx else None)
+                else:
+                    dest = self.random_empty_neighbor(x, y)
                 if dest is not None:
                     grid[y * W + x] = None
                     c.x, c.y = dest
@@ -385,14 +449,18 @@ class World:
                 continue
 
             # 7: division
-            if c.energy >= c.div_thr:
+            thr = c.div_thr
+            if fx and div_shift:
+                thr = min(cfg.div_max, max(cfg.div_min, thr + div_shift))
+            if c.energy >= thr:
                 spot = self.random_empty_neighbor(c.x, c.y)
                 if spot is not None:
                     c.energy -= cfg.body_cost
                     child_e = c.energy * c.child_frac
                     c.energy -= child_e
-                    child = Cell(self._new_id(), spot[0], spot[1], child_e,
-                                 self.mutate(c.genes, c.mut_sigma), c.lineage, cfg)
+                    genes = self.mutate(c.genes, c.mut_sigma)
+                    rules = self.mutate_rules(c.rules, c.mut_sigma) if open_genome else ()
+                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules)
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
@@ -453,10 +521,13 @@ class World:
             for gi, name in enumerate(GENE_NAMES):
                 s["mean_" + name] = round(sum(c.genes[gi] for c in cells) / n, 4)
             s["mean_age"] = round(sum(c.age for c in cells) / n, 1)
+            s["rules_mean"] = round(sum(len(c.rules) for c in cells) / n, 3)
+            s["rules_max"] = max(len(c.rules) for c in cells)
         else:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
+            s["rules_mean"], s["rules_max"] = 0.0, 0
         if self.tracker is not None:
             s.update(self.tracker.stats())
         return s

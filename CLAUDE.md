@@ -90,6 +90,9 @@ runs (same seed, before/after), not only by unit tests.
 - **Sensing (F3)**: `sensed_move()` steers movement from the 6 sensor genes when
   `cfg.sensing` is on (off by default; the genes are then inert). Kinship uses
   `lineage`, never `species`. Species distance is rescaled per gene (ADR-0005).
+- **Open genome (F4)**: `Cell.rules` is a variable-length list of rule genes, used only
+  when `cfg.open_genome` is on; with it off no rule code may draw from `rng` (the off-world
+  must stay bit-identical). Species are defined on the 16 fixed genes only (ADR-0006).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

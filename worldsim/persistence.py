@@ -1,8 +1,9 @@
 """Save and load a complete world state (ADR-0002).
 
-Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 2, ...}`.
-Version 2 (F2, ADR-0004) adds the static terrain maps and the 10th gene; version-1
-saves are rejected (their 9-gene genomes cannot continue under the new rules).
+Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 4, ...}`.
+Version 2 (F2, ADR-0004) added the static terrain maps and the 10th gene, version 3
+(F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes.
+Older saves are rejected (their genomes cannot continue under the new rules).
 JSON is used instead of pickle so a save file shared by someone else can never
 execute code when loaded. Python's float repr round-trips exactly through JSON,
 so a resumed run continues bit-for-bit like an uninterrupted one.
@@ -20,10 +21,11 @@ import numpy as np
 from .config import Config
 from .species import SpeciesTracker
 from .terrain import Terrain
-from .world import N_GENES, Cell, World
+from .world import N_GENES, RULE_LEN, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 3
+VERSION = 4
+CELL_ROW_LEN = 10
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
 COUNTERS = ("births", "deaths", "kills", "extinctions")
 
@@ -46,9 +48,9 @@ def world_to_dict(world: World) -> dict:
         "rng": {"version": version, "internal": list(internal), "gauss_next": gauss_next},
         "organic": world.organic.tolist(),
         "terrain": _terrain_to_dict(world.terrain),
-        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order]]
+        # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules]
         "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
-                   [b.id for b in c.bonds]] for c in world.cells],
+                   [b.id for b in c.bonds], [list(r) for r in c.rules]] for c in world.cells],
         "tracker": world.tracker.to_dict() if world.tracker is not None else None,
     }
 
@@ -82,7 +84,17 @@ def _terrain_from_dict(d: dict | None, width: int, height: int) -> Terrain:
 
 
 def world_from_dict(d: dict) -> World:
-    if d.get("format") != FORMAT:
+    """Rebuild a world from a save dict. Any malformed content raises SaveFormatError (saves are untrusted)."""
+    try:
+        return _world_from_dict(d)
+    except SaveFormatError:
+        raise
+    except (KeyError, IndexError, TypeError, ValueError, OverflowError, AttributeError) as e:
+        raise SaveFormatError(f"malformed save: {type(e).__name__}: {e}") from e
+
+
+def _world_from_dict(d: dict) -> World:
+    if not isinstance(d, dict) or d.get("format") != FORMAT:
         raise SaveFormatError("not a WorldSim save file")
     if d.get("version") != VERSION:
         raise SaveFormatError(f"unsupported save version {d.get('version')!r} (expected {VERSION})")
@@ -113,7 +125,9 @@ def world_from_dict(d: dict) -> World:
     world.organic = organic
 
     by_id: dict[int, Cell] = {}
-    for cid, x, y, energy, age, genes, lineage, species, _ in d["cells"]:
+    if any(not isinstance(row, list) or len(row) != CELL_ROW_LEN for row in d["cells"]):
+        raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
+    for cid, x, y, energy, age, genes, lineage, species, _, rules in d["cells"]:
         if not (0 <= x < world.W and 0 <= y < world.H):
             raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
@@ -122,7 +136,9 @@ def world_from_dict(d: dict) -> World:
                  and all(_finite(g) and 0.0 <= g <= 1.0 for g in genes))
         if not valid:
             raise SaveFormatError(f"invalid cell #{cid}")
-        c = Cell(cid, x, y, energy, list(genes), lineage, cfg)
+        if not _valid_rules(rules, cfg):
+            raise SaveFormatError(f"cell #{cid} has invalid rule genes")
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules])
         c.age = age
         c.species = species
         world._place(c)
@@ -159,8 +175,21 @@ def _load_tracker(data, cells) -> SpeciesTracker:
     return tracker
 
 
+def _valid_rules(rules, cfg) -> bool:
+    """F4 rule genes: at most max_rules (none when the open genome is off), each RULE_LEN values in [0, 1]."""
+    if not isinstance(rules, list) or len(rules) > (cfg.max_rules if cfg.open_genome else 0):
+        return False
+    return all(isinstance(r, list) and len(r) == RULE_LEN and all(_finite(v) and 0.0 <= v <= 1.0 for v in r)
+               for r in rules)
+
+
 def _finite(v) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    try:
+        return math.isfinite(v)
+    except OverflowError:           # a huge JSON integer
+        return False
 
 
 def load_world(path) -> World:

@@ -16,6 +16,8 @@ _BOUNDS = {
     "max_age": (1, 10**9), "mut_min": (0, 1), "mut_max": (0, 1),
     "immigration_rate": (0, 100), "species_threshold": (1e-9, math.inf),
     "novelty_activity": (1, 10**12), "sense_noise": (0, 10), "sense_upkeep": (0, 10),
+    "rule_dup_rate": (0, 1), "rule_del_rate": (0, 1), "rule_new_rate": (0, 1), "rule_upkeep": (0, 10),
+    "max_rules": (0, 64), "rule_div_shift": (0, 1),
 }
 
 
@@ -69,6 +71,16 @@ class Config:
     sensing: bool = False            # directed movement steered by the 6 sensor genes (weights in [-1, 1])
     sense_noise: float = 0.1         # random jitter added to each candidate tile's score (breaks ties)
     sense_upkeep: float = 0.05       # cost per step x mean |sensor weight|, paid only when sensing is on
+
+    # --- open genome (F4). Off by default: cells carry no rule genes ---
+    open_genome: bool = False        # variable-length list of rule genes (condition -> target, intensity)
+    rules_neutral: bool = False      # control arm: rules mutate and cost the same but have no effect
+    rule_dup_rate: float = 0.02      # per division: duplicate one rule (the copy sits next to it)
+    rule_del_rate: float = 0.02      # per division: delete one rule
+    rule_new_rate: float = 0.01      # per division: add a random new rule (de novo source)
+    rule_upkeep: float = 0.01        # cost per rule per step
+    max_rules: int = 16              # hard cap on the number of rules per cell
+    rule_div_shift: float = 0.5      # a division rule shifts the threshold by intensity x this x (div_max - div_min)
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)
