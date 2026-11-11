@@ -7,7 +7,8 @@ changed; the result is a named set of overrides for later experiments.
 ## Checklist
 1. [x] Death probe: 96-97% of deaths are predation (below)
 2. [x] Goal and selection criteria (this file), written before the sweep
-3. [ ] Coarse sweep of predation pressure, 10k steps, seeds 41 and 43, both planets
+3. [x] Coarse sweep of predation pressure, 10k steps, seeds 41 and 43, both planets
+7. [ ] Extended sweep with spec_exp (rules below), same criteria
 4. [ ] Pick a setting by the criteria; check it at 30k steps on 20 pairs
 5. [ ] Re-run the regulator pilot in the chosen world
 6. [ ] Docs (ROADMAP, CHANGELOG, TEST.md), commit, ask to push
@@ -34,3 +35,14 @@ qualifies, report it and ask the owner before widening the grid.
 ## Check (30k steps, P1 pairs)
 The chosen setting on the 20 P1 pairs, 30k steps: report median life, population, predator share, extinctions.
 It is accepted as the "long-life world" if the criteria hold in >= 16/20 pairs.
+
+## Coarse sweep result (2026-11-11, `docs/world_study.csv`)
+No setting qualifies. Best: `pred_eff` 0.25, `pred_upkeep` 1.0 (median life 21-29 in 3 runs, 6 on volcanic 41;
+predators < 2% in 3 runs). Killer probe (default world): 62-77% of kills are made by cells whose dominant strategy is
+photo or chemo with a small predatory share; 38-68% of cells have `pred_k` > 0.01. Predation is diffuse, so costs
+on specialist predators barely touch it. The owner approved widening the grid.
+
+## Extended sweep (fixed before running; same criteria, same seeds and steps)
+`spec_exp` in {3, 4} (default 2: a higher exponent shrinks the small shares of mixed diets, so `pred_k` of mostly
+photo cells falls) x `pred_eff` in {0.5, 0.35, 0.25} x `pred_upkeep` in {0.3, 1.0}: 12 settings x 4 runs.
+"Closest to the defaults" ranks first by the number of changed parameters, then by the size of the change.
