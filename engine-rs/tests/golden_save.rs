@@ -32,7 +32,12 @@ fn volcanic_save_has_terrain() {
 
 /// The default golden save as JSON, for the mutation tests below.
 fn base_save() -> Value {
-    let gz = std::fs::read(golden_dir("default").join("start.json.gz")).expect("default save");
+    set_save("default")
+}
+
+/// A golden start save as JSON.
+fn set_save(set: &str) -> Value {
+    let gz = std::fs::read(golden_dir(set).join("start.json.gz")).expect("golden save");
     let mut text = String::new();
     GzDecoder::new(gz.as_slice())
         .read_to_string(&mut text)
@@ -108,8 +113,8 @@ fn malformed_saves_are_refused() {
         (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
         (with(|s| s["config"]["hgt"] = json!(true)), "hgt is on"),
         (
-            with(|s| s["config"]["defence"] = json!(true)),
-            "defence is on",
+            with(|s| s["config"]["plasticity"] = json!(true)),
+            "plasticity is on",
         ),
         (with(|s| s["seed"] = json!(1.5)), BAD),
         (
@@ -255,6 +260,33 @@ fn malformed_saves_are_refused() {
             ),
         }
     }
+}
+
+/// With `defence` on, `armor_p` must be in [0, 1] (`persistence.py`); the bounds load, values past them do not.
+#[test]
+fn armour_is_bounded_when_defence_is_on() {
+    let armoured = |v: Value| {
+        let mut s = set_save("defence");
+        s["cells"][0][14] = v;
+        load(&s)
+    };
+    for v in [json!(0.0), json!(-0.0), json!(1.0), json!(0.5)] {
+        assert!(armoured(v.clone()).is_ok(), "armor_p {v} refused");
+    }
+    for v in [json!(1.01), json!(-0.01), json!(true)] {
+        let e = armoured(v.clone())
+            .err()
+            .unwrap_or_else(|| panic!("armor_p {v} accepted"));
+        assert!(
+            e.message().contains("armor_p") || e.message().contains("invalid"),
+            "{v}: {}",
+            e.message()
+        );
+    }
+    // Python accepts a non-zero `defended` counter whatever the flag (it only reports it).
+    let mut s = base_save();
+    s["counters"]["defended"] = json!(7);
+    assert!(load(&s).is_ok());
 }
 
 #[test]

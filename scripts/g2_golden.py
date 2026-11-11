@@ -33,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from worldsim.config import Config  # noqa: E402
-from worldsim.persistence import VERSION, load_world, save_world  # noqa: E402
+from worldsim.persistence import COUNTERS, VERSION, load_world, save_world  # noqa: E402
 from worldsim.render import render_rgb  # noqa: E402
 from worldsim.world import World  # noqa: E402
 from worldsim.worldgen import load_planet  # noqa: E402
@@ -45,6 +45,8 @@ SET_COMMON = ["--seed", "1", "--warmup", "200", "--steps", "1000"]
 SETS = {
     "default": [],
     "volcanic": ["--planet", "examples/volcanic.json"],
+    "defence": ["--set", "defence=1"],
+    "defence_neutral": ["--set", "defence=1", "--set", "defence_neutral=1"],
 }
 
 
@@ -61,6 +63,9 @@ def state_hash(world: World) -> str:
     h.update(u64(world.step_count) + u64(world.next_id))
     for n in (world.births, world.deaths, world.kills, world.extinctions, world.sex_births):
         h.update(u64(n))
+    defence = world.cfg.defence          # flag fields are hashed only when their flag is on (M5)
+    if defence:
+        h.update(u64(world.defended))
     _, internal, gauss_next = world.rng.getstate()
     h.update(struct.pack(f"<{len(internal)}I", *internal))      # 624 MT words + position index
     h.update(b"\x00" + f64(0.0) if gauss_next is None else b"\x01" + f64(gauss_next))
@@ -73,6 +78,8 @@ def state_hash(world: World) -> str:
         for b in c.bonds:
             h.update(u64(b.id))
         h.update(f64(c.sex_p))
+        if defence:
+            h.update(f64(c.armor_p))
     return h.hexdigest()
 
 
@@ -175,6 +182,7 @@ def main(argv=None, repo_relative=False) -> None:
         world.step()
     save_world(world, args.out / "start.json.gz")
     start_hash = state_hash(world)
+    start_counts = {name: getattr(world, name) for name in COUNTERS}
 
     with open(args.out / "hashes.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
@@ -189,7 +197,9 @@ def main(argv=None, repo_relative=False) -> None:
     rng = rng_vectors(args.seed)
     rng["meta"] = {"python": platform.python_version(), "system": platform.system(), "platform": platform.platform(),
                    "save_version": VERSION, "warmup": args.warmup, "steps": args.steps,
-                   "planet": args.planet.as_posix() if args.planet else None, "set": args.set}
+                   "planet": args.planet.as_posix() if args.planet else None, "set": args.set,
+                   # events during the hashed steps: shows that a flag's mechanism actually fired
+                   "counter_deltas": {name: getattr(world, name) - n for name, n in start_counts.items()}}
     (args.out / "rng.json").write_text(json.dumps(rng, separators=(",", ":")) + "\n", encoding="utf-8")
     write_renders(args.out, args.steps)
     print(f"{args.out}: start step {args.warmup} hash {start_hash[:12]}, "

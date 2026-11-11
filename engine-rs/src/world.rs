@@ -1,4 +1,5 @@
-//! World state and the step (`worldsim/world.py`), default flags only (G2 milestone M2).
+//! World state and the step (`worldsim/world.py`): the default flags (G2 M2) plus, from M5, the
+//! optional flags ported so far (`defence`). Other flags are refused by the loader.
 //!
 //! Cells live in a slab (`World::slab`) and are referred to by slot ([`CellRef`]), never by
 //! pointer; `World::order` is Python's `World.cells` list (its order is part of the state: the
@@ -61,8 +62,9 @@ pub struct Phenotype {
 }
 
 impl Phenotype {
-    /// `Cell.express(cfg)` with sensing, open genome and plasticity off.
-    pub fn express(g: &[f64; N_GENES], cfg: &Config) -> Self {
+    /// `Cell.express(cfg)` for the flags the kernel runs; `armor_p` costs upkeep when `defence`
+    /// is on (added last, as Python does).
+    pub fn express(g: &[f64; N_GENES], armor_p: f64, cfg: &Config) -> Self {
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
         if s == 0.0 {
             s = 1e-9; // Python: `... or 1e-9`
@@ -75,6 +77,10 @@ impl Phenotype {
         );
         let e = cfg.spec_exp;
         let mv = g[G_MOVE];
+        let mut upkeep = cfg.base_cost + cfg.pred_upkeep * pred + cfg.move_upkeep * mv;
+        if cfg.defence {
+            upkeep += cfg.defence_upkeep * armor_p;
+        }
         Self {
             photo_k: photo.powf(e),
             sapro_k: sapro.powf(e),
@@ -86,7 +92,7 @@ impl Phenotype {
             attach: g[G_ATTACH],
             share: 0.5 * g[G_SHARE],
             mut_sigma: cfg.mut_min + g[G_MUT] * (cfg.mut_max - cfg.mut_min),
-            upkeep: cfg.base_cost + cfg.pred_upkeep * pred + cfg.move_upkeep * mv,
+            upkeep,
         }
     }
 }
@@ -105,12 +111,15 @@ pub struct Cell {
     pub bonds: Vec<CellRef>,
     /// F5a mating propensity; always 0 while `sex` is off (kept for the state hash).
     pub sex_p: f64,
+    /// F5e armour: share of attacks the cell can repel; 0 unless `defence` is on.
+    pub armor_p: f64,
     pub alive: bool,
     pub pheno: Phenotype,
 }
 
 impl Cell {
-    /// A newborn (age 0, no bonds), phenotype expressed from its genes.
+    /// A newborn (age 0, no bonds), phenotype expressed from its genes and armour.
+    #[allow(clippy::too_many_arguments)] // mirrors Python's Cell(...) constructor
     pub fn new(
         id: u64,
         x: usize,
@@ -118,6 +127,7 @@ impl Cell {
         energy: f64,
         genes: [f64; N_GENES],
         lineage: u64,
+        armor_p: f64,
         cfg: &Config,
     ) -> Self {
         Self {
@@ -130,8 +140,9 @@ impl Cell {
             lineage,
             bonds: Vec::new(),
             sex_p: 0.0,
+            armor_p,
             alive: true,
-            pheno: Phenotype::express(&genes, cfg),
+            pheno: Phenotype::express(&genes, armor_p, cfg),
         }
     }
 }
@@ -163,6 +174,8 @@ pub struct Counters {
     pub kills: u64,
     pub extinctions: u64,
     pub sex_births: u64,
+    /// F5e: attacks repelled by armour (hashed only when `defence` is on).
+    pub defended: u64,
 }
 
 /// A world: configuration, RNG, fields and cells.
@@ -293,6 +306,15 @@ impl World {
         g
     }
 
+    /// The flag draws of a founder (seeded or immigrant), after its genes: `armor_p`.
+    fn founder_armor(&mut self) -> f64 {
+        if self.cfg.defence {
+            self.rng.random()
+        } else {
+            0.0
+        }
+    }
+
     /// `World.neighbors`: the in-grid neighbour tiles, x toroidal, in `NEIGH8` order.
     fn neighbors(&self, x: usize, y: usize) -> ([(usize, usize); 8], usize) {
         let (w, h) = (self.width as isize, self.height as isize);
@@ -377,6 +399,7 @@ impl World {
         for i in free {
             let id = self.new_id();
             let genes = self.random_genes();
+            let armor_p = self.founder_armor();
             let cell = Cell::new(
                 id,
                 i % self.width,
@@ -384,6 +407,7 @@ impl World {
                 self.cfg.initial_energy,
                 genes,
                 id,
+                armor_p,
                 &self.cfg,
             );
             self.place(cell);
@@ -465,12 +489,13 @@ impl World {
 
     // ------------------------------------------------------------------ step
 
-    /// `World.step()` for the default flags (sensing, open genome, sex, plasticity off; no
-    /// species tracker). One function on purpose, like Python's: the per-cell loop is the hot
-    /// path and its order of operations is what has to match.
+    /// `World.step()` for the flags the kernel runs (no species tracker). One function on
+    /// purpose, like Python's: the per-cell loop is the hot path and its order of operations is
+    /// what has to match. Flag blocks draw from the RNG only when their flag is on.
     pub fn step(&mut self) {
         let cfg = self.cfg.clone();
         let w = self.width;
+        let (defence_on, armour) = (cfg.defence, cfg.defence && !cfg.defence_neutral);
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -510,10 +535,18 @@ impl World {
             // 4: predation
             if ph.pred_k > 0.0 && self.rng.random() < ph.pred_k {
                 if let Some(prey) = self.random_prey(r) {
-                    let food = py_max(self.slab[prey as usize].energy, 0.0) + cfg.body_cost;
-                    self.slab[ri].energy += cfg.pred_eff * food;
-                    self.kill(prey, (1.0 - cfg.pred_eff) * food);
-                    self.counters.kills += 1;
+                    // F5e: the armour may repel the attack; then nobody gains or loses energy
+                    if armour
+                        && self.rng.random()
+                            < self.slab[prey as usize].armor_p * cfg.defence_strength
+                    {
+                        self.counters.defended += 1;
+                    } else {
+                        let food = py_max(self.slab[prey as usize].energy, 0.0) + cfg.body_cost;
+                        self.slab[ri].energy += cfg.pred_eff * food;
+                        self.kill(prey, (1.0 - cfg.pred_eff) * food);
+                        self.counters.kills += 1;
+                    }
                 }
             }
 
@@ -560,10 +593,19 @@ impl World {
                     c.energy -= cfg.body_cost;
                     let child_e = c.energy * ph.child_frac;
                     c.energy -= child_e;
-                    let (parent_genes, lineage) = (c.genes, c.lineage);
+                    let (parent_genes, lineage, parent_armor) = (c.genes, c.lineage, c.armor_p);
                     let genes = self.mutate(&parent_genes, ph.mut_sigma);
+                    // `World.offspring_armor_p`
+                    let armor_p = if defence_on {
+                        let a = parent_armor + self.rng.gauss(0.0, ph.mut_sigma);
+                        py_min(1.0, py_max(0.0, a))
+                    } else {
+                        0.0
+                    };
                     let id = self.new_id();
-                    let child = self.alloc(Cell::new(id, sx, sy, child_e, genes, lineage, &cfg));
+                    let child = self.alloc(Cell::new(
+                        id, sx, sy, child_e, genes, lineage, armor_p, &cfg,
+                    ));
                     self.grid[sy * w + sx] = child;
                     newborns.push(child);
                     self.counters.births += 1;
@@ -601,7 +643,17 @@ impl World {
                 if self.grid[i] == EMPTY && !self.terrain.rock[i] {
                     let id = self.new_id();
                     let genes = self.random_genes();
-                    let cell = Cell::new(id, i % w, i / w, cfg.initial_energy, genes, id, &cfg);
+                    let armor_p = self.founder_armor();
+                    let cell = Cell::new(
+                        id,
+                        i % w,
+                        i / w,
+                        cfg.initial_energy,
+                        genes,
+                        id,
+                        armor_p,
+                        &cfg,
+                    );
                     self.place(cell);
                 }
             }

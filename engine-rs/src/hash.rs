@@ -21,6 +21,10 @@ pub fn state_digest(world: &World) -> [u8; 32] {
     for n in [c.births, c.deaths, c.kills, c.extinctions, c.sex_births] {
         h.update(n.to_le_bytes());
     }
+    let defence = world.cfg.defence; // flag fields are hashed only when their flag is on (M5)
+    if defence {
+        h.update(c.defended.to_le_bytes());
+    }
     let (words, gauss_next) = world.rng.state();
     for w in words {
         h.update(w.to_le_bytes()); // 624 MT words, then the position index
@@ -54,6 +58,9 @@ pub fn state_digest(world: &World) -> [u8; 32] {
             h.update(world.cell(b).id.to_le_bytes());
         }
         h.update(cell.sex_p.to_le_bytes());
+        if defence {
+            h.update(cell.armor_p.to_le_bytes());
+        }
     }
     h.finalize().into()
 }
@@ -69,7 +76,8 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// The first field, in state-hash order, where two worlds differ (`None` if the hashed state
-/// is identical). Used to diagnose a golden mismatch against a Python save of the same step
+/// is identical). It also compares the flag fields (`defended`, `armor_p`) when their flag is
+/// off, where the hash skips them: equal hashes do not guarantee `None` for hand-made worlds. Used to diagnose a golden mismatch against a Python save of the same step
 /// (`scripts/g2_golden.py --dump-step`).
 pub fn first_difference(a: &World, b: &World) -> Option<String> {
     let scalars = [
@@ -84,6 +92,7 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             b.counters.extinctions,
         ),
         ("sex_births", a.counters.sex_births, b.counters.sex_births),
+        ("defended", a.counters.defended, b.counters.defended),
     ];
     if let Some((name, x, y)) = scalars.iter().find(|(_, x, y)| x != y) {
         return Some(format!("{name}: {x} vs {y}"));
@@ -139,6 +148,8 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             "bonds"
         } else if ca.sex_p.to_bits() != cb.sex_p.to_bits() {
             "sex_p"
+        } else if ca.armor_p.to_bits() != cb.armor_p.to_bits() {
+            "armor_p"
         } else {
             continue;
         };

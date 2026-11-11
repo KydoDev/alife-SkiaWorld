@@ -51,6 +51,8 @@ SHA-256 over, in this order, little-endian:
 - `len(cells)` (u64), then each cell **in list order**: `id, x, y` (u64/u32/u32),
   `energy` bits, `age` (u64), the 16 genes' bits, `lineage` (u64), number of bonds and
   bond ids **in insertion order**, `sex_p` bits.
+- **Flag fields (M5)**, only when their flag is on, so the hashes of worlds with the flag off never change:
+  `defence` adds the counter `defended` (u64) after `sex_births`, and each cell's `armor_p` bits after `sex_p`.
 Excluded: species and tracker (observer state), derived fields (`light`, phenotype),
 which are recomputed and would only hide where a difference started.
 
@@ -265,3 +267,22 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   Review (code-review-security, no blocking issue) follow-ups, done: `--all` refuses per-set arguments and passes
   `--renders-only` on; planet paths in `SETS` resolve against the repository only; pytest checks that each committed
   set was made with the arguments `SETS` declares (seed, warm-up, steps, planet, overrides).
+- **M5 item 2, `defence`** (2026-11-11, Windows 11): the kernel runs F5e prey defence. `Cell.armor_p` (founders
+  draw it after their genes, children inherit it with a `gauss(0, mut_sigma)` step clamped to [0, 1]), upkeep
+  `defence_upkeep x armor_p` added last in `express`, and in predation the failed-attack draw
+  `random() < armor_p x defence_strength` (none in the neutral arm): a repelled attack moves no energy and counts
+  in `defended`. The loader accepts `defence` and checks `armor_p` like `persistence.py` (finite, in [0, 1], zero
+  unless the flag is on); the refusal tests now use `plasticity` and `hgt`. State hash: `defended` and `armor_p`
+  only when the flag is on. New golden set `defence` (flat default world, `--set defence=1`). Verdict (rules fixed
+  in `PLAN.md` before the run): **met**. The kernel equals Python at every one of the 1000 steps of `defence`, and
+  `hashes.csv` of `default` and `volcanic` is byte-identical when regenerated. The set is not vacuous: 13002 attacks
+  repelled and 12179 kills in the hashed steps (`counter_deltas` in `rng.json` meta, checked by pytest), armour
+  spread over [0, 1] in the start save. Speed (M3 benchmark, default flags, before / after): 6.38 / 6.11, 8.08 / 7.92,
+  5.43 / 5.54 million cell-updates/s at 800 / 10k / 50k cells, within the ±5% run-to-run spread.
+  Review (code-review-security, no blocking issue; it also ran the neutral arm and a reseed-after-extinction run
+  with armour against the kernel, both bit-exact) follow-ups, done: golden set `defence_neutral` (`defended` 0,
+  14005 kills, equal at every step); loader test on a defence save (`armor_p` 0, -0.0, 0.5, 1 load; 1.01, -0.01,
+  `true` refused); `save.rs` documents that a JSON integer `-0` in a float slot hashes differently from Python
+  (Python never writes it); a comment on `first_difference`. Open, for later: `WsInfo` does not expose `defended`
+  (adding it changes the layout: ABI version 2, when the front-end needs it); `default`/`volcanic` `rng.json` meta
+  lacks `set` and `counter_deltas` until their next regeneration.

@@ -34,6 +34,25 @@ def test_golden_set_lists_agree():
     assert re.findall(r'"([^"]+)"', rust.group(1)) == list(GOLDEN_SETS)
 
 
+def test_the_defence_set_is_not_vacuous():
+    """The armour repelled attacks during the hashed steps and its values are spread (M5 verdict rule)."""
+    golden = ROOT / "engine-rs" / "tests" / "golden" / "defence"
+    deltas = json.loads((golden / "rng.json").read_text(encoding="utf-8"))["meta"]["counter_deltas"]
+    assert deltas["defended"] > 0 and deltas["kills"] > 0
+    world = load_world(golden / "start.json.gz")
+    assert world.cfg.defence and not world.cfg.defence_neutral
+    armour = [c.armor_p for c in world.cells]
+    assert max(armour) - min(armour) > 0.5
+
+
+def test_the_neutral_defence_set_is_not_vacuous():
+    """Neutral arm: armour costs and is inherited but never repels, while predators still kill."""
+    golden = ROOT / "engine-rs" / "tests" / "golden" / "defence_neutral"
+    deltas = json.loads((golden / "rng.json").read_text(encoding="utf-8"))["meta"]["counter_deltas"]
+    assert deltas["defended"] == 0 and deltas["kills"] > 0
+    assert load_world(golden / "start.json.gz").cfg.defence_neutral
+
+
 @pytest.mark.parametrize("name", GOLDEN_SETS)
 def test_committed_set_matches_its_arguments(name):
     """The committed data was made with the arguments SETS declares (else regenerate with --all)."""

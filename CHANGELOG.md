@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, `defence` in the Rust kernel**: saves with F5e prey defence now load and run in the kernel, equal to
+  Python at every step of new golden sets `defence` (13002 attacks repelled in its 1000 steps) and `defence_neutral`; the state hash
+  covers `armor_p` and `defended` when the flag is on, so the existing hashes are unchanged. `rng.json` meta
+  records the counter deltas of the hashed steps. No speed change.
 - **G2 M5 started**: `scripts/g2_golden.py` takes `--set KEY=VALUE` and `--all ROOT`, with the golden sets listed
   once (`SETS`), so each optional flag can get its own golden set; pytest checks the lists agree and CI regenerates
   every set with `--all`. Plan in `PLAN.md` (one flag at a time, verdict rules fixed before any run).
