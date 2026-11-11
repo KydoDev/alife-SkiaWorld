@@ -149,6 +149,42 @@ def test_the_open_genome_sets_are_not_vacuous():
             assert fired == {"sense": 0, "div": 0}
 
 
+@pytest.mark.parametrize("name", ["combined", "combined_reseed", "combined_width2"])
+def test_the_combined_sets_are_not_vacuous(name):
+    """With every ported flag on, each flag's mechanism fired during the hashed steps; the small world went
+    extinct and reseeded (founders then draw every propensity), the width-2 world ran with aliased neighbours."""
+    meta = json.loads((ROOT / "engine-rs" / "tests" / "golden" / name / "rng.json").read_text(encoding="utf-8"))["meta"]
+    deltas = meta["counter_deltas"]
+    for counter in ("births", "kills", "sex_births", "hgt_events", "hgt_foreign", "defended"):
+        assert deltas[counter] > 0, counter
+    assert (deltas["extinctions"] > 0) == (name == "combined_reseed")
+    world = load_world(ROOT / "engine-rs" / "tests" / "golden" / name / "start.json.gz")
+    cfg = world.cfg
+    assert cfg.defence and cfg.hgt and cfg.plasticity and cfg.sex and cfg.sensing and cfg.open_genome
+    assert any(c.rules for c in world.cells)
+    if name == "combined_width2":
+        assert world.W == 2
+
+
+def test_the_unsensed_open_genome_set_is_not_vacuous():
+    """With sensing off only the division target of a rule acts: it fired during the hashed steps."""
+    world = load_world(ROOT / "engine-rs" / "tests" / "golden" / "open_genome_unsensed" / "start.json.gz")
+    assert world.cfg.open_genome and not world.cfg.sensing
+    shifts = 0
+    rule_effects = world.rule_effects
+
+    def counting(c, light_here):
+        nonlocal shifts
+        sense, div = rule_effects(c, light_here)
+        shifts += div != 0.0
+        return sense, div
+
+    world.rule_effects = counting
+    for _ in range(20):
+        world.step()
+    assert shifts > 20
+
+
 @pytest.mark.parametrize("name", GOLDEN_SETS)
 def test_committed_set_matches_its_arguments(name):
     """The committed data was made with the arguments SETS declares (else regenerate with --all)."""

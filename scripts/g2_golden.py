@@ -45,6 +45,8 @@ SET_COMMON = ["--seed", "1", "--warmup", "200", "--steps", "1000"]
 # F4: founders carry no rules, so with the default rates few cells hold any by the hashed steps; the
 # open-genome sets raise the de novo and duplication rates so rules are common and fire.
 RULES_TUNED = ["--set", "rule_new_rate=0.3", "--set", "rule_dup_rate=0.2"]
+ALL_FLAGS = ["--set", "defence=1", "--set", "hgt=1", "--set", "plasticity=1", "--set", "sex=1", "--set", "sensing=1",
+             "--set", "open_genome=1", *RULES_TUNED]
 SETS = {
     "default": [],
     "volcanic": ["--planet", "examples/volcanic.json"],
@@ -60,6 +62,13 @@ SETS = {
     "sensing_volcanic": ["--planet", "examples/volcanic.json", "--set", "sensing=1"],
     "open_genome": ["--set", "open_genome=1", "--set", "sensing=1", *RULES_TUNED],
     "rules_neutral": ["--set", "open_genome=1", "--set", "sensing=1", "--set", "rules_neutral=1", *RULES_TUNED],
+    # M5 item 8: the ported flags together; a small world that goes extinct and reseeds with them; width 2,
+    # where toroidal neighbours alias; rules with sensing off (only the division target acts)
+    "combined": [*ALL_FLAGS],
+    "combined_reseed": [*ALL_FLAGS, "--set", "width=4", "--set", "height=4", "--set", "initial_cells=8",
+                        "--set", "immigration_rate=0", "--set", "max_age=30"],
+    "combined_width2": [*ALL_FLAGS, "--set", "width=2", "--set", "height=32", "--set", "initial_cells=32"],
+    "open_genome_unsensed": ["--set", "open_genome=1", *RULES_TUNED],
 }
 
 

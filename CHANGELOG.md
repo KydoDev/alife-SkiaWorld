@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, combined golden sets**: `combined` (every ported flag on), `combined_reseed` (a 4x4 world that goes
+  extinct and reseeds with them), `combined_width2` (aliased neighbours) and `open_genome_unsensed`; the kernel
+  equals Python at every step of all four.
 - **G2 M5, `open_genome` in the Rust kernel**: saves with F4 rule genes load and run in the kernel, equal to
   Python at every step of new golden sets `open_genome` and `rules_neutral` (with raised rule rates, so rules are
   common). The state hash includes the rules when the flag is on. Every optional flag now loads in the kernel.

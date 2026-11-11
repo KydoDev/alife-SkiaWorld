@@ -386,3 +386,15 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `rules_neutral` 52 of 150 cells hold rules and none ever fires. Loader tests: 0, 1 and `max_rules` rules load;
   `max_rules + 1`, 65, values outside [0, 1], 3 or 5 values, a boolean, a bare number and an object are refused; a
   rule with the flag off is refused. Speed, alternating rounds against the previous commit (flag off): means of six rounds, 800 cells 0%, 10k +2%, 50k -2% (the first three rounds showed 50k -9%, the next three, run in the other order, +4%: noise level); Cell grows from 384 to 408 bytes (the rule Vec).
+- **M5 item 8, combined sets** (2026-11-11, Windows 11): four golden sets with no new kernel code, for the
+  interactions the single-flag sets cannot see. `combined`: every ported flag on (defence, hgt, plasticity, sex,
+  sensing, open genome with the raised rule rates). `combined_reseed`: the same on a 4x4 world (8 founders, no
+  immigration, `max_age` 30) that goes extinct 20 times in the hashed steps, so reseeded founders draw every
+  propensity. `combined_width2`: the same on a 2x32 world, where a cell's left and right neighbours are the same
+  tile (sensed candidates, prey, mates and gene donors alias). `open_genome_unsensed`: rule genes with sensing off,
+  so only division rules act. Verdict: **met**, all four equal Python at every one of the 1000 steps at the first
+  run (the item-6 and item-7 reviews had already run scratch versions); the fourteen earlier sets' hashes are
+  byte-identical when regenerated. Not vacuous (pytest): in the three combined sets every counter (births, kills,
+  sexual births, gene transfers, foreign transfers, repelled attacks) moved during the hashed steps, extinctions
+  only in `combined_reseed`; in `open_genome_unsensed` division rules shifted the threshold in 20 steps. CI
+  regenerates 18 sets on Linux now (about a minute more).
