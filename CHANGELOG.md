@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **World study** (`scripts/world_study.py`, criteria pre-registered): lives are short because predation is diffuse
+  (most kills by mostly photo/chemo cells). No predation, cost or specialisation setting gives a stable long-life
+  world: the best 10k-step setting failed the 30k check on 20 pairs (7/20). A pilot of memory regulators (not
+  committed) was nearly inert for the same reason. The default world is unchanged.
 - **F3 re-run at the P1 standard** (`scripts/f3_p1_experiment.py`, rules pre-registered and committed before
   each run): positive control fires (16/20, then 19/20); phototaxis with cost-free sensing vs off 13/20 then
   16/20 (at the threshold): a lean towards light, not established; flat planet 9/10 twice. Almost no cell moves
