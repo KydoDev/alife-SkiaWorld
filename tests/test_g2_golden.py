@@ -301,6 +301,33 @@ def test_the_terrain_vectors_are_not_vacuous():
     assert any(p["nonzero"] == 1 for p in committed["plumes"])                                # exp underflow
 
 
+def test_committed_create_vectors_match_this_python(request):
+    """engine-rs/tests/golden/create.json lists the cases of g2_create_vectors.py (ADR-0012 piece 4) and, on the
+    OS it was made on, holds this Python's step-0 hashes (the 10 000-wide cases are skipped here for time)."""
+    spec = importlib.util.spec_from_file_location("g2_create_vectors", ROOT / "scripts" / "g2_create_vectors.py")
+    cv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cv)
+    committed = json.loads((ROOT / "engine-rs" / "tests" / "golden" / "create.json").read_text(encoding="utf-8"))
+    specs = cv.create_specs()
+    assert [(c["name"], c["seed"]) for c in committed["cases"]] == [(n, str(s)) for n, _, s in specs]
+    if platform.system() != committed["system"]:
+        request.applymarker(pytest.mark.xfail(strict=False, reason=f"made on {committed['system']}; libm may differ"))
+    for c, (name, fields, seed) in zip(committed["cases"], specs, strict=True):
+        if fields["width"] < 10_000:
+            assert c == cv.create_case(name, fields, seed), "regenerate the golden files"
+
+
+def test_the_creation_sets_start_at_creation():
+    """create_* sets hash from step 0 with the planet's own seed, so the kernel can build them with World::new."""
+    for name in g2.CREATE_SETS:
+        assert name in GOLDEN_SETS
+        meta = json.loads((ROOT / "engine-rs" / "tests" / "golden" / name / "rng.json").read_text(encoding="utf-8"))
+        assert meta["meta"]["warmup"] == 0
+    volcanic = json.loads((ROOT / "engine-rs" / "tests" / "golden" / "create_volcanic" / "rng.json").read_text(
+        encoding="utf-8"))
+    assert volcanic["seed"] == 42 and volcanic["meta"]["planet"] == "examples/volcanic.json"
+
+
 def test_committed_mean_vectors_match_this_numpy():
     """engine-rs/tests/mean_vectors.json is what this numpy's ndarray.mean() gives (ADR-0012 piece 2)."""
     spec = importlib.util.spec_from_file_location("g2_mean_vectors", ROOT / "scripts" / "g2_mean_vectors.py")

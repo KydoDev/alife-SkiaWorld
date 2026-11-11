@@ -433,3 +433,16 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   a few seconds. libm makes the digests platform-dependent, so `g2_golden.py --all ROOT` also writes
   `ROOT/terrain.json` (`scripts/g2_terrain_vectors.py`): the committed copy is the Windows reference and CI tests
   against the one it regenerates on Linux, with no workflow change. No step, loader or ABI change.
+- **ADR-0012 piece 4, `World::new`** (2026-11-11, Windows 11): the kernel builds a world itself, as
+  `World(cfg, seed)` with `terrain=None`: `generate_terrain` (piece 3), the initial organic field, then
+  `initial_cells` founders on `random.Random(seed)` (seeding of piece 1; the founder loop was already ported for
+  reseed). No species tracker, as for loaded worlds. Verdict: **met** at the first run. (1) The step-0 state hash
+  equals Python's on 52 creations (`scripts/g2_create_vectors.py`, written by `g2_golden.py --all` as
+  `create.json` with the full `cfg.to_dict()` of each case): the 44 terrain cases of piece 3, each founder flag
+  (`sex`, `plasticity`, `hgt`, `defence`, `open_genome`) alone and together on the volcanic form, `initial_cells = 0`
+  and `initial_cells` 6000 on a world with 2648 free tiles; population and `next_id` equal too. (2) Two new golden
+  sets hashed from creation, `create_default` (seed 1) and `create_volcanic` (the form's seed 42, the existing
+  `volcanic` set uses seed 1), with no warmup: the kernel builds them with `World::new`, equals their start save
+  field by field (`first_difference`) and matches all 1000 hashed steps. They are also ordinary sets (20 now), so
+  the load-and-step tests cover them. (3) A full `--all` regeneration left the 18 existing `hashes.csv` files and
+  `terrain.json` byte-identical. No step, loader or ABI change; the entry point is piece 5.

@@ -14,6 +14,7 @@
 
 use crate::config::Config;
 use crate::rng::PyRandom;
+use crate::terrain::{generate_terrain, TerrainParams};
 use crate::N_GENES;
 
 /// Index of a cell in [`World::slab`].
@@ -469,6 +470,19 @@ pub struct World {
 }
 
 impl World {
+    /// `World(cfg, seed)` with `terrain=None` (ADR-0012): the procedural terrain of `cfg` and
+    /// `seed`, its initial organic field, then `initial_cells` founders on `random.Random(seed)`
+    /// (fewer if there are not enough free tiles). The same seed drives terrain and dynamics, as in
+    /// Python. No species tracker (`track_species=False`).
+    pub fn new(cfg: Config, seed: u64) -> Self {
+        let (terrain, organic) = generate_terrain(&TerrainParams::from_config(&cfg), seed);
+        // validated: 0 <= initial_cells <= width * height
+        let founders = cfg.initial_cells as usize;
+        let mut world = Self::from_parts(cfg, terrain, PyRandom::from_seed_u64(seed), organic);
+        world.seed_population(founders);
+        world
+    }
+
     /// An empty world on `terrain` (`World(..., populate=False)` plus `set_terrain`); the
     /// caller restores counters and places cells.
     pub fn from_parts(cfg: Config, terrain: Terrain, rng: PyRandom, organic: Vec<f64>) -> Self {

@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0012 piece 4, `World::new` in the Rust kernel**: the kernel creates a world from a full config and a `u64`
+  seed, equal to Python's `World(cfg, seed)` at step 0 on 52 cases (`scripts/g2_create_vectors.py`, `create.json`)
+  and over 1000 steps on the new golden sets `create_default` and `create_volcanic` (20 sets now).
 - **ADR-0012 piece 3, procedural terrain in the Rust kernel**: `terrain::generate_terrain` and `vent_plume` equal
   Python's maps bit for bit on 44 terrains and 27 plumes (`scripts/g2_terrain_vectors.py`, written by
   `g2_golden.py --all` as `terrain.json`, so CI checks it on Linux too); 71 ms for a 10 000 x 100 world with 100

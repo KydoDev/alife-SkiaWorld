@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 /// The golden sets checked by every test.
 #[allow(dead_code)] // the terrain vectors test uses only the root
-pub const GOLDEN_SETS: [&str; 18] = [
+pub const GOLDEN_SETS: [&str; 20] = [
     "default",
     "volcanic",
     "defence",
@@ -23,7 +23,13 @@ pub const GOLDEN_SETS: [&str; 18] = [
     "combined_reseed",
     "combined_width2",
     "open_genome_unsensed",
+    "create_default",
+    "create_volcanic",
 ];
+
+/// The golden sets hashed from creation (step 0): the kernel also builds them with `World::new`.
+#[allow(dead_code)] // not every test crate that includes this module uses it
+pub const CREATE_SETS: [&str; 2] = ["create_default", "create_volcanic"];
 
 /// Root of the golden sets: `$WORLDSIM_GOLDEN_DIR` if set, else the committed
 /// `tests/golden/` (the Windows reference). CI sets it to sets regenerated on Linux, since

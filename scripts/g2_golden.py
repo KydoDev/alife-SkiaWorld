@@ -14,8 +14,9 @@ The state hash is defined in docs/G2_PLAN.md ("State hash"); both engines must i
 Golden files depend on the platform's maths library for gauss/pow/sin, so they record where they were made.
 
 Every golden set is listed in SETS below, the single list that pytest, the Rust tests and CI follow;
-`--all ROOT` (re)writes each of them under ROOT/<name>, and the procedural-terrain vectors as ROOT/terrain.json
-(scripts/g2_terrain_vectors.py; libm sin/exp, so they are regenerated per platform like the sets):
+`--all ROOT` (re)writes each of them under ROOT/<name>, the procedural-terrain vectors as ROOT/terrain.json
+(scripts/g2_terrain_vectors.py) and the world-creation vectors as ROOT/create.json (scripts/g2_create_vectors.py);
+both use libm sin/exp, so they are regenerated per platform like the sets:
 
     python scripts/g2_golden.py --all engine-rs/tests/golden
     python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --out engine-rs/target/try
@@ -71,7 +72,13 @@ SETS = {
                         "--set", "immigration_rate=0", "--set", "max_age=30"],
     "combined_width2": [*ALL_FLAGS, "--set", "width=2", "--set", "height=32", "--set", "initial_cells=32"],
     "open_genome_unsensed": ["--set", "open_genome=1", *RULES_TUNED],
+    # ADR-0012 piece 4: worlds hashed from their creation (step 0, no warmup), which the kernel builds itself with
+    # World::new; the volcanic one with the form's own seed
+    "create_default": ["--warmup", "0"],
+    "create_volcanic": ["--planet", "examples/volcanic.json", "--seed", "42", "--warmup", "0"],
 }
+# The sets above that start at creation: the kernel also builds them from their config and seed.
+CREATE_SETS = ("create_default", "create_volcanic")
 
 
 def f64_hex(v: float) -> str:
@@ -164,9 +171,8 @@ def rng_vectors(seed: int) -> dict:
     return out
 
 
-def _terrain_vectors():
-    path = Path(__file__).with_name("g2_terrain_vectors.py")
-    spec = importlib.util.spec_from_file_location("g2_terrain_vectors", path)
+def _sibling(name):
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(f"{name}.py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -202,7 +208,8 @@ def main(argv=None, repo_relative=False) -> None:
         for name, extra in SETS.items():
             main([*SET_COMMON, *extra, "--out", str(args.all / name), *renders], repo_relative=True)
         if not args.renders_only:
-            _terrain_vectors().write(args.all / "terrain.json")
+            _sibling("g2_terrain_vectors").write(args.all / "terrain.json")
+            _sibling("g2_create_vectors").write(args.all / "create.json")
         return
     if args.out is None:
         ap.error("--out or --all is required")
