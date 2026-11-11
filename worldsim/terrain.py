@@ -44,11 +44,33 @@ def seabed_heights(width, height, rock_fraction, rng):
     x = np.arange(width)
     profile = np.ones(width)
     for k in (1, 2, 3, 5):
-        profile += (0.6 / k) * np.sin(2 * math.pi * k * x / width + rng.uniform(0, 2 * math.pi))
+        phase = 2 * math.pi * k * x / width + rng.uniform(0, 2 * math.pi)
+        # libm sin per element, not np.sin: numpy's SIMD sin is not correctly rounded on AVX-512 (G2_PLAN)
+        profile += (0.6 / k) * np.array([math.sin(a) for a in phase.tolist()])
     profile = np.clip(profile, 0.0, None)
     profile *= rock_fraction * height / profile.mean()
     # never fill a column to the surface: row 0 stays water
     return np.clip(np.rint(profile), 0, height - 1).astype(np.int64)
+
+
+def vent_plume(H, W, vx, vy, vent_strength, vent_radius):
+    """(H, W) chemical energy of one vent at (vx, vy): `vent_strength * exp(-dist / vent_radius)`.
+
+    G2 (docs/G2_PLAN.md, rules for the port): no numpy transcendentals, whose SIMD paths are not
+    correctly rounded on AVX-512 CPUs. The offsets are integers, so `dist = sqrt(dx*dx + dy*dy)` with
+    the sum done in integers is exact up to one correctly rounded sqrt: the same value on every
+    platform and in Rust (and equal to `np.hypot` on libm). `exp` is `math.exp`, once per distinct
+    distance.
+    """
+    ys, xs = np.mgrid[0:H, 0:W]
+    dx = np.abs(xs - vx)
+    dx = np.minimum(dx, W - dx)                           # toroidal in x
+    dy = ys - vy
+    d2 = (dx * dx + dy * dy).ravel()                      # int64, exact
+    uniq, inverse = np.unique(d2, return_inverse=True)
+    dist = np.sqrt(uniq.astype(np.float64))
+    plume = np.array([vent_strength * math.exp(-d / vent_radius) for d in dist.tolist()])
+    return plume[inverse.ravel()].reshape(H, W)
 
 
 def vent_field(rock, vent_count, vent_strength, vent_radius, rng):
@@ -57,15 +79,11 @@ def vent_field(rock, vent_count, vent_strength, vent_radius, rng):
     chem = np.zeros((H, W), dtype=np.float64)
     if vent_count <= 0 or vent_strength <= 0.0:
         return chem
-    ys, xs = np.mgrid[0:H, 0:W]
     for _ in range(vent_count):
         vx = rng.randrange(W)
         solid = np.flatnonzero(rock[:, vx])
         vy = (solid[0] if solid.size else H) - 1         # first water tile above the rock
-        dx = np.abs(xs - vx)
-        dx = np.minimum(dx, W - dx)                       # toroidal in x
-        dist = np.hypot(dx, ys - vy)
-        chem += vent_strength * np.exp(-dist / vent_radius)
+        chem += vent_plume(H, W, vx, vy, vent_strength, vent_radius)
     chem[rock] = 0.0
     return chem
 

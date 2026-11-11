@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .terrain import Terrain
+from .terrain import Terrain, vent_plume
 
 TOOLS = ("nutrients", "meteorite", "mountain", "dig", "volcano")
 SPECIALIST = 0.6          # feeding share above which a cell counts as a specialist
@@ -114,11 +114,8 @@ def add_vent(world, x, y, max_chem):
     cfg, t = world.cfg, world.terrain
     if t.rock[y, x]:
         return 0
-    H, W = world.H, world.W
-    ys, xs = np.mgrid[0:H, 0:W]
-    dx = np.abs(xs - x)
-    dx = np.minimum(dx, W - dx)
-    added = np.minimum(t.chem + cfg.vent_strength * np.exp(-np.hypot(dx, ys - y) / cfg.vent_radius), max_chem)
+    plume = vent_plume(world.H, world.W, x, y, cfg.vent_strength, cfg.vent_radius)   # libm exp (G2)
+    added = np.minimum(t.chem + plume, max_chem)
     t.chem = np.maximum(t.chem, added)
     t.chem[t.rock] = 0.0
     _finish_edit(world, True)

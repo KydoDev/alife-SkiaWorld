@@ -90,6 +90,18 @@ All notable changes to this project are documented here. Format based on
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
 
 ### Fixed
+- **No numpy transcendentals left in terrain generation or interventions** (G2, before M5): the
+  vent field (generation and the G1 vent tool, now one helper `terrain.vent_plume`) uses
+  `math.exp` and an exact `sqrt` of the integer distance; `seabed_heights` uses `math.sin`; the
+  image-planet gradient uses `sqrt(gx*gx + gy*gy)` (not `math.hypot`, which is not libm).
+  Windows results are bit-identical (both golden sets regenerated, unchanged; only Windows was
+  measured). On AVX-512 CPUs vent/relief planets may differ by an ULP from before, and on any
+  non-Windows platform photo planets may gain or lose rock at the edge threshold (glibc `hypot`
+  vs the sqrt form, not compared). Generating vents
+  on very large worlds is slower (~0.75 s per vent at the 1M-tile cap).
+- **CI**: the `rust-core` job builds and tests with `--locked` and audits the crate's
+  dependencies against RustSec (`cargo deny check advisories`, prebuilt binary, action pinned
+  by commit SHA).
 - **G2 Rust kernel diverged from Python on Linux** (AVX-512 CPUs): numpy's `exp`/`power` SIMD
   paths are not correctly rounded, so the light differed by an ULP at some rows. The light's
   transcendentals now come from libm (`math.exp`, `math.pow`, tabulated per row/count), as in

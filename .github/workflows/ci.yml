@@ -44,7 +44,13 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
       - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
+      # --locked: build exactly the committed Cargo.lock; a dependency change must update it in the PR
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      # Dependency audit against the RustSec advisory database (prebuilt binary, no cargo install)
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037   # v2.87.32
+        with:
+          tool: cargo-deny@0.20.2
+      - run: cargo deny --locked check advisories
       # Committed golden sets are the Windows reference; gauss and the stepped hashes depend on
       # the platform maths library, so CI regenerates them on Linux and tests against those
       # (docs/G2_PLAN.md, "Golden sets per platform").
@@ -59,6 +65,6 @@ jobs:
         run: |
           python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/target/golden-linux/default
           python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000             --out engine-rs/target/golden-linux/volcanic
-      - run: cargo test
+      - run: cargo test --locked
         env:
           WORLDSIM_GOLDEN_DIR: ${{ github.workspace }}/engine-rs/target/golden-linux
