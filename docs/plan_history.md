@@ -598,6 +598,8 @@ vs 0.5-1.8% at 10k), kills 82% of deaths, median life 15.5 (3-86; 2x the default
 0/20), one extinction. The 10k selection did not hold at 30k. Conclusion: with the existing parameters there is no
 stable world where cells live long enough; predation re-evolves. Study closed; the default world is unchanged.
 
+---
+
 ### F5e Prey defence (closed 2026-11-11)
 
 F5e Prey defence (owner's choice 2026-11-11, after the world study). Goal: a world where cells live long enough for
