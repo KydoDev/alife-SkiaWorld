@@ -25,7 +25,7 @@ Numbered, append-only records of the decisions that shaped the system:
 [0009 diet plasticity and save v6](./adr/0009-diet-plasticity-and-save-v6.md) ·
 [0010 horizontal gene transfer and save v7](./adr/0010-horizontal-gene-transfer-and-save-v7.md) ·
 [0011 prey defence and save v8](./adr/0011-prey-defence-and-save-v8.md) ·
-[0012 world creation in the kernel](./adr/0012-world-creation-in-the-kernel.md) (proposed).
+[0012 world creation in the kernel](./adr/0012-world-creation-in-the-kernel.md).
 
 ### [G2 engine port plan](./G2_PLAN.md)
 Milestones and verification criteria for the Rust core port (ADR-0008).

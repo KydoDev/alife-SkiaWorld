@@ -1,6 +1,7 @@
 # ADR-0012: World creation in the Rust kernel
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-11: the owner confirmed `u64` seeds only, forms and images in Python until G3,
+  and an ABI bump for additions too)
 - **Date**: 2026-11-11
 - **Deciders**: project owner
 - **Parent**: [ADR-0008](0008-engine-port-stack.md) (Rust core, bit-exact reference kernel)

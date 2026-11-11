@@ -6,10 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
-- **ADR-0012 (Proposed), world creation in the Rust kernel**: the kernel would create the default world and every
+- **ADR-0012, world creation in the Rust kernel**: the kernel would create the default world and every
   procedural planet from a full config and a `u64` seed (`World::new`, CPython's integer and string seeding, numpy's
   pairwise mean, `generate_terrain`), behind a new `ws_world_create` entry point (ABI 2); planet forms and images stay
-  in Python. Five pieces with verdicts fixed in advance; awaiting the owner's decision.
+  in Python. Five pieces with verdicts fixed in advance; accepted by the owner.
 - **G2 M5, combined golden sets**: `combined` (every ported flag on), `combined_reseed` (a 4x4 world that goes
   extinct and reseeds with them), `combined_width2` (aliased neighbours) and `open_genome_unsensed`; the kernel
   equals Python at every step of all four.
