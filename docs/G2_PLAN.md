@@ -13,7 +13,7 @@ the F-phase experiments).
 5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [x] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
-8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
+8. [~] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
 
 ## Scope of the first milestone (M0–M2)
@@ -25,8 +25,11 @@ Out of scope until M2 passes: rendering, interventions, planet loading from form
 images (the Rust side only reads saves, which already contain the terrain maps).
 
 ## Golden data (M0)
-`scripts/g2_golden.py [--planet FILE] --seed S --warmup W --steps N --out engine-rs/tests/golden/<name>/`
-writes (sets committed: `default`, flat world; `volcanic`, `examples/volcanic.json`):
+`scripts/g2_golden.py [--planet FILE] [--set KEY=VALUE ...] --seed S --warmup W --steps N --out DIR` writes one
+set; `--all ROOT` writes every set listed in `SETS` in the script (the single list: `tests/test_g2_golden.py` checks
+that the committed directories and `GOLDEN_SETS` in `engine-rs/tests/common/mod.rs` match it, and CI regenerates the
+Linux sets with `--all`). Committed sets: `default`, flat world; `volcanic`, `examples/volcanic.json` (terrain,
+vents, day/night amplitude 1.0 and seasons 0.5, so the light factor is covered). Each set writes:
 - `start.json.gz` — a save (current `SAVE_VERSION`) at step 0 (or after a warm-up, so colonies and organic
   matter exist);
 - `rng.json` — from a fixed state: 1000 × `random()`, `randrange(n)` for several `n`
@@ -252,3 +255,13 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   A Windows player build loads the default golden save and runs at 30 and 60 steps/s; checked on screen
   through screenshots (surface on top, controls working). Not in CI (licence). Observed once and not
   reproduced in two tries: after a click on `+`, `Space` left the player paused; recorded, not fixed.
+- **Correction** (2026-11-11): the M4 part A entry lists "the light factor (day/night, seasons) is not covered by a
+  golden set" as open. It is covered: the `volcanic` set runs with `day_amplitude` 1.0 and `season_amplitude` 0.5
+  (from `examples/volcanic.json`), and its 1000 stepped hashes match. Nothing is open on that point.
+- **M5 item 1, golden infrastructure** (2026-11-11): `scripts/g2_golden.py` gains `--set KEY=VALUE` (as `run.py`;
+  recorded in `rng.json` meta) and `--all ROOT`; the sets are listed once, in `SETS`. Regenerating both committed
+  sets with `--all` gives identical `hashes.csv`, renders and RNG draws; the saves differ only in the gzip header
+  time (same content). CI regenerates the Linux sets with `--all`. M5 plan and per-flag rules: `PLAN.md`.
+  Review (code-review-security, no blocking issue) follow-ups, done: `--all` refuses per-set arguments and passes
+  `--renders-only` on; planet paths in `SETS` resolve against the repository only; pytest checks that each committed
+  set was made with the arguments `SETS` declares (seed, warm-up, steps, planet, overrides).

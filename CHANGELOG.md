@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5 started**: `scripts/g2_golden.py` takes `--set KEY=VALUE` and `--all ROOT`, with the golden sets listed
+  once (`SETS`), so each optional flag can get its own golden set; pytest checks the lists agree and CI regenerates
+  every set with `--all`. Plan in `PLAN.md` (one flag at a time, verdict rules fixed before any run).
 - **G2 M4 part B, Unity front-end** (`unity/`, Unity 6000.5.6f1): loads a save into the Rust kernel through
   P/Invoke and shows it as a texture with play/pause, step and speed. `scripts/unity_sync.py` builds the kernel
   and copies the DLL and a save into the project (git-ignored). EditMode tests check golden hashes and renders

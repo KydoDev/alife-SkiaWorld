@@ -9,6 +9,7 @@ import importlib.util
 import json
 import platform
 import random
+import re
 from pathlib import Path
 
 import pytest
@@ -16,11 +17,33 @@ import pytest
 from worldsim.persistence import load_world
 
 ROOT = Path(__file__).resolve().parent.parent
-GOLDEN_SETS = ("default", "volcanic")
 
 _spec = importlib.util.spec_from_file_location("g2_golden", ROOT / "scripts" / "g2_golden.py")
 g2 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(g2)
+GOLDEN_SETS = tuple(g2.SETS)   # the single list of golden sets
+
+
+def test_golden_set_lists_agree():
+    """SETS in the script, the committed directories and the Rust tests' GOLDEN_SETS name the same sets."""
+    committed = {d.name for d in (ROOT / "engine-rs" / "tests" / "golden").iterdir() if d.is_dir()}
+    assert committed == set(GOLDEN_SETS)
+    common = (ROOT / "engine-rs" / "tests" / "common" / "mod.rs").read_text(encoding="utf-8")
+    rust = re.search(r"GOLDEN_SETS: \[&str; \d+\] = \[([^\]]*)\]", common)
+    assert rust, "GOLDEN_SETS not found in engine-rs/tests/common/mod.rs"
+    assert re.findall(r'"([^"]+)"', rust.group(1)) == list(GOLDEN_SETS)
+
+
+@pytest.mark.parametrize("name", GOLDEN_SETS)
+def test_committed_set_matches_its_arguments(name):
+    """The committed data was made with the arguments SETS declares (else regenerate with --all)."""
+    args = g2.build_parser().parse_args([*g2.SET_COMMON, *g2.SETS[name], "--out", "unused"])
+    made = json.loads((ROOT / "engine-rs" / "tests" / "golden" / name / "rng.json").read_text(encoding="utf-8"))
+    meta = made["meta"]
+    assert made["seed"] == args.seed
+    assert (meta["warmup"], meta["steps"]) == (args.warmup, args.steps)
+    assert meta["planet"] == (args.planet.as_posix() if args.planet else None)
+    assert meta.get("set", []) == args.set
 
 
 @pytest.fixture(scope="module", params=GOLDEN_SETS)

@@ -63,8 +63,7 @@ jobs:
       - name: Regenerate golden sets on Linux
         working-directory: .
         run: |
-          python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/target/golden-linux/default
-          python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000             --out engine-rs/target/golden-linux/volcanic
+          python scripts/g2_golden.py --all engine-rs/target/golden-linux
       - run: cargo test --locked
         env:
           WORLDSIM_GOLDEN_DIR: ${{ github.workspace }}/engine-rs/target/golden-linux

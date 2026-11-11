@@ -60,9 +60,11 @@ ruff check .                             # lint
 # Rust core (G2, engine-rs/): needs a stable Rust toolchain
 cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 
-# regenerate the G2 golden vectors after any change to the default dynamics
-python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/default
-python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/volcanic
+# regenerate every G2 golden set after any change to the dynamics (the sets are listed in SETS
+# in scripts/g2_golden.py; a new set also goes into GOLDEN_SETS in engine-rs/tests/common/mod.rs)
+python scripts/g2_golden.py --all engine-rs/tests/golden
+# one-off world with overrides, e.g. to try a flag before it becomes a set
+python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --out engine-rs/target/try
 # after a change to render.py only: rewrite the two golden renders of a set, nothing else
 python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/golden/default
 

@@ -13,9 +13,11 @@ Writes into --out:
 The state hash is defined in docs/G2_PLAN.md ("State hash"); both engines must implement it byte-for-byte.
 Golden files depend on the platform's maths library for gauss/pow/sin, so they record where they were made.
 
-    python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/default
-    python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000 \
-        --out engine-rs/tests/golden/volcanic
+Every golden set is listed in SETS below, the single list that pytest, the Rust tests and CI follow;
+`--all ROOT` (re)writes each of them under ROOT/<name>:
+
+    python scripts/g2_golden.py --all engine-rs/tests/golden
+    python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --out engine-rs/target/try
 """
 import argparse
 import csv
@@ -37,6 +39,13 @@ from worldsim.world import World  # noqa: E402
 from worldsim.worldgen import load_planet  # noqa: E402
 
 RANDRANGE_NS = (1, 2, 3, 7, 10, 100, 1000, 10_240, 2**31 - 1, 2**32 + 5)
+REPO = Path(__file__).resolve().parent.parent
+# The golden sets: name -> arguments added to SET_COMMON. Planet paths are relative to the repository.
+SET_COMMON = ["--seed", "1", "--warmup", "200", "--steps", "1000"]
+SETS = {
+    "default": [],
+    "volcanic": ["--planet", "examples/volcanic.json"],
+}
 
 
 def f64_hex(v: float) -> str:
@@ -112,16 +121,38 @@ def rng_vectors(seed: int) -> dict:
     return out
 
 
-def main(argv=None) -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--warmup", type=int, default=200, help="steps run before the start save")
     ap.add_argument("--steps", type=int, default=1000, help="steps hashed after the start save")
     ap.add_argument("--planet", type=Path, help="planet form (.json) or image; default: the flat default world")
-    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="override a Config parameter (as run.py); a planet form's fields override it")
+    ap.add_argument("--out", type=Path, help="directory of the set to write")
+    ap.add_argument("--all", type=Path, metavar="ROOT", help="write every set of SETS under ROOT/<name>")
     ap.add_argument("--dump-step", type=int, help="also write a save at this step (step_N.json.gz)")
     ap.add_argument("--renders-only", action="store_true", help="only (re)write the two golden renders")
+    return ap
+
+
+def main(argv=None, repo_relative=False) -> None:
+    """`repo_relative`: resolve --planet against the repository only (used by --all for the paths in SETS)."""
+    ap = build_parser()
     args = ap.parse_args(argv)
+    if args.all:
+        defaults = ap.parse_args([])
+        own = [k for k in ("out", "planet", "set", "dump_step", "seed", "warmup", "steps")
+               if getattr(args, k) != getattr(defaults, k)]
+        if own:
+            flags = ", ".join("--" + k.replace("_", "-") for k in own)
+            ap.error(f"--all takes each set's arguments from SETS; drop {flags}")
+        renders = ["--renders-only"] if args.renders_only else []
+        for name, extra in SETS.items():
+            main([*SET_COMMON, *extra, "--out", str(args.all / name), *renders], repo_relative=True)
+        return
+    if args.out is None:
+        ap.error("--out or --all is required")
     if args.renders_only:
         write_renders(args.out, args.steps)
         print(f"{args.out}: renders written")
@@ -129,12 +160,17 @@ def main(argv=None) -> None:
     if args.steps < 1 or args.warmup < 0:
         ap.error("--steps must be >= 1 and --warmup >= 0")
 
+    try:
+        cfg = Config().apply_overrides(args.set).validate()
+    except ValueError as e:
+        ap.error(f"invalid --set: {e}")
     args.out.mkdir(parents=True, exist_ok=True)
     if args.planet:
-        cfg, terrain, seed = load_planet(args.planet, Config(), args.seed)
+        planet = REPO / args.planet if repo_relative or not args.planet.exists() else args.planet
+        cfg, terrain, seed = load_planet(planet, cfg, args.seed)
         world = World(cfg, seed=seed, track_species=False, terrain=terrain)
     else:
-        world = World(Config(), seed=args.seed, track_species=False)
+        world = World(cfg, seed=args.seed, track_species=False)
     for _ in range(args.warmup):
         world.step()
     save_world(world, args.out / "start.json.gz")
@@ -153,7 +189,7 @@ def main(argv=None) -> None:
     rng = rng_vectors(args.seed)
     rng["meta"] = {"python": platform.python_version(), "system": platform.system(), "platform": platform.platform(),
                    "save_version": VERSION, "warmup": args.warmup, "steps": args.steps,
-                   "planet": args.planet.as_posix() if args.planet else None}
+                   "planet": args.planet.as_posix() if args.planet else None, "set": args.set}
     (args.out / "rng.json").write_text(json.dumps(rng, separators=(",", ":")) + "\n", encoding="utf-8")
     write_renders(args.out, args.steps)
     print(f"{args.out}: start step {args.warmup} hash {start_hash[:12]}, "
