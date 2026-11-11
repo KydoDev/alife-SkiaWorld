@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **ADR-0013 piece 2, `refresh_terrain`**: the kernel derives its terrain state (base light, shade powers,
+  rock/chemical flags) in one `World::refresh_terrain()`, ready for the terrain edits; no output changes.
+
 ### Added
 - **ADR-0012 piece 5, `ws_world_create` (C ABI 2) and Unity "New world"**: a front-end creates a world in the kernel
   from an exported config and a `u64` seed; Unity has a seed field and a New world button, and

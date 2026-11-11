@@ -487,6 +487,39 @@ impl World {
     /// caller restores counters and places cells.
     pub fn from_parts(cfg: Config, terrain: Terrain, rng: PyRandom, organic: Vec<f64>) -> Self {
         let (w, h) = (cfg.w(), cfg.h());
+        let mut world = Self {
+            width: w,
+            height: h,
+            step_count: 0,
+            next_id: 0,
+            counters: Counters::default(),
+            rng,
+            organic,
+            has_rock: false,
+            has_chem: false,
+            terrain,
+            light: Vec::new(),
+            slab: Vec::new(),
+            order: Vec::new(),
+            grid: vec![EMPTY; w * h],
+            free_slots: Vec::new(),
+            base_light: Vec::new(),
+            shade_pow: Vec::new(),
+            views: views(),
+            cfg,
+        };
+        world.refresh_terrain();
+        world.light = world.base_light.clone();
+        world
+    }
+
+    /// Everything derived from the terrain maps (Python's `World.set_terrain`): the base light, the shade powers
+    /// and the rock / chemical flags. One function for loading and for terrain edits (ADR-0013), so the two cannot
+    /// drift. It leaves `light` alone, as `set_terrain` does.
+    pub(crate) fn refresh_terrain(&mut self) {
+        let (w, h) = (self.width, self.height);
+        let cfg = &self.cfg;
+        let terrain = &self.terrain;
         // depth = light_max * exp(-rows / light_depth); base = depth[:, None] * sun[None, :] * lit
         let mut base_light = vec![0.0; w * h];
         let mut lit = vec![true; w];
@@ -498,28 +531,10 @@ impl World {
                 base_light[i] = depth * terrain.sun[x] * if *lit_x { 1.0 } else { 0.0 };
             }
         }
-        let shade_pow = (0..=h).map(|k| cfg.shade.powf(k as f64)).collect();
-        Self {
-            width: w,
-            height: h,
-            step_count: 0,
-            next_id: 0,
-            counters: Counters::default(),
-            rng,
-            organic,
-            has_rock: terrain.rock.iter().any(|&r| r),
-            has_chem: terrain.chem.iter().any(|&c| c != 0.0),
-            terrain,
-            light: base_light.clone(),
-            slab: Vec::new(),
-            order: Vec::new(),
-            grid: vec![EMPTY; w * h],
-            free_slots: Vec::new(),
-            base_light,
-            shade_pow,
-            views: views(),
-            cfg,
-        }
+        self.shade_pow = (0..=h).map(|k| cfg.shade.powf(k as f64)).collect();
+        self.has_rock = terrain.rock.iter().any(|&r| r);
+        self.has_chem = terrain.chem.iter().any(|&c| c != 0.0);
+        self.base_light = base_light;
     }
 
     /// Number of living cells (`len(World.cells)` between steps).
