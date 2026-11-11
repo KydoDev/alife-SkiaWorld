@@ -53,6 +53,8 @@ SETS = {
     "plastic_neutral": ["--set", "plasticity=1", "--set", "plastic_neutral=1"],
     "sex": ["--set", "sex=1"],
     "sex_neutral": ["--set", "sex=1", "--set", "sex_neutral=1"],
+    "sensing": ["--set", "sensing=1"],
+    "sensing_volcanic": ["--planet", "examples/volcanic.json", "--set", "sensing=1"],
 }
 
 

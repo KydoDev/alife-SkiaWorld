@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from worldsim.persistence import load_world
+from worldsim.world import NEIGH8
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -90,6 +91,36 @@ def test_the_sex_sets_are_not_vacuous():
     for s in ("sex", "sex_neutral"):
         sex_p = [c.sex_p for c in load_world(golden / s / "start.json.gz").cells]
         assert max(sex_p) - min(sex_p) > 0.5
+
+
+@pytest.mark.parametrize("name", ["sensing", "sensing_volcanic"])
+def test_the_sensing_sets_are_not_vacuous(name):
+    """Sensed moves happen from the start state, with sensor weights spread over [-1, 1]; the volcanic set
+    also reaches the chemical-energy and rock branches of sensed_move."""
+    world = load_world(ROOT / "engine-rs" / "tests" / "golden" / name / "start.json.gz")
+    assert world.cfg.sensing
+    weights = [w for c in world.cells for w in c.sense]
+    assert min(weights) < -0.5 and max(weights) > 0.5
+    calls, moves, surface, beside_rock = 0, 0, 0, 0
+    sensed_move = world.sensed_move
+    W, H = world.W, world.H
+
+    def counting(c, sense=None):
+        nonlocal calls, moves, surface, beside_rock
+        beside_rock += world.has_rock and any(
+            0 <= c.y + dy < H and world.blocked[(c.y + dy) * W + (c.x + dx) % W] for dx, dy in NEIGH8)
+        surface += c.y == 0
+        dest = sensed_move(c, sense)
+        calls += 1
+        moves += dest is not None
+        return dest
+
+    world.sensed_move = counting
+    for _ in range(20):
+        world.step()
+    assert calls > 100 and moves > 50 and surface > 0
+    if name == "sensing_volcanic":
+        assert world.has_chem and beside_rock > 0
 
 
 @pytest.mark.parametrize("name", GOLDEN_SETS)

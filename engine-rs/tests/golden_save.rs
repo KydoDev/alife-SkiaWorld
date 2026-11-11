@@ -111,10 +111,6 @@ fn malformed_saves_are_refused() {
             "div_min/mut_min",
         ),
         (
-            with(|s| s["config"]["sensing"] = json!(true)),
-            "sensing is on",
-        ),
-        (
             with(|s| s["config"]["open_genome"] = json!(true)),
             "open_genome is on",
         ),

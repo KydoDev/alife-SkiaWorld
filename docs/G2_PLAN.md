@@ -168,7 +168,7 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   decompressor. Deliberately stricter than Python (listed in `save.rs`): those bounds, rock as 0/1 integers,
   symmetric bonds without duplicates or self-bonds, every config key present, seed None/int/str, RNG version
   the integer 3 and words ≤ 32 bits. Saves with `sensing`, `open_genome`, `sex` or `plasticity` on are refused
-  until M5; the species tracker is skipped, not validated (observer state, never read).
+  until M5 (since ported in M5, except `open_genome` so far); the species tracker is skipped, not validated (observer state, never read).
 - **M2** (2026-11-10, Windows 11, rustc 1.98.1, Python 3.12.10, numpy 2.5.4, CPU without AVX-512):
   `engine-rs/src/world.rs` ports `World.step()` for the default flags (light with terrain, day/night and
   seasons; feeding incl. chemosynthesis; predation; random walk; sharing; death; division with mutation;
@@ -346,3 +346,20 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   first run; the eight earlier sets' hashes are byte-identical when regenerated. Not vacuous: 2631 sexual births in
   `sex`, none in `sex_neutral`, `sex_p` spread over [0, 1] in both. Speed, two alternating rounds against the previous
   commit: 800 cells +2%, 10k -5%, 50k +2% (noise level).
+- **M5 item 6, `sensing`** (2026-11-11, Windows 11): the kernel runs F3 directed movement. A moving cell scores
+  staying put and each free, non-rock neighbour tile as `sum(weight x input) + sense_noise x random()`, one draw
+  per candidate in Python's order (stay, then `NEIGH8`), none when no tile is free; inputs are the tile's light
+  (/ `light_max`), organic and chemical saturation `v / (v + 1)`, and the kin, strangers and summed predator share
+  among the mover's neighbours touching the tile, divided by `VIEWS` (precomputed per surface/floor row). Weights
+  are `2g - 1` of genes 10-15, computed when needed (no new cell state). With `sensing` on, upkeep gains
+  `sense_upkeep x sum(|w|) / 6` before the other flag terms, using CPython 3.12's compensated `sum()` (now shared by
+  the loader's diet check). The loader accepts `sensing`; only `open_genome` is still refused. The hash needs no
+  change (no new state). Golden sets `sensing` (flat planet) and `sensing_volcanic` (vents and rock, so the chemical
+  and blocked-tile branches run). Verdict (rules in `PLAN.md`): **met**. Both sets equal Python at every one of the
+  1000 steps, at the first run; the ten earlier sets' hashes are byte-identical when regenerated. Not vacuous: from
+  the `sensing` start, 584 sensed-move calls and 414 moves in 20 steps; weights span [-1, 1]. Speed, two alternating
+  rounds against the previous commit (flag off): 800 cells +1%, 10k +4%, 50k -1% (noise level). The review also
+  ran scratch sets, all bit-exact: width 2 (aliased neighbours), 2x2 and 3x2 worlds, `light_max` 0 and subnormal,
+  `sense_noise` 0 and the config bounds, and every ported flag on together; committed sets for the combinations
+  belong to item 8. Regenerating all sets also refreshed the `meta` of `default` and `volcanic` (`set`,
+  `counter_deltas`); their RNG vectors and hashes are unchanged.

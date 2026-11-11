@@ -19,8 +19,8 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5 ports them): saves with `sensing` or `open_genome` on are
-//!   refused; `defence`, `hgt`, `plasticity` and `sex` are ported (M5);
+//! - **unsupported** (until milestone M5 ports it): saves with `open_genome` on are refused;
+//!   `defence`, `hgt`, `plasticity`, `sex` and `sensing` are ported (M5);
 //! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not).
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
@@ -30,7 +30,7 @@
 
 use crate::config::{Config, MAX_WORLD_TILES};
 use crate::rng::{PyRandom, MT_N};
-use crate::world::{Cell, CellRef, Counters, Terrain, Traits, World, EMPTY};
+use crate::world::{python_sum, Cell, CellRef, Counters, Terrain, Traits, World, EMPTY};
 use crate::{SaveError, N_GENES, SAVE_VERSION};
 use flate2::read::MultiGzDecoder;
 use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
@@ -387,12 +387,10 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         )));
     }
     let cfg = Config::from_json(&raw.config.0)?;
-    for (flag, on) in [("sensing", cfg.sensing), ("open_genome", cfg.open_genome)] {
-        if on {
-            return Err(err(format!(
-                "unsupported save: {flag} is on (this kernel does not run it yet, M5)"
-            )));
-        }
+    if cfg.open_genome {
+        return Err(err(
+            "unsupported save: open_genome is on (this kernel does not run it yet, M5)",
+        ));
     }
     let (w, h) = (cfg.w(), cfg.h());
     let terrain = match raw.terrain {
@@ -424,25 +422,6 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     // `persistence.py` recomputes the light at load (`now = step_count`); it is not hashed.
     world.update_light(world.step_count);
     Ok(world)
-}
-
-/// CPython 3.12's `sum()` of floats: Neumaier compensated summation, the compensation added at
-/// the end when non-zero and finite. Plain `+` differs near the diet's 1e-6 tolerance.
-fn python_sum(values: &[f64]) -> f64 {
-    let (mut total, mut comp) = (0.0f64, 0.0f64);
-    for &x in values {
-        let t = total + x;
-        if total.abs() >= x.abs() {
-            comp += (total - t) + x;
-        } else {
-            comp += (x - t) + total;
-        }
-        total = t;
-    }
-    if comp != 0.0 && comp.is_finite() {
-        total += comp;
-    }
-    total
 }
 
 /// `Random.setstate((3, internal, gauss_next))`.

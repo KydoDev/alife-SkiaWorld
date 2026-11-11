@@ -33,6 +33,9 @@ const G_ATTACH: usize = 6;
 const G_SHARE: usize = 7;
 const G_MUT: usize = 8;
 pub(crate) const G_CHEMO: usize = 9;
+/// F3 sensor weights: genes 10..16 (light, organic, chem, kin, stranger, danger), weight `2g - 1`.
+const G_W_LIGHT: usize = 10;
+const N_SENSE: usize = 6;
 
 /// `NEIGH8`: neighbour offsets in Python's order (it fixes which tile a `choice` picks).
 const NEIGH8: [(isize, isize); 8] = [
@@ -45,6 +48,56 @@ const NEIGH8: [(isize, isize); 8] = [
     (0, 1),
     (1, 1),
 ];
+
+/// The F3 sensor weights `2g - 1` of genes `G_W_LIGHT..` (`Cell.sense`).
+fn sense_weights(g: &[f64; N_GENES]) -> [f64; N_SENSE] {
+    let mut w = [0.0; N_SENSE];
+    for (o, v) in w.iter_mut().zip(&g[G_W_LIGHT..G_W_LIGHT + N_SENSE]) {
+        *o = 2.0 * v - 1.0;
+    }
+    w
+}
+
+/// `VIEWS[(top, bottom)]` as `[top as usize * 2 + bottom as usize][candidate]`: how many of the
+/// mover's in-grid neighbour tiles touch each candidate (0 = stay, then `NEIGH8`), at least 1;
+/// it normalises the social inputs of a sensed move.
+fn views() -> [[f64; 9]; 4] {
+    let mut out = [[0.0; 9]; 4];
+    for (k, row) in out.iter_mut().enumerate() {
+        let (top, bottom) = (k >= 2, k % 2 == 1);
+        let tiles: Vec<(isize, isize)> = NEIGH8
+            .into_iter()
+            .filter(|n| !(top && n.1 == -1) && !(bottom && n.1 == 1))
+            .collect();
+        for (slot, d) in row.iter_mut().zip(std::iter::once((0, 0)).chain(NEIGH8)) {
+            let touching = tiles
+                .iter()
+                .filter(|&&n| n != d && (n.0 - d.0).abs() <= 1 && (n.1 - d.1).abs() <= 1)
+                .count();
+            *slot = touching.max(1) as f64;
+        }
+    }
+    out
+}
+
+/// CPython 3.12's `sum()` of floats: Neumaier compensated summation, the compensation added at
+/// the end when non-zero and finite. Plain `+` can differ in the last bit.
+pub(crate) fn python_sum(values: &[f64]) -> f64 {
+    let (mut total, mut comp) = (0.0f64, 0.0f64);
+    for &x in values {
+        let t = total + x;
+        if total.abs() >= x.abs() {
+            comp += (total - t) + x;
+        } else {
+            comp += (x - t) + total;
+        }
+        total = t;
+    }
+    if comp != 0.0 && comp.is_finite() {
+        total += comp;
+    }
+    total
+}
 
 /// Traits derived from the genes at birth (`Cell.express`); with `plasticity` on, the feeding
 /// shares and their `_k` powers follow the acclimated diet (`Cell.apply_diet`).
@@ -177,7 +230,7 @@ fn genetic_diet(photo: f64, sapro: f64, chemo: f64) -> [f64; 3] {
 
 impl Phenotype {
     /// The genetic part of `Cell.express(cfg)`, then the flag upkeep terms in Python's order
-    /// (`plast_p`, `hgt_p`, `armor_p`). The diet is applied by [`Cell::express`].
+    /// (sensor weights, `plast_p`, `hgt_p`, `armor_p`). The diet is applied by [`Cell::express`].
     pub fn express(g: &[f64; N_GENES], t: Traits, cfg: &Config) -> Self {
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
         if s == 0.0 {
@@ -192,6 +245,10 @@ impl Phenotype {
         let e = cfg.spec_exp;
         let mv = g[G_MOVE];
         let mut upkeep = cfg.base_cost + cfg.pred_upkeep * pred + cfg.move_upkeep * mv;
+        if cfg.sensing {
+            let abs = sense_weights(g).map(f64::abs);
+            upkeep += cfg.sense_upkeep * python_sum(&abs) / N_SENSE as f64;
+        }
         if cfg.plasticity {
             upkeep += cfg.plastic_upkeep * t.plast_p;
         }
@@ -380,6 +437,8 @@ pub struct World {
     shade_pow: Vec<f64>,
     pub(crate) has_rock: bool,
     pub(crate) has_chem: bool,
+    /// `VIEWS` (F3), see [`views`].
+    views: [[f64; 9]; 4],
 }
 
 impl World {
@@ -417,6 +476,7 @@ impl World {
             free_slots: Vec::new(),
             base_light,
             shade_pow,
+            views: views(),
             cfg,
         }
     }
@@ -637,6 +697,88 @@ impl World {
             }
         }
         (k > 0).then(|| *self.rng.choice(&free[..k]))
+    }
+
+    /// `World.sensed_move` (F3): score staying put and each free neighbour tile from the cell's
+    /// sensor weights (environment of the tile, kin / strangers / danger among the mover's
+    /// neighbours touching it) plus `sense_noise * random()` per candidate, in Python's order and
+    /// arithmetic; `None` = stay. No draw when no neighbour tile is free.
+    fn sensed_move(&mut self, r: CellRef) -> Option<(usize, usize)> {
+        let (w, h) = (self.width, self.height);
+        let c = &self.slab[r as usize];
+        let (x, y, lineage) = (c.x, c.y, c.lineage);
+        let [wl, wo, wc, wk, ws, wd] = sense_weights(&c.genes);
+        // (dx, dy, is_kin, predator share) of the neighbours; candidates (dx, dy, x, y, view
+        // index: 0 = stay, k + 1 = NEIGH8[k])
+        let mut social = [(0isize, 0isize, false, 0.0f64); 8];
+        let mut n_social = 0;
+        let mut cands = [(0isize, 0isize, 0usize, 0usize, 0usize); 9];
+        cands[0] = (0, 0, x, y, 0);
+        let mut n_cands = 1;
+        for (k, (dx, dy)) in NEIGH8.into_iter().enumerate() {
+            let ny = y as isize + dy;
+            if ny < 0 || ny >= h as isize {
+                continue;
+            }
+            let (nx, ny) = (
+                (x as isize + dx).rem_euclid(w as isize) as usize,
+                ny as usize,
+            );
+            let o = self.grid[ny * w + nx];
+            if o == EMPTY {
+                if !(self.has_rock && self.terrain.rock[ny * w + nx]) {
+                    cands[n_cands] = (dx, dy, nx, ny, k + 1);
+                    n_cands += 1;
+                }
+            } else {
+                let oc = &self.slab[o as usize];
+                social[n_social] = (dx, dy, oc.lineage == lineage, oc.pheno.pred);
+                n_social += 1;
+            }
+        }
+        if n_cands == 1 {
+            return None;
+        }
+        let cfg = &self.cfg;
+        let inv_l = if cfg.light_max > 0.0 {
+            1.0 / cfg.light_max
+        } else {
+            0.0
+        };
+        let noise = cfg.sense_noise;
+        let view = self.views[usize::from(y == 0) * 2 + usize::from(y == h - 1)];
+        let (mut best, mut best_score) = (0usize, f64::NEG_INFINITY);
+        for (k, &(dx, dy, tx, ty, v)) in cands[..n_cands].iter().enumerate() {
+            let tile = ty * w + tx;
+            let o = self.organic[tile];
+            let mut s = wl * self.light[tile] * inv_l + wo * o / (o + 1.0);
+            if self.has_chem {
+                let ch = self.terrain.chem[tile];
+                s += wc * ch / (ch + 1.0);
+            }
+            if n_social > 0 {
+                let (mut kin, mut strangers, mut danger) = (0.0f64, 0.0f64, 0.0f64);
+                for &(sx, sy, is_kin, pred) in &social[..n_social] {
+                    if (-1..=1).contains(&(sx - dx))
+                        && (-1..=1).contains(&(sy - dy))
+                        && (sx != dx || sy != dy)
+                    {
+                        if is_kin {
+                            kin += 1.0;
+                        } else {
+                            strangers += 1.0;
+                        }
+                        danger += pred;
+                    }
+                }
+                s += (wk * kin + ws * strangers + wd * danger) / view[v];
+            }
+            s += noise * self.rng.random();
+            if s > best_score {
+                (best, best_score) = (k, s);
+            }
+        }
+        (best != 0).then(|| (cands[best].2, cands[best].3))
     }
 
     /// `World.random_prey`: a random neighbour that is not bonded to `c`.
@@ -861,9 +1003,14 @@ impl World {
                 }
             }
 
-            // 5: movement (unbonded cells only): a random walk
+            // 5: movement (unbonded cells only); F3 sensing steers it, otherwise a random walk
             if self.slab[ri].bonds.is_empty() && ph.move_p > 0.0 && self.rng.random() < ph.move_p {
-                if let Some((nx, ny)) = self.random_empty_neighbor(x, y) {
+                let dest = if cfg.sensing {
+                    self.sensed_move(r)
+                } else {
+                    self.random_empty_neighbor(x, y)
+                };
+                if let Some((nx, ny)) = dest {
                     self.grid[tile] = EMPTY;
                     self.grid[ny * w + nx] = r;
                     let c = &mut self.slab[ri];

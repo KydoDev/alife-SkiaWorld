@@ -105,8 +105,8 @@ attacks it can repel, which costs energy every step) · `ESC` quit.
 ## Unity front-end (preview, G2)
 A first Unity front-end runs the world on the Rust kernel, which is much faster than Python and
 gives the same result step for step. For now it only **shows** a world: it loads a save made by
-the Python engine (default options, optionally with prey defence, gene transfer, plasticity and/or two
-parents on) and offers play/pause, single step and speed (1–480
+the Python engine (default options, optionally with prey defence, gene transfer, plasticity, two parents
+and/or sensing on) and offers play/pause, single step and speed (1–480
 steps/s). Controls: the buttons on top, or `Space` play/pause, `N` one step (when paused), `+`/`-`
 speed. Planets, interventions and the optional mechanisms arrive later; to play, use `game.py`.
 Setup is in the Developer Guide (Unity front-end).
