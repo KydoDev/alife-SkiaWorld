@@ -12,7 +12,7 @@ the F-phase experiments).
 4. [x] M1c Load a save (current `SAVE_VERSION`) in Rust; state hash at step 0 equals Python's
 5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
-7. [ ] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
+7. [~] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
 8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
 
