@@ -11,6 +11,7 @@
 pub mod config;
 pub mod ffi;
 pub mod hash;
+pub mod numpy;
 pub mod render;
 pub mod rng;
 pub mod save;

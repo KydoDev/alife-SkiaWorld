@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0012 piece 2, numpy's pairwise mean in the Rust kernel**: `numpy::numpy_mean` equals `ndarray.mean()` bit
+  for bit on 34 lengths around every block boundary (`scripts/g2_mean_vectors.py`); numpy sums the whole array from
+  its identity, not from the first element.
+- **Plan item 10**: the owner's proposal of an evolvable perception radius (`sense_r`), with its constraints and
+  experiment, recorded in `PLAN.md`.
 - **ADR-0012 piece 1, seeding in the Rust kernel**: `PyRandom::from_seed_u64` / `from_seed_str` reproduce
   CPython's `random.Random(seed)` (state and draws equal on 13 seeds, `scripts/g2_seed_vectors.py`).
 - **ADR-0013, interventions through the C ABI**: the five G1 world edits move into the kernel as a

@@ -406,3 +406,14 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `worldsim-terrain-{0, 42, 2^64-1}`, the empty string and a non-ASCII one (`scripts/g2_seed_vectors.py` ->
   `engine-rs/tests/seed_vectors.json`, test `seed_vectors.rs`; a pytest checks the committed file against this
   Python). Platform-independent (integer arithmetic and SHA-512). No step, loader or ABI change.
+- **ADR-0012 piece 2, pairwise mean** (2026-11-11, Windows 11, numpy 2.5.4): `numpy::numpy_mean` ports
+  `ndarray.mean()` of a contiguous `float64` array: `pairwise_sum_DOUBLE` (plain loop below 8, eight accumulators
+  up to 128 with the fixed combine order, then a split at half rounded down to a multiple of 8), divided by the
+  count. The open point of the ADR, settled by the vectors: the reduction starts from the identity `+0.0` and sums
+  the **whole** array pairwise; seeding the accumulator with the first element (the candidate tried first) failed
+  at n = 4 and differs on 14 of the 34 lengths, a plain left-to-right sum on 18. Verdict: **met**: sum and mean
+  bit-equal on lengths 1-20, 127-130, 255-257, 1023-1025, 8191-8193 (the ufunc buffer size: no chunking for
+  contiguous input) and 10 000. The data of each length is drawn from `random.Random(1000 + n)` with `+` and `*`
+  only, so the kernel rebuilds it with its own seeding and the file holds only results
+  (`scripts/g2_mean_vectors.py` -> `engine-rs/tests/mean_vectors.json`, test `numpy_mean.rs`; a pytest ties the
+  file to the installed numpy, so an upgrade that changed the summation fails there). No step, loader or ABI change.

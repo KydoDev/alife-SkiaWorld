@@ -266,3 +266,13 @@ def test_committed_seed_vectors_match_this_python():
     committed = json.loads((ROOT / "engine-rs" / "tests" / "seed_vectors.json").read_text(encoding="utf-8"))
     fresh = [sv.case("int", s) for s in sv.INT_SEEDS] + [sv.case("str", s) for s in sv.STR_SEEDS]
     assert committed["cases"] == fresh and committed["draws"] == sv.DRAWS
+
+
+def test_committed_mean_vectors_match_this_numpy():
+    """engine-rs/tests/mean_vectors.json is what this numpy's ndarray.mean() gives (ADR-0012 piece 2)."""
+    spec = importlib.util.spec_from_file_location("g2_mean_vectors", ROOT / "scripts" / "g2_mean_vectors.py")
+    mv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mv)
+    committed = json.loads((ROOT / "engine-rs" / "tests" / "mean_vectors.json").read_text(encoding="utf-8"))
+    assert committed["seed_base"] == mv.SEED_BASE
+    assert committed["cases"] == [mv.case(n) for n in mv.LENGTHS]
