@@ -63,6 +63,8 @@ cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 # regenerate every G2 golden set after any change to the dynamics (the sets are listed in SETS
 # in scripts/g2_golden.py; a new set also goes into GOLDEN_SETS in engine-rs/tests/common/mod.rs)
 python scripts/g2_golden.py --all engine-rs/tests/golden
+# seeding vectors (random.Random(seed) for int and str seeds; platform-independent)
+python scripts/g2_seed_vectors.py --out engine-rs/tests/seed_vectors.json
 # genome distance vectors (math.dist is CPython's own algorithm; platform-independent)
 python scripts/g2_distance_vectors.py --out engine-rs/tests/genome_distance.json
 # one-off world with overrides, e.g. to try a flag before it becomes a set

@@ -7,9 +7,27 @@
 //! and `gauss`. Each mirrors CPython's `Modules/_randommodule.c` or `Lib/random.py`, including
 //! the order in which it consumes words, which is what makes the stream match.
 //!
-//! Seeding (`init_by_array`) is deliberately absent: the kernel always starts from a save.
+//! Seeding (ADR-0012): `random.Random(n)` for a `u64` and `random.Random(s)` for a `str`, as
+//! CPython's `random_seed` and `init_by_array` do it; `None`, negative and bytes seeds are not
+//! ported (the kernel takes `u64` seeds only).
 
 use std::fmt;
+
+/// The 32-bit words of the non-negative integer whose big-endian bytes are `bytes`, least
+/// significant first, without high zero words and at least one (CPython's `random_seed` key).
+fn words_of_big_endian(bytes: &[u8]) -> Vec<u32> {
+    let mut words: Vec<u32> = bytes
+        .rchunks(4)
+        .map(|c| c.iter().fold(0u32, |w, &b| (w << 8) | u32::from(b)))
+        .collect();
+    while words.len() > 1 && words.last() == Some(&0) {
+        words.pop();
+    }
+    if words.is_empty() {
+        words.push(0);
+    }
+    words
+}
 
 /// MT19937 state size in 32-bit words.
 pub const MT_N: usize = 624;
@@ -78,6 +96,67 @@ impl PyRandom {
         let mut words = self.mt.to_vec();
         words.push(self.index as u32);
         (words, self.gauss_next)
+    }
+
+    /// `random.Random(seed)` for a non-negative integer seed (ADR-0012): the seed's 32-bit words,
+    /// least significant first and at least one (`0` gives `[0]`), through `init_by_array`.
+    pub fn from_seed_u64(seed: u64) -> Self {
+        let (low, high) = (seed as u32, (seed >> 32) as u32);
+        if high == 0 {
+            Self::from_key(&[low])
+        } else {
+            Self::from_key(&[low, high])
+        }
+    }
+
+    /// `random.Random(s)` for a `str` seed (version 2): `int.from_bytes(b + sha512(b), "big")`
+    /// with `b = s.encode()`, then the integer path on that (large, positive) number.
+    pub fn from_seed_str(s: &str) -> Self {
+        use sha2::{Digest, Sha512};
+        let mut bytes = s.as_bytes().to_vec();
+        bytes.extend_from_slice(&Sha512::digest(s.as_bytes()));
+        Self::from_key(&words_of_big_endian(&bytes))
+    }
+
+    /// `init_by_array` (which starts with `init_genrand(19650218)`); index 624, no cached gauss.
+    fn from_key(key: &[u32]) -> Self {
+        let mut mt = [0u32; MT_N];
+        mt[0] = 19_650_218;
+        for i in 1..MT_N {
+            mt[i] = 1_812_433_253u32
+                .wrapping_mul(mt[i - 1] ^ (mt[i - 1] >> 30))
+                .wrapping_add(i as u32);
+        }
+        let (mut i, mut j) = (1usize, 0usize);
+        for _ in 0..MT_N.max(key.len()) {
+            mt[i] = (mt[i] ^ (mt[i - 1] ^ (mt[i - 1] >> 30)).wrapping_mul(1_664_525))
+                .wrapping_add(key[j])
+                .wrapping_add(j as u32);
+            i += 1;
+            j += 1;
+            if i >= MT_N {
+                mt[0] = mt[MT_N - 1];
+                i = 1;
+            }
+            if j >= key.len() {
+                j = 0;
+            }
+        }
+        for _ in 0..MT_N - 1 {
+            mt[i] = (mt[i] ^ (mt[i - 1] ^ (mt[i - 1] >> 30)).wrapping_mul(1_566_083_941))
+                .wrapping_sub(i as u32);
+            i += 1;
+            if i >= MT_N {
+                mt[0] = mt[MT_N - 1];
+                i = 1;
+            }
+        }
+        mt[0] = 0x8000_0000;
+        Self {
+            mt,
+            index: MT_N,
+            gauss_next: None,
+        }
     }
 
     /// `genrand_uint32` from `_randommodule.c`.

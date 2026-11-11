@@ -398,3 +398,11 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   sexual births, gene transfers, foreign transfers, repelled attacks) moved during the hashed steps, extinctions
   only in `combined_reseed`; in `open_genome_unsensed` division rules shifted the threshold in 20 steps. CI
   regenerates 18 sets on Linux now (about a minute more).
+- **ADR-0012 piece 1, seeding** (2026-11-11, Windows 11): `PyRandom::from_seed_u64` and `from_seed_str` port
+  CPython's `random_seed` (the seed's 32-bit words, least significant first, at least one) and `init_by_array`; a
+  `str` seed is `int.from_bytes(b + sha512(b), "big")` first (`sha2`, already a dependency). Verdict (fixed in the
+  ADR): **met** at the first run. The full state (624 words, index 624, no cached gauss) and a SHA-256 of the first
+  1000 `random()` draws equal CPython's for seeds 0, 1, 42, 2^31-1, 2^32-1, 2^32, 2^63, 2^64-1 and the strings
+  `worldsim-terrain-{0, 42, 2^64-1}`, the empty string and a non-ASCII one (`scripts/g2_seed_vectors.py` ->
+  `engine-rs/tests/seed_vectors.json`, test `seed_vectors.rs`; a pytest checks the committed file against this
+  Python). Platform-independent (integer arithmetic and SHA-512). No step, loader or ABI change.

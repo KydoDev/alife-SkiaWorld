@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0012 piece 1, seeding in the Rust kernel**: `PyRandom::from_seed_u64` / `from_seed_str` reproduce
+  CPython's `random.Random(seed)` (state and draws equal on 13 seeds, `scripts/g2_seed_vectors.py`).
 - **ADR-0013, interventions through the C ABI**: the five G1 world edits move into the kernel as a
   validated, RNG-free `World::intervene` behind one entry point `ws_world_intervene` (new `WS_ERR_INVALID`, which
   does not poison the handle); budget, milestones and the game flow stay in Python until G3, never in C#. Proof by

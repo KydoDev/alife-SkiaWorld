@@ -256,3 +256,13 @@ def test_dump_step_writes_the_save_of_that_step(tmp_path):
     world = load_world(tmp_path / "step_2.json.gz")
     assert world.step_count == 2
     assert g2.state_hash(world) == rows[2]["hash"]
+
+
+def test_committed_seed_vectors_match_this_python():
+    """engine-rs/tests/seed_vectors.json is what this CPython's random.Random(seed) gives (ADR-0012 piece 1)."""
+    spec = importlib.util.spec_from_file_location("g2_seed_vectors", ROOT / "scripts" / "g2_seed_vectors.py")
+    sv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sv)
+    committed = json.loads((ROOT / "engine-rs" / "tests" / "seed_vectors.json").read_text(encoding="utf-8"))
+    fresh = [sv.case("int", s) for s in sv.INT_SEEDS] + [sv.case("str", s) for s in sv.STR_SEEDS]
+    assert committed["cases"] == fresh and committed["draws"] == sv.DRAWS

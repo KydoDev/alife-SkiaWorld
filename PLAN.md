@@ -5,7 +5,7 @@ accepted 2026-11-11; world creation first). Work on `main`, one commit per piece
 Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run; detail: `docs/G2_PLAN.md`.
 
 ## Checklist
-1. [ ] ADR-0012 piece 1: CPython integer and string seeding in `rng.rs`; raw-state golden vectors
+1. [x] ADR-0012 piece 1: CPython integer and string seeding in `rng.rs`; raw-state golden vectors
 2. [ ] ADR-0012 piece 2: numpy pairwise mean (`numpy_mean`), bit-equal to `ndarray.mean()` on the fixed lengths
 3. [ ] ADR-0012 piece 3: `generate_terrain` (incl. `vent_plume`); terrain digest equal on every listed case
 4. [ ] ADR-0012 piece 4: `World::new`; step-0 hashes and creation sets `create_default`, `create_volcanic`
