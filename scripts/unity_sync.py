@@ -5,7 +5,10 @@ Builds `engine-rs` in release mode and copies:
 - a save (default: the default golden start save) to `unity/Assets/StreamingAssets/world.json.gz`;
 - the config of a planet form (default: examples/volcanic.json), `Config.to_dict()` as a save stores it, to
   `unity/Assets/StreamingAssets/world_config.json`: the input of "New world", which the kernel creates with the
-  seed typed in the front-end (ADR-0012; forms and images themselves stay in Python).
+  seed typed in the front-end (ADR-0012; forms and images themselves stay in Python);
+- the G1 tool parameters of `GameRules()` (kind, radius, amount per tool) to
+  `unity/Assets/StreamingAssets/game_tools.json`: the viewer's sandbox tools (ADR-0013 piece 5), so the game
+  rules keep one home, in Python.
 The destinations are git-ignored. The Unity editor locks a loaded native library: close it before
 re-running this script after a kernel change.
 
@@ -51,6 +54,31 @@ def main(argv=None) -> None:
     copy(ENGINE / "target/release" / lib, UNITY / "Assets/Plugins/x86_64" / lib)
     copy(args.save, UNITY / "Assets/StreamingAssets/world.json.gz")
     write_config(args.planet, UNITY / "Assets/StreamingAssets/world_config.json")
+    write_tools(UNITY / "Assets/StreamingAssets/game_tools.json")
+
+
+# `ws_world_intervene` kind of each G1 tool (WS_EDIT_*, engine-rs/src/ffi.rs)
+TOOL_KIND = {"nutrients": 1, "meteorite": 2, "mountain": 3, "dig": 4, "volcano": 5}
+
+
+def tool_parameters(rules=None) -> list[dict]:
+    """Each G1 tool as the arguments of `ws_world_intervene`: what `Game.act` passes to the `play.py` edit (the
+    radius from `rules.radius`, `nutrients_amount` or `max_chem` as the amount; unused arguments 0)."""
+    from worldsim.play import TOOLS, GameRules
+    rules = rules or GameRules()
+    out = []
+    for tool in TOOLS:
+        kind = TOOL_KIND[tool]
+        radius = 0 if tool == "volcano" else int(rules.radius[tool])
+        amount = {"nutrients": rules.nutrients_amount, "volcano": rules.max_chem}.get(tool, 0.0)
+        out.append({"name": tool, "kind": kind, "radius": radius, "amount": float(amount)})
+    return out
+
+
+def write_tools(dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(json.dumps({"tools": tool_parameters()}, separators=(",", ":")) + "\n", encoding="utf-8")
+    print(f"GameRules() tools -> {dst.relative_to(ROOT)}")
 
 
 def write_config(planet: Path, dst: Path) -> None:

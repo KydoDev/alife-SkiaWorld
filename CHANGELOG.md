@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0013 piece 5, Unity sandbox tools**: the viewer gets the five G1 tools (pick one, click the world), with
+  the parameters `scripts/unity_sync.py` exports from `GameRules()` to `StreamingAssets/game_tools.json`.
 - **ADR-0013 piece 4, `ws_world_intervene` (C ABI 3)**: front-ends apply the five G1 edits through the C ABI;
   a refused edit returns `WS_ERR_INVALID` and changes nothing. The Unity wrapper gains `NativeWorld.Intervene`.
 - **ADR-0013 piece 3, `World::intervene`**: the kernel applies the five G1 edits (nutrients, meteorite, raise rock,

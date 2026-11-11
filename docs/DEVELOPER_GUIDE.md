@@ -105,7 +105,9 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
   and images themselves stay in Python; a kernel-made world cannot be saved yet.
 - **Edits** (ADR-0013): `NativeWorld.Intervene(Edit, x, y, radius, amount)` applies a G1 tool between steps,
   bit-exact with `worldsim/play.py`; a refusal throws `WorldSimException` with `Status == StatusInvalid` and leaves
-  the world as it was. The viewer's tools come with piece 5.
+  the world as it was. In the viewer, the second bar row picks a tool (click it again to put it down) and a left
+  click on the world applies it; the parameters come from `StreamingAssets/game_tools.json`, which
+  `unity_sync.py` exports from `GameRules()`. A sandbox: no budget or milestones until G3.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

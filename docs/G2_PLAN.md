@@ -509,3 +509,12 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   leaving hash and render unchanged and the handle usable; the poisoned handle refuses an edit. Unity EditMode
   **12/12** (new: every interventions case through P/Invoke; a refused edit throws `StatusInvalid` and changes
   neither hash nor render).
+- **ADR-0013 piece 5, Unity sandbox tools** (2026-11-11, Windows 11, Unity 6000.5.6f1): `scripts/unity_sync.py`
+  exports the five G1 tools of `GameRules()` as `StreamingAssets/game_tools.json` (`kind`, `radius`, `amount`
+  each: the arguments of `ws_world_intervene`), so the tool parameters have no C# copy. The viewer reads it (capped
+  at 16 KiB; without it the viewer works with no tools) and shows a second bar row: pick a tool, click the world,
+  and the tile under the mouse gets the edit at once (paused or running, between steps); the row shows the edit's
+  value or the kernel's refusal; a panic stops the world. No budget or milestones (G3). pytest: the exported
+  `(kind, radius, amount)` equal what `g2_intervention_vectors.game_actions` makes of a G1 log (the expansion the
+  kernel is proven against), and follow changed `GameRules`. The viewer compiles and the EditMode tests pass
+  (**12/12**); the click-to-apply path is checked by hand in the Editor, by the owner (Unity is not in CI).
