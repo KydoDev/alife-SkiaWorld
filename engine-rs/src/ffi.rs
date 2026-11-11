@@ -17,7 +17,12 @@ use crate::render::{render_rgb, rgb_len};
 use crate::save::{world_from_gzip, MAX_SAVE_BYTES};
 use crate::world::World;
 use std::cell::RefCell;
+use std::fmt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+
+// The whole boundary relies on unwinding to catch panics.
+#[cfg(panic = "abort")]
+compile_error!("the C ABI needs panic = unwind");
 
 /// Bumped whenever a signature or a struct below changes; front-ends refuse a mismatch.
 pub const WS_ABI_VERSION: u32 = 1;
@@ -25,8 +30,6 @@ pub const WS_ABI_VERSION: u32 = 1;
 pub const WS_OK: i32 = 0;
 /// A null pointer or a buffer of the wrong size.
 pub const WS_ERR_ARGUMENT: i32 = -1;
-/// The save was refused (malformed, hostile, or needs a feature this kernel lacks).
-pub const WS_ERR_LOAD: i32 = -2;
 /// A panic was caught; the handle, if any, is now poisoned.
 pub const WS_ERR_PANIC: i32 = -3;
 /// The handle was poisoned by an earlier panic.
@@ -34,6 +37,10 @@ pub const WS_ERR_POISONED: i32 = -4;
 
 /// Length of the hex state hash written by [`ws_world_state_hash`].
 pub const WS_HASH_LEN: usize = 64;
+
+/// Largest compressed save [`ws_world_load`] accepts (the decompressed cap is
+/// `save::MAX_SAVE_BYTES`; a front-end should still expect up to about 1 GiB of peak memory).
+pub const WS_MAX_SAVE_LEN: usize = 256 * 1024 * 1024;
 
 /// An opaque world handle.
 pub struct WsWorld {
@@ -54,28 +61,37 @@ pub struct WsInfo {
     pub kills: u64,
 }
 
+// The layout C# mirrors (`LayoutKind.Sequential`: two uint, five ulong); a change bumps the ABI.
+const _: () = assert!(std::mem::size_of::<WsInfo>() == 48 && std::mem::align_of::<WsInfo>() == 8);
+
 thread_local! {
     static LAST_ERROR: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
-fn set_error(message: impl Into<String>) {
-    LAST_ERROR.with(|e| *e.borrow_mut() = message.into());
+fn set_error(message: impl fmt::Display) {
+    // `try_with`: never panic, even during thread teardown.
+    let _ = LAST_ERROR.try_with(|e| *e.borrow_mut() = crate::bounded(message));
 }
 
-fn fail(code: i32, message: impl Into<String>) -> i32 {
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    let text = payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("unknown");
+    format!("internal error (panic caught): {text}")
+}
+
+fn fail(code: i32, message: impl fmt::Display) -> i32 {
     set_error(message);
     code
 }
 
-/// Run `f` on a live, unpoisoned handle; a panic poisons it when `poison_on_panic`.
+/// Run `f` on a live, unpoisoned handle with exclusive access; a panic poisons the handle.
 ///
 /// # Safety
-/// `handle` is null or a live pointer from [`ws_world_load`].
-unsafe fn with_world(
-    handle: *mut WsWorld,
-    poison_on_panic: bool,
-    f: impl FnOnce(&mut World) -> i32,
-) -> i32 {
+/// `handle` is null or a live pointer from [`ws_world_load`], not used by another call meanwhile.
+unsafe fn with_world_mut(handle: *mut WsWorld, f: impl FnOnce(&mut World) -> i32) -> i32 {
     // SAFETY: the caller guarantees a null or live, unaliased handle.
     let Some(h) = (unsafe { handle.as_mut() }) else {
         return fail(WS_ERR_ARGUMENT, "null world handle");
@@ -85,12 +101,28 @@ unsafe fn with_world(
     }
     match catch_unwind(AssertUnwindSafe(|| f(&mut h.world))) {
         Ok(code) => code,
-        Err(_) => {
-            if poison_on_panic {
-                h.poisoned = true;
-            }
-            fail(WS_ERR_PANIC, "internal error (panic caught)")
+        Err(payload) => {
+            h.poisoned = true; // the world may be half-updated
+            fail(WS_ERR_PANIC, panic_message(&*payload))
         }
+    }
+}
+
+/// Run `f` on a live, unpoisoned handle with shared access (read-only views).
+///
+/// # Safety
+/// `handle` is null or a live pointer from [`ws_world_load`], not being stepped meanwhile.
+unsafe fn with_world(handle: *const WsWorld, f: impl FnOnce(&World) -> i32) -> i32 {
+    // SAFETY: the caller guarantees a null or live handle with no concurrent writer.
+    let Some(h) = (unsafe { handle.as_ref() }) else {
+        return fail(WS_ERR_ARGUMENT, "null world handle");
+    };
+    if h.poisoned {
+        return fail(WS_ERR_POISONED, "world handle poisoned by an earlier panic");
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(&h.world))) {
+        Ok(code) => code,
+        Err(payload) => fail(WS_ERR_PANIC, panic_message(&*payload)),
     }
 }
 
@@ -110,6 +142,12 @@ pub unsafe extern "C" fn ws_world_load(data: *const u8, len: usize) -> *mut WsWo
         set_error("empty save data");
         return std::ptr::null_mut();
     }
+    if len > WS_MAX_SAVE_LEN {
+        set_error(format_args!(
+            "save data larger than {WS_MAX_SAVE_LEN} bytes"
+        ));
+        return std::ptr::null_mut();
+    }
     // SAFETY: checked non-null; the caller guarantees `len` readable bytes.
     let bytes = unsafe { std::slice::from_raw_parts(data, len) };
     match catch_unwind(|| world_from_gzip(bytes, MAX_SAVE_BYTES)) {
@@ -121,8 +159,8 @@ pub unsafe extern "C" fn ws_world_load(data: *const u8, len: usize) -> *mut WsWo
             set_error(e.message());
             std::ptr::null_mut()
         }
-        Err(_) => {
-            set_error("internal error while loading (panic caught)");
+        Err(payload) => {
+            set_error(panic_message(&*payload));
             std::ptr::null_mut()
         }
     }
@@ -140,7 +178,8 @@ pub unsafe extern "C" fn ws_world_free(handle: *mut WsWorld) {
     }
 }
 
-/// Advance the world by `steps` steps.
+/// Advance the world by `steps` steps. The call blocks until done and cannot be cancelled:
+/// a front-end steps in small per-frame chunks.
 ///
 /// # Safety
 /// `handle` is null or a live pointer from [`ws_world_load`].
@@ -148,7 +187,7 @@ pub unsafe extern "C" fn ws_world_free(handle: *mut WsWorld) {
 pub unsafe extern "C" fn ws_world_step(handle: *mut WsWorld, steps: u32) -> i32 {
     // SAFETY: forwarded caller guarantee.
     unsafe {
-        with_world(handle, true, |w| {
+        with_world_mut(handle, |w| {
             for _ in 0..steps {
                 w.step();
             }
@@ -162,13 +201,13 @@ pub unsafe extern "C" fn ws_world_step(handle: *mut WsWorld, steps: u32) -> i32 
 /// # Safety
 /// `handle` as for [`ws_world_step`]; `out` is null or writable.
 #[no_mangle]
-pub unsafe extern "C" fn ws_world_info(handle: *mut WsWorld, out: *mut WsInfo) -> i32 {
+pub unsafe extern "C" fn ws_world_info(handle: *const WsWorld, out: *mut WsInfo) -> i32 {
     if out.is_null() {
         return fail(WS_ERR_ARGUMENT, "null info pointer");
     }
     // SAFETY: forwarded caller guarantee; `out` checked non-null.
     unsafe {
-        with_world(handle, false, |w| {
+        with_world(handle, |w| {
             *out = WsInfo {
                 width: w.width as u32,
                 height: w.height as u32,
@@ -190,7 +229,7 @@ pub unsafe extern "C" fn ws_world_info(handle: *mut WsWorld, out: *mut WsInfo) -
 /// `handle` as for [`ws_world_step`]; `out` is null or points to `len` writable bytes.
 #[no_mangle]
 pub unsafe extern "C" fn ws_world_state_hash(
-    handle: *mut WsWorld,
+    handle: *const WsWorld,
     out: *mut u8,
     len: usize,
 ) -> i32 {
@@ -202,7 +241,7 @@ pub unsafe extern "C" fn ws_world_state_hash(
     }
     // SAFETY: forwarded caller guarantee; `out` checked non-null with `len` bytes.
     unsafe {
-        with_world(handle, false, |w| {
+        with_world(handle, |w| {
             let hash = state_hash(w);
             std::slice::from_raw_parts_mut(out, len).copy_from_slice(hash.as_bytes());
             WS_OK
@@ -217,7 +256,7 @@ pub unsafe extern "C" fn ws_world_state_hash(
 /// `handle` as for [`ws_world_step`]; `out` is null or points to `len` writable bytes.
 #[no_mangle]
 pub unsafe extern "C" fn ws_world_render_rgb(
-    handle: *mut WsWorld,
+    handle: *const WsWorld,
     out: *mut u8,
     len: usize,
 ) -> i32 {
@@ -226,7 +265,7 @@ pub unsafe extern "C" fn ws_world_render_rgb(
     }
     // SAFETY: forwarded caller guarantee; `out` checked non-null, its size checked below.
     unsafe {
-        with_world(handle, false, |w| {
+        with_world(handle, |w| {
             let need = rgb_len(w);
             if len != need {
                 return fail(
@@ -240,23 +279,27 @@ pub unsafe extern "C" fn ws_world_render_rgb(
     }
 }
 
-/// Copy the last error message of this thread (UTF-8, no terminator) into `out`, truncated
-/// to `len` bytes. Returns the full message length, so a caller can retry with a larger
-/// buffer; `out` may be null to query the length.
+/// Copy the last error message of this thread (UTF-8, no terminator, at most
+/// `MAX_MESSAGE` + 3 bytes) into `out`, truncated to `len` bytes (a cut may split a UTF-8
+/// sequence). Returns the full message length, so a caller can retry with a larger buffer;
+/// `out` may be null to query the length. The message is not cleared on success.
 ///
 /// # Safety
 /// `out` is null or points to `len` writable bytes.
 #[no_mangle]
 pub unsafe extern "C" fn ws_last_error(out: *mut u8, len: usize) -> usize {
-    LAST_ERROR.with(|e| {
-        let e = e.borrow();
-        if !out.is_null() {
-            let n = e.len().min(len);
-            // SAFETY: checked non-null; the caller guarantees `len` writable bytes.
-            unsafe { std::slice::from_raw_parts_mut(out, n) }.copy_from_slice(&e.as_bytes()[..n]);
-        }
-        e.len()
-    })
+    LAST_ERROR
+        .try_with(|e| {
+            let e = e.borrow();
+            if !out.is_null() {
+                let n = e.len().min(len);
+                // SAFETY: checked non-null; the caller guarantees `len` writable bytes.
+                unsafe { std::slice::from_raw_parts_mut(out, n) }
+                    .copy_from_slice(&e.as_bytes()[..n]);
+            }
+            e.len()
+        })
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -275,11 +318,18 @@ mod tests {
             poisoned: false,
         }));
         unsafe {
-            let code = with_world(h, true, |_| panic!("boom"));
+            let code = with_world_mut(h, |_| panic!("boom"));
             assert_eq!(code, WS_ERR_PANIC);
             assert_eq!(ws_world_step(h, 1), WS_ERR_POISONED);
             let mut info = WsInfo::default();
             assert_eq!(ws_world_info(h, &mut info), WS_ERR_POISONED);
+            let mut hash = [0u8; WS_HASH_LEN];
+            assert_eq!(
+                ws_world_state_hash(h, hash.as_mut_ptr(), WS_HASH_LEN),
+                WS_ERR_POISONED
+            );
+            let mut rgb = vec![0u8; 3];
+            assert_eq!(ws_world_render_rgb(h, rgb.as_mut_ptr(), 3), WS_ERR_POISONED);
             ws_world_free(h);
         }
     }

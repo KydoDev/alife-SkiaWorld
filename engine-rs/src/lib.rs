@@ -31,10 +31,47 @@ pub struct SaveError {
     message: String,
 }
 
+/// Longest error message kept, in bytes: a hostile save must not make an error text huge (the
+/// JSON parser echoes offending strings, and front-ends copy the message out).
+pub const MAX_MESSAGE: usize = 512;
+
+/// Format `value` into at most [`MAX_MESSAGE`] bytes (cut at a char boundary, then "..."),
+/// without ever building the full text.
+pub(crate) fn bounded(value: impl fmt::Display) -> String {
+    struct Capped(String, bool);
+    impl fmt::Write for Capped {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            let room = MAX_MESSAGE - self.0.len();
+            if s.len() <= room {
+                self.0.push_str(s);
+                return Ok(());
+            }
+            let mut cut = room;
+            while !s.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            self.0.push_str(&s[..cut]);
+            self.1 = true;
+            Err(fmt::Error) // stop formatting: the rest is dropped
+        }
+    }
+    let mut out = Capped(String::new(), false);
+    let _ = fmt::write(&mut out, format_args!("{value}"));
+    if out.1 {
+        out.0.push_str("...");
+    }
+    out.0
+}
+
 impl SaveError {
     pub(crate) fn new(message: impl Into<String>) -> Self {
+        let message = message.into();
         Self {
-            message: message.into(),
+            message: if message.len() > MAX_MESSAGE {
+                bounded(message)
+            } else {
+                message
+            },
         }
     }
 

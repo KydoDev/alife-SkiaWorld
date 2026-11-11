@@ -51,6 +51,12 @@ pub fn render_rgb(world: &World, out: &mut [u8]) {
         }
         write_px(out, i, px);
     }
+    // Python colours cells by `c.photo` etc., which follow the acclimated diet when plasticity
+    // is on. The loader refuses plasticity until M5; porting it must switch this to the diet.
+    debug_assert!(
+        !world.cfg.plasticity,
+        "render of a plastic world needs the diet (M5)"
+    );
     for c in world.cells() {
         let g = &c.genes;
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];

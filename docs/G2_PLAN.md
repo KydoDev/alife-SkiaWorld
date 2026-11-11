@@ -235,3 +235,9 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   hashes through the ABI in uneven chunks, bad and refused saves with their message, null handles, wrong buffers,
   error truncation; a unit test checks the poisoned handle. Checked from outside Rust with Python `ctypes` on the
   built `worldsim_core.dll` (volcanic, 1000 steps: hash equal).
+  Security review (no blocking issue) follow-ups, done: error messages capped at 512 bytes while formatting (a
+  hostile save echoed a 10 MB string into the error), read-only calls take a shared reference, `ws_last_error` and
+  `set_error` never panic (`try_with`), a build with `panic = "abort"` fails to compile, compressed saves above
+  256 MiB refused, `WsInfo` layout asserted (48 bytes), panic text kept in the message. Open, for later: the
+  light factor (day/night, seasons) is not covered by a golden set (both have it off); render reads the genes,
+  so plasticity at M5 must switch it to the diet (a debug assertion marks it).

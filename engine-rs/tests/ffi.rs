@@ -146,6 +146,23 @@ fn a_save_with_an_unsupported_flag_is_refused_with_its_reason() {
 }
 
 #[test]
+fn a_hostile_save_cannot_make_a_huge_error_message() {
+    use std::io::Write;
+    let json = format!(
+        r#"{{"format": "worldsim-save", "step_count": "{}"}}"#,
+        "A".repeat(1_000_000)
+    );
+    let mut gz = Vec::new();
+    let mut e = flate2::write::GzEncoder::new(&mut gz, flate2::Compression::best());
+    e.write_all(json.as_bytes()).unwrap();
+    e.finish().unwrap();
+    assert!(load_bytes(&gz).is_null());
+    let n = unsafe { ws_last_error(std::ptr::null_mut(), 0) };
+    assert!(n <= worldsim_core::MAX_MESSAGE + 3, "message of {n} bytes");
+    assert!(last_error().ends_with("..."));
+}
+
+#[test]
 fn last_error_truncates_to_the_buffer() {
     assert!(load_bytes(b"x").is_null());
     let full = last_error();
