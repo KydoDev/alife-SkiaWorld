@@ -326,3 +326,23 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `non_pred` 0 and 1/3-diet branches), the neutral arm with the other flags, heavy immigration. Follow-ups, done:
   the loader's diet sum now mirrors CPython 3.12's compensated `sum()` (plain `+` disagreed with Python within an ulp
   of the 1e-6 tolerance, both ways); a test for a moved diet in the neutral arm.
+- **M5 item 5, `sex`** (2026-11-11, Windows 11): the kernel runs F5a two-parent division. A dividing cell (not in
+  the neutral arm) draws `random() < sex_p`, then needs energy above `sex_cost + body_cost`; it looks for a partner
+  within `mate_radius` (Chebyshev, x toroidal, tiles scanned once in Python's order) whose fixed genes are closer
+  than `mate_distance`, picks one at random, pays `sex_cost` and counts a sexual birth. The child's genes are a
+  uniform crossover (one draw per gene) before mutation; `sex_p` is inherited from the dividing parent only and
+  drawn before the other propensities, as for founders. The distance is `species.genome_distance`, i.e.
+  `math.dist`, which in CPython 3.12 is not libm but its own extended-precision `vector_norm`: the kernel
+  reproduces it operation by operation. Its products are `hi = x * y`, `lo = fma(x, y, -hi)`; the kernel computes the
+  same pair with Dekker's TwoProduct (the rounding error of a product is unique, so the pair is identical unless a
+  term underflows below ~2^-969), and uses CPython's exact frexp condition for the subnormal rescaling. A pure-Python copy of the
+  algorithm equalled `math.dist` on 2M random pairs (close, sparse, nearly equal and identical genomes); the Rust
+  one equals Python on 700 committed pairs, including 80 with a subnormal maximum and pairs mixing large and
+  tiny differences (`scripts/g2_distance_vectors.py` -> `engine-rs/tests/genome_distance.json`,
+  test `genome_distance.rs`; platform-independent, so one file serves Windows and Linux; the script records the
+  Python version and refuses anything but CPython 3.12/3.13, as 3.11 has another algorithm). The loader accepts `sex`
+  and bounds `sex_p`; the hash needs no change (`sex_p` and `sex_births` were always hashed). Golden sets `sex` and
+  `sex_neutral`. Verdict (rules in `PLAN.md`): **met**. Both sets equal Python at every one of the 1000 steps, at the
+  first run; the eight earlier sets' hashes are byte-identical when regenerated. Not vacuous: 2631 sexual births in
+  `sex`, none in `sex_neutral`, `sex_p` spread over [0, 1] in both. Speed, two alternating rounds against the previous
+  commit: 800 cells +2%, 10k -5%, 50k +2% (noise level).

@@ -19,8 +19,8 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5 ports them): saves with `sensing`, `open_genome` or `sex`
-//!   on are refused; `defence`, `hgt` and `plasticity` are ported (M5);
+//! - **unsupported** (until milestone M5 ports them): saves with `sensing` or `open_genome` on are
+//!   refused; `defence`, `hgt`, `plasticity` and `sex` are ported (M5);
 //! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not).
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
@@ -387,11 +387,7 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         )));
     }
     let cfg = Config::from_json(&raw.config.0)?;
-    for (flag, on) in [
-        ("sensing", cfg.sensing),
-        ("open_genome", cfg.open_genome),
-        ("sex", cfg.sex),
-    ] {
+    for (flag, on) in [("sensing", cfg.sensing), ("open_genome", cfg.open_genome)] {
         if on {
             return Err(err(format!(
                 "unsupported save: {flag} is on (this kernel does not run it yet, M5)"
@@ -546,11 +542,12 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 world.next_id
             )));
         }
-        // With sex off (checked above) Python accepts only a zero sex_p.
-        if !(sex_p.is_finite() && sex_p == 0.0) {
+        let cfg = &world.cfg;
+        // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless the flag is on.
+        let sex_ok = sex_p.is_finite() && (0.0..=1.0).contains(&sex_p) && (cfg.sex || sex_p == 0.0);
+        if !sex_ok {
             return Err(err(format!("cell #{id} has an invalid sex_p")));
         }
-        let cfg = &world.cfg;
         // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless the flag is on.
         let plast_ok = plast_p.is_finite()
             && (0.0..=1.0).contains(&plast_p)
@@ -595,6 +592,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             count(lineage, "cell lineage")?,
             // the propensities keep the sign of a -0.0 (they are hashed by bits)
             Traits {
+                sex_p,
                 plast_p,
                 hgt_p,
                 armor_p,
@@ -618,7 +616,6 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             cell.apply_diet(&world.cfg);
         }
         cell.age = count(age, "cell age")?;
-        cell.sex_p = sex_p; // keeps the sign of a -0.0 (it is hashed by bits)
         world.slab.push(cell);
         world.order.push(r);
         world.grid[tile] = r;

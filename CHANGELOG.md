@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, `sex` in the Rust kernel**: saves with F5a two-parent division load and run in the kernel, equal to
+  Python at every step of new golden sets `sex` (2631 sexual births in 1000 steps) and `sex_neutral`. Mate choice
+  uses CPython's own `math.dist` algorithm, reproduced in Rust and checked bit for bit on 700 gene pairs, subnormal ones included
+  (`scripts/g2_distance_vectors.py`). Earlier hashes unchanged; speed within noise.
 - **G2 M5, `plasticity` in the Rust kernel**: saves with F5b diet acclimation load and run in the kernel, equal to
   Python at every step and in the renders of new golden sets `plasticity` (538 of 555 cells acclimated) and
   `plastic_neutral`; the kernel's render now colours cells by their (acclimated) feeding shares. The state hash

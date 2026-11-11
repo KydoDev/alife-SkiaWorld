@@ -1,5 +1,6 @@
 //! World state and the step (`worldsim/world.py`): the default flags (G2 M2) plus, from M5, the
-//! optional flags ported so far (`defence`, `hgt`, `plasticity`). Other flags are refused by the loader.
+//! optional flags ported so far (`defence`, `hgt`, `plasticity`, `sex`). Other flags are refused by the
+//! loader.
 //!
 //! Cells live in a slab (`World::slab`) and are referred to by slot ([`CellRef`]), never by
 //! pointer; `World::order` is Python's `World.cells` list (its order is part of the state: the
@@ -71,9 +72,97 @@ pub struct Phenotype {
 /// while its flag is off.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Traits {
+    pub sex_p: f64,
     pub plast_p: f64,
     pub hgt_p: f64,
     pub armor_p: f64,
+}
+
+/// `species.REFERENCE_GENES`: the genome length the distance threshold was calibrated on.
+const REFERENCE_GENES: f64 = 10.0;
+
+/// `species.genome_distance`: `math.dist(a, b) * sqrt(REFERENCE_GENES / len(a))` (ADR-0005).
+pub fn genome_distance(a: &[f64; N_GENES], b: &[f64; N_GENES]) -> f64 {
+    let mut diffs = [0.0; N_GENES];
+    let mut max = 0.0f64;
+    for (d, (p, q)) in diffs.iter_mut().zip(a.iter().zip(b)) {
+        *d = (p - q).abs();
+        if *d > max {
+            max = *d;
+        }
+    }
+    vector_norm(&mut diffs, max) * (REFERENCE_GENES / N_GENES as f64).sqrt()
+}
+
+/// CPython 3.12's `vector_norm` (`Modules/mathmodule.c`), behind `math.dist`: not a libm call but
+/// its own extended-precision algorithm, so it is reproduced operation by operation. Domain: finite,
+/// non-negative values with `max` their maximum (gene differences in [0, 1]); NaN and infinity,
+/// which CPython handles before this point, cannot occur here.
+fn vector_norm(vec: &mut [f64], max: f64) -> f64 {
+    debug_assert!(max.is_finite() && max >= 0.0);
+    if max == 0.0 || vec.len() <= 1 {
+        return max;
+    }
+    let bits = max.to_bits();
+    let biased = ((bits >> 52) & 0x7ff) as i32;
+    // frexp: max = m * 2^max_e, m in [0.5, 1); a subnormal's exponent comes from its bit length
+    let max_e = if biased == 0 {
+        (64 - (bits & ((1u64 << 52) - 1)).leading_zeros()) as i32 - 1074
+    } else {
+        biased - 1022
+    };
+    if max_e < -1023 {
+        // same condition as CPython: `ldexp(1.0, -max_e)` would overflow, so rescale by DBL_MIN
+        for v in vec.iter_mut() {
+            *v /= f64::MIN_POSITIVE;
+        }
+        return f64::MIN_POSITIVE * vector_norm(vec, max / f64::MIN_POSITIVE);
+    }
+    let scale = f64::from_bits(((1023 - max_e) as u64) << 52); // ldexp(1.0, -max_e)
+    let (mut csum, mut frac1, mut frac2) = (1.0f64, 0.0f64, 0.0f64);
+    for &v in vec.iter() {
+        let x = v * scale;
+        let (hi, lo) = dl_mul(x, x);
+        let (s_hi, s_lo) = dl_fast_sum(csum, hi);
+        csum = s_hi;
+        frac1 += lo;
+        frac2 += s_lo;
+    }
+    let mut h = (csum - 1.0 + (frac1 + frac2)).sqrt();
+    let (hi, lo) = dl_mul(-h, h);
+    let (s_hi, s_lo) = dl_fast_sum(csum, hi);
+    csum = s_hi;
+    frac1 += lo;
+    frac2 += s_lo;
+    let x = csum - 1.0 + (frac1 + frac2);
+    h += x / (2.0 * h);
+    h / scale
+}
+
+/// Dekker's split (Veltkamp constant 2^27 + 1).
+fn dl_split(x: f64) -> (f64, f64) {
+    let t = x * 134_217_729.0;
+    let hi = t - (t - x);
+    (hi, x - hi)
+}
+
+/// The exact product `x * y` as `hi + lo` with `hi = fl(x * y)`: the same pair as CPython's `fma`
+/// path (`hi = x * y; lo = fma(x, y, -hi)`), here via Dekker's TwoProduct so no `mul_add` is
+/// needed. The rounding error of a product is unique, so the pair is identical whenever nothing
+/// underflows; only terms below ~2^-969 could differ, far under the last bit of any sum they join.
+/// (CPython's own non-`fma` fallback splits differently; 3.12 builds do not use it.)
+fn dl_mul(x: f64, y: f64) -> (f64, f64) {
+    let z = x * y;
+    let (xh, xl) = dl_split(x);
+    let (yh, yl) = dl_split(y);
+    let zz = ((xh * yh - z) + xh * yl + xl * yh) + xl * yl;
+    (z, zz)
+}
+
+/// `a + b` as `hi + lo` (requires `|a| >= |b|`).
+fn dl_fast_sum(a: f64, b: f64) -> (f64, f64) {
+    let x = a + b;
+    (x, (a - x) + b)
 }
 
 /// `genetic_diet`: the genetic split of the non-predatory share among photo / sapro / chemo.
@@ -180,7 +269,7 @@ impl Cell {
             genes,
             lineage,
             bonds: Vec::new(),
-            sex_p: 0.0,
+            sex_p: traits.sex_p,
             plast_p: traits.plast_p,
             diet: [0.0; 3],
             hgt_p: traits.hgt_p,
@@ -195,6 +284,7 @@ impl Cell {
     /// The traits the cell was born with (they never change during its life).
     pub fn traits(&self) -> Traits {
         Traits {
+            sex_p: self.sex_p,
             plast_p: self.plast_p,
             hgt_p: self.hgt_p,
             armor_p: self.armor_p,
@@ -394,17 +484,71 @@ impl World {
     }
 
     /// The flag draws of a founder (seeded or immigrant), after its genes, in Python's keyword
-    /// order: `plast_p`, `hgt_p`, `armor_p`.
+    /// order: `sex_p`, `plast_p`, `hgt_p`, `armor_p`.
     fn founder_traits(&mut self) -> Traits {
         let mut draw = |on: bool| if on { self.rng.random() } else { 0.0 };
+        let sex_p = draw(self.cfg.sex);
         let plast_p = draw(self.cfg.plasticity);
         let hgt_p = draw(self.cfg.hgt);
         let armor_p = draw(self.cfg.defence);
         Traits {
+            sex_p,
             plast_p,
             hgt_p,
             armor_p,
         }
+    }
+
+    /// `World.find_mate` (F5a): a random cell within `mate_radius` (Chebyshev, x toroidal) whose
+    /// fixed genes are closer than `mate_distance`, or `None`. Tiles are scanned row by row like
+    /// Python, each once (on a narrow world the x-wrap revisits tiles).
+    fn find_mate(&mut self, r: CellRef) -> Option<CellRef> {
+        let (w, h) = (self.width as isize, self.height as isize);
+        let radius = self.cfg.mate_radius as isize;
+        let limit = self.cfg.mate_distance;
+        let c = &self.slab[r as usize];
+        let (cx, cy) = (c.x as isize, c.y as isize);
+        let mut seen: Vec<usize> = Vec::new();
+        let mut found: Vec<CellRef> = Vec::new();
+        for dy in -radius..=radius {
+            let y = cy + dy;
+            if !(0 <= y && y < h) {
+                continue;
+            }
+            for dx in -radius..=radius {
+                let i = (y * w + (cx + dx).rem_euclid(w)) as usize;
+                if seen.contains(&i) {
+                    continue;
+                }
+                seen.push(i);
+                let o = self.grid[i];
+                if o != EMPTY
+                    && o != r
+                    && genome_distance(&c.genes, &self.slab[o as usize].genes) < limit
+                {
+                    found.push(o);
+                }
+            }
+        }
+        (!found.is_empty()).then(|| *self.rng.choice(&found))
+    }
+
+    /// `World.offspring_genes` (F5a): uniform crossover with the mate, or the parent's genes.
+    fn offspring_genes(&mut self, r: CellRef, mate: Option<CellRef>) -> [f64; N_GENES] {
+        let own = self.slab[r as usize].genes;
+        let Some(m) = mate else {
+            return own;
+        };
+        let other = self.slab[m as usize].genes;
+        let mut out = [0.0; N_GENES];
+        for (k, o) in out.iter_mut().enumerate() {
+            *o = if self.rng.random() < 0.5 {
+                own[k]
+            } else {
+                other[k]
+            };
+        }
+        out
     }
 
     /// `World.acclimate` (F5b): move the diet towards the split of what each diet would yield on
@@ -648,6 +792,7 @@ impl World {
         let (defence_on, armour) = (cfg.defence, cfg.defence && !cfg.defence_neutral);
         let (hgt_on, transfer) = (cfg.hgt, cfg.hgt && !cfg.hgt_neutral);
         let (plastic_on, plastic) = (cfg.plasticity, cfg.plasticity && !cfg.plastic_neutral);
+        let (sex_on, mating) = (cfg.sex, cfg.sex && !cfg.sex_neutral);
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -755,14 +900,36 @@ impl World {
             if energy >= ph.div_thr {
                 let (cx, cy) = (self.slab[ri].x, self.slab[ri].y);
                 if let Some((sx, sy)) = self.random_empty_neighbor(cx, cy) {
+                    // F5a: mating needs enough energy for its cost and the body (no negative energy)
+                    let mut mate = None;
+                    if mating
+                        && self.rng.random() < self.slab[ri].sex_p
+                        && self.slab[ri].energy > cfg.sex_cost + cfg.body_cost
+                    {
+                        mate = self.find_mate(r);
+                        if mate.is_some() {
+                            self.slab[ri].energy -= cfg.sex_cost;
+                            self.counters.sex_births += 1;
+                        }
+                    }
                     let c = &mut self.slab[ri];
                     c.energy -= cfg.body_cost;
                     let child_e = c.energy * ph.child_frac;
                     c.energy -= child_e;
-                    let (parent_genes, lineage) = (c.genes, c.lineage);
+                    let lineage = c.lineage;
                     let parent = c.traits();
+                    let parent_genes = if mating {
+                        self.offspring_genes(r, mate)
+                    } else {
+                        self.slab[ri].genes
+                    };
                     let genes = self.mutate(&parent_genes, ph.mut_sigma);
-                    // `offspring_plast_p`, `offspring_hgt_p`, then `offspring_armor_p` (Python's order)
+                    // offspring sex_p, plast_p, hgt_p, then armor_p (Python's order)
+                    let sex_p = if sex_on {
+                        self.offspring_propensity(parent.sex_p, ph.mut_sigma)
+                    } else {
+                        0.0
+                    };
                     let plast_p = if plastic_on {
                         self.offspring_propensity(parent.plast_p, ph.mut_sigma)
                     } else {
@@ -780,6 +947,7 @@ impl World {
                     };
                     let id = self.new_id();
                     let traits = Traits {
+                        sex_p,
                         plast_p,
                         hgt_p,
                         armor_p,

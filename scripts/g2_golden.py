@@ -51,6 +51,8 @@ SETS = {
     "hgt_neutral": ["--set", "hgt=1", "--set", "hgt_neutral=1"],
     "plasticity": ["--set", "plasticity=1"],
     "plastic_neutral": ["--set", "plasticity=1", "--set", "plastic_neutral=1"],
+    "sex": ["--set", "sex=1"],
+    "sex_neutral": ["--set", "sex=1", "--set", "sex_neutral=1"],
 }
 
 

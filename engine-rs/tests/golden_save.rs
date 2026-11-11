@@ -110,7 +110,10 @@ fn malformed_saves_are_refused() {
             with(|s| s["config"]["div_min"] = json!(100.0)),
             "div_min/mut_min",
         ),
-        (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
+        (
+            with(|s| s["config"]["sensing"] = json!(true)),
+            "sensing is on",
+        ),
         (
             with(|s| s["config"]["open_genome"] = json!(true)),
             "open_genome is on",
@@ -337,6 +340,17 @@ fn propensities_are_bounded_when_their_flag_is_on() {
             Ok(_) => panic!("plast_p {p}, diet {diet} accepted"),
             Err(e) => assert!(e.message().contains(why), "{why}: {}", e.message()),
         }
+    }
+    let sexual = |v: Value| {
+        let mut s = set_save("sex");
+        s["cells"][0][10] = v;
+        load(&s)
+    };
+    for v in [json!(0.0), json!(-0.0), json!(1.0), json!(0.5)] {
+        assert!(sexual(v.clone()).is_ok(), "sex_p {v} refused");
+    }
+    for v in [json!(1.01), json!(-0.01), json!(true)] {
+        assert!(sexual(v.clone()).is_err(), "sex_p {v} accepted");
     }
     // Python accepts a non-zero `defended` counter whatever the flag (it only reports it).
     let mut s = base_save();
