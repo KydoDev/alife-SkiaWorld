@@ -1,6 +1,7 @@
 # ADR-0013: Interventions through the C ABI
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-11: the owner confirmed the sandbox until G3, and world creation (ADR-0012) is
+  implemented first, so it takes ABI version 2 and ports `vent_plume`; this ADR's FFI commit takes 3)
 - **Date**: 2026-11-11
 - **Deciders**: project owner
 - **Parent**: [ADR-0008](0008-engine-port-stack.md) (Rust core, bit-exact reference kernel);
