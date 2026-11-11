@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-10 — G2 M2 open points (vent field, seabed, gradient off numpy; CI `--locked` + audit), working tree before the commit
+Last run: 2026-11-10 — F3 re-run at the P1 standard (branch `exp/f3-p1` merged with main `36b4d21`)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -8,13 +8,12 @@ Last run: 2026-11-10 — G2 M2 open points (vent field, seabed, gradient off num
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| Unit + integration (`tests/`, 198 tests; new `test_terrain_transcendentals_come_from_libm`) | 198 | 0 | 0 | 98.85% |
-| `ruff check .` | clean | | | |
-| Rust (`engine-rs`): `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings`, `cargo test --locked` | green (14 tests) | 0 | | |
-| `cargo deny --locked check advisories` (cargo-deny 0.20.2, default config) | advisories ok | | | |
-| Golden sets regenerated (default + volcanic, 1000 steps) vs committed | identical (`hashes.csv`, `rng.json`, decompressed `start.json.gz`) | | | |
-| Old vs new expressions (plumes with x-wrap, `seabed_heights` x150 seeds, `planet.png` gradient) | bit-identical | | | |
+| Unit + integration (`tests/`, 198 tests) | 198 | 0 | 0 | 98.9% (`worldsim/`, excl. render) |
+| Reproducibility on main after #19 (libm light): `flat_seasons` seed 1 `free`, 30k steps, re-run | identical CSV row | | | |
+| F3 P1 positive control (`sense_upkeep=0.5`; pre-registered >= 16/20) | 16/20, then 19/20 on seeds 21–39: fires | | | |
+| F3 P1 phototaxis (`w_light` free vs off) | 13/20, then 16/20: lean, not established | | | |
 
-## Notes
-- The new regression test cannot fail on this CPU (no AVX-512: numpy already used libm); it guards
-  the Linux CI runner.
+Lint: `ruff check .` — clean.
+
+## Failures
+None. No engine code changed in this piece (experiment script and docs only).

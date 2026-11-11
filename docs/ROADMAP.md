@@ -94,6 +94,20 @@ Original scope:
 - Speciation stays comparable after the per-gene distance rescaling: with immigration, 77–93 species and 299–435 established novelties at 10k steps with sensing off and 67–113 / 220–490 with sensing on, vs 72–107 and 359–587 before F3 (same planets and seeds). Comparable in order of magnitude only: the sensor genes add neutral drift to the distance (ADR-0005).
 - Next: a wider perception radius, or a cost on staying near predators, are separate experiments (one mechanism at a time).
 
+**Re-run at the P1 standard** (2026-11-10; `python scripts/f3_p1_experiment.py --steps 30000`, [f3_p1_experiment.csv](f3_p1_experiment.csv); confirmation `--seeds 21 23 ... 39 --arms off free control --out docs/f3_p1_confirm.csv`, [f3_p1_confirm.csv](f3_p1_confirm.csv); rules fixed before each run, plan_history). Immigration 0, flat world with day/night + seasons and `volcanic.json`, 20 pairs, 30k steps, second half, all descendants. Arms: off / free (sensing on, `sense_upkeep` 0, so that the cost, which pulls every weight towards 0, cannot fake a sign) / on (default cost) / control (`sense_upkeep` 0.5).
+
+| Question | Seeds 1–19 | Seeds 21–39 | Verdict |
+|---|---|---|---|
+| **Positive control**: \|`w_light`\| control < free, ≥ 16/20 | 16/20 | **19/20** | fires (power confirmed) |
+| **Phototaxis**: mean `w_light` free > off, ≥ 16/20 | 13/20 (median +0.40 vs −0.08) | 16/20, at the threshold (+0.45 vs +0.05) | **a lean towards light, not established** |
+| Flat planet only (noticed after the first run, rule set before the second) | 9/10 | 9/10 | reproduced (exploratory) |
+| Volcanic only | 4/10 | 7/10 | no |
+| Motile descendants only (`move` > 0.3) | 1 usable pair | 1 usable pair | no verdict: median 1–3 motile cells per sample |
+| Other five weights, free vs off (exploratory) | 9–12/20 | – | no sign |
+
+- **The 10k-step verdict "phototaxis likely selected" weakens to a lean.** The direction is the same in both seed sets (`w_light` above the off arm in 29 of 40 pairs, a plain sum) and holds on the flat planet (18/20), but neither set alone reaches a confirmed verdict. The old evidence came from immigration arms, where hundreds of lineages move; with immigration 0 almost no cell moves, so sensing has very little to act on.
+- Same reason as the F5d probe: median life 6–8 steps and 0.4–2.5 sensed moves per life. Any behaviour that sensing or learning could select is weak in this world until movement matters more (more motile cells, longer lives).
+
 Original scope:
 - The cell perceives its 8 neighboring tiles: light, organic matter, presence of cells, kinship.
 - **Directed** movement (towards food/light, away from predators) instead of random.
@@ -123,7 +137,7 @@ Original scope:
 See the dedicated section. In short: from a fixed vector to a **variable-length genome** with gene duplication and deletion.
 
 ## F5 — Two parents and variation during life
-**Status**: in progress — **F5a two parents**, **F5b diet plasticity** and **F5c horizontal gene transfer done** (2026-11-10); learning still open (one mechanism at a time).
+**Status**: in progress — **F5a two parents**, **F5b diet plasticity** and **F5c horizontal gene transfer done** (2026-11-10); **F5d learning not built**: its precondition is not met in this world (below).
 
 **F5a — two parents** ([ADR-0007](adr/0007-two-parents-and-save-v5.md)). `--set sex=1`: each cell carries an evolvable propensity `sex_p`; when it divides it may recombine with a genetically close cell within radius 2 (uniform crossover of the 16 fixed genes; the partner gives genes, not energy), at an optional `sex_cost`. `sex_neutral=1` is the control arm (`sex_p` inherited and mutated, no mating). Off by default and then bit-identical to F4 and F3 (full-state fingerprints; a test asserts no mating code runs). A probe before coding found that 85–96% of neighbours are within the species distance, 1–2.5 mutation steps apart, and only 1–6% from another lineage: mates are close relatives.
 
@@ -187,6 +201,8 @@ See the dedicated section. In short: from a fixed vector to a **variable-length 
 - **Contrast with divergent donors failed as a test** (and it was weak by design: immigrants' offspring count as descendants and pull `hgt_p` towards 0.5 in both arms; the contrast world also has seasons, `season_amplitude` 0.5, where the plan said day/night only): with immigration 0.5 the foreign-donor share only reached 5% (why was not checked; a likely reason is that random-gene immigrants die before they meet residents). Divergent donors need another design (for example transfer from organic matter, which the ADR lists as a separate experiment).
 - Confirmation command: `python scripts/f5c_experiment.py --steps 30000 --seeds 21 23 ... 39 --arms off on neutral neutral_cost --no-contrast --out docs/f5c_confirm.csv`.
 - Not run: transfer from organic matter, a distance-filtered transfer, transfer of rule genes, a test of why species rise, and a species measure that is robust to genomes changing during life.
+
+**F5d — learning: precondition not met** (2026-11-10). The roadmap's learning is "the F3 brain changes its weights during life". A probe before any code (sensing on, immigration 0, both planets, seeds 41 and 43, steps 5–10k) found a median life of 6–8 steps, 18–41% of cells ever making a sensed move, 0.4–2.5 sensed moves per life (3–12% of cell-steps), and a median of 0–2 for cells living 30+ steps. A weight that learns from one or two experiences cannot learn, so the mechanism would be inert by construction. The owner chose to re-run F3 at the P1 standard first (see F3: a lean towards light, not established). Learning needs a world where cells move and live long enough, or a learned trait used every step; either is a new design decision.
 
 Original scope:
 See the dedicated section: sexual reproduction, plasticity, learning, horizontal gene transfer.

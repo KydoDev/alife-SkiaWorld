@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F3 re-run at the P1 standard** (`scripts/f3_p1_experiment.py`, rules pre-registered and committed before
+  each run): positive control fires (16/20, then 19/20); phototaxis with cost-free sensing vs off 13/20 then
+  16/20 (at the threshold): a lean towards light, not established; flat planet 9/10 twice. Almost no cell moves
+  with immigration 0 (median 1–3 motile cells), so sensing has little to act on.
+- **F5d learning probe**: learning on the F3 sensor weights would be inert in this world (median life 6–8
+  steps, 0.4–2.5 sensed moves per life); not built, recorded in ROADMAP.
 - **G2 milestone M3**: benchmark of the Rust reference kernel (`scripts/g2_bench.py`,
   `cargo run --release --example bench`): single-threaded 5–8×10⁶ cell-updates/s, ~48k cells at
   ~110 steps/s, about 3× the 60 fps target and 12–27× Python on the same worlds; the kernel's
