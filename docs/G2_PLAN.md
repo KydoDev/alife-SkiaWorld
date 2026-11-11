@@ -53,7 +53,8 @@ SHA-256 over, in this order, little-endian:
   bond ids **in insertion order**, `sex_p` bits.
 - **Flag fields (M5)**, only when their flag is on, so the hashes of worlds with the flag off never change:
   `hgt` adds the counters `hgt_events, hgt_foreign` (u64) after `sex_births`, then `defence` adds `defended`;
-  per cell, after `sex_p`: `hgt_p` bits (`hgt`), then `armor_p` bits (`defence`).
+  per cell, after `sex_p`: `plast_p` and the 3 diet values (`plasticity`), `hgt_p` (`hgt`), then `armor_p`
+  (`defence`), all as f64 bits.
 Excluded: species and tracker (observer state), derived fields (`light`, phenotype),
 which are recomputed and would only hide where a difference started.
 
@@ -305,3 +306,23 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   neighbour tiles), the neutral defence arm with heavy immigration, and a 20x20 world with `max_age` 2 (321
   extinctions and reseeds). Open: no committed set yet combines flags or reseeds with flags on (taken into item 8);
   `WsInfo` exposes neither `defended` nor the hgt counters (one ABI version 2 change, when the front-end needs them).
+- **M5 item 4, `plasticity`** (2026-11-11, Windows 11): the kernel runs F5b diet acclimation. The phenotype keeps
+  the feeding shares; with the flag on, `Cell::express` resets the diet to the genetic split and `apply_diet` derives
+  the photo / sapro / chemo shares and their powers from it (the predation share stays genetic; a cell with all four
+  feeding genes at 0 cannot feed). Before feeding, a cell with `plast_p > 0` (not in the neutral arm) moves its diet
+  towards the yield split of its tile (`acclimate`, no RNG). Founders and children draw `plast_p` before `hgt_p` and
+  `armor_p`; upkeep adds `plastic_upkeep x plast_p` first. The loader accepts `plasticity`, checks `plast_p` and the
+  diet like `persistence.py` (3 values in [0, 1] summing to 1 within 1e-6, empty with the flag off, frozen diets
+  equal to the genetic split within 1e-9) and applies the stored diet. The render now colours cells by the phenotype
+  shares, so a plastic world shows its acclimated diets, as in Python (the M4 debug assertion is gone). Golden sets
+  `plasticity` and `plastic_neutral`. Verdict (rules in `PLAN.md`): **met**. Both sets equal Python at every one of
+  the 1000 steps and in both renders, at the first run; the hashes of the six earlier sets are byte-identical when
+  regenerated. Not vacuous: in the `plasticity` start save 538 of 555 cells have a diet more than 0.01 away from
+  their genetic split, 0 of 133 in `plastic_neutral` (checked by pytest), `plast_p` spread over [0, 1] in both.
+  Speed, three alternating runs against the previous commit: 800 cells +9%, 10k -4%, 50k -3% (`Cell` grows from 320
+  to 384 bytes, `Phenotype` from 88 to 120); small, near the run-to-run spread, possibly a real few percent at large
+  scale. Review (code-review-security, no blocking issue) ran eight more scratch sets, all bit-exact: volcanic with
+  plasticity, hgt and defence together, `plastic_rate` 1, non-integer `spec_exp`, many all-zero feeding genes (the
+  `non_pred` 0 and 1/3-diet branches), the neutral arm with the other flags, heavy immigration. Follow-ups, done:
+  the loader's diet sum now mirrors CPython 3.12's compensated `sum()` (plain `+` disagreed with Python within an ulp
+  of the 1e-6 tolerance, both ways); a test for a moved diet in the neutral arm.

@@ -5,7 +5,7 @@
 //! colours are float32 throughout. The final cast truncates. Every step below keeps that order
 //! and those precisions, so the result equals Python's exactly (checked against golden renders).
 
-use crate::world::{World, G_CHEMO, G_PHOTO, G_PRED, G_SAPRO};
+use crate::world::World;
 
 const C_PHOTO: [f32; 3] = [60.0, 210.0, 70.0];
 const C_SAPRO: [f32; 3] = [170.0, 90.0, 230.0];
@@ -51,19 +51,11 @@ pub fn render_rgb(world: &World, out: &mut [u8]) {
         }
         write_px(out, i, px);
     }
-    // Python colours cells by `c.photo` etc., which follow the acclimated diet when plasticity
-    // is on. The loader refuses plasticity until M5; porting it must switch this to the diet.
-    debug_assert!(
-        !world.cfg.plasticity,
-        "render of a plastic world needs the diet (M5)"
-    );
+    // Cells are coloured by their feeding shares (`c.photo` ...), which follow the acclimated
+    // diet when plasticity is on.
     for c in world.cells() {
-        let g = &c.genes;
-        let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
-        if s == 0.0 {
-            s = 1e-9;
-        }
-        let tr = [G_PHOTO, G_SAPRO, G_PRED, G_CHEMO].map(|k| (g[k] / s) as f32);
+        let ph = &c.pheno;
+        let tr = [ph.photo, ph.sapro, ph.pred, ph.chemo].map(|v| v as f32);
         let bonded: f32 = if c.bonds.is_empty() { 0.0 } else { 1.0 };
         let factor = 0.85f32 + 0.15f32 * bonded;
         let mut px = [0.0f64; 3];

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, `plasticity` in the Rust kernel**: saves with F5b diet acclimation load and run in the kernel, equal to
+  Python at every step and in the renders of new golden sets `plasticity` (538 of 555 cells acclimated) and
+  `plastic_neutral`; the kernel's render now colours cells by their (acclimated) feeding shares. The state hash
+  covers `plast_p` and the diet when the flag is on (earlier hashes unchanged). Speed within a few percent.
 - **G2 M5, `hgt` in the Rust kernel**: saves with F5c gene transfer load and run in the kernel, equal to Python at
   every step of new golden sets `hgt` (26594 genes copied in 1000 steps) and `hgt_neutral`; the state hash covers
   `hgt_p` and the transfer counters when the flag is on (earlier hashes unchanged). No speed change.

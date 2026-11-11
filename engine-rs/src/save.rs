@@ -19,9 +19,9 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5 ports them): saves with `sensing`, `open_genome`, `sex` or
-//!   `plasticity` on are refused; `defence` and `hgt` are ported (M5);
-//! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, `sex_p`, `hgt_p`, `armor_p`) becomes
+//! - **unsupported** (until milestone M5 ports them): saves with `sensing`, `open_genome` or `sex`
+//!   on are refused; `defence`, `hgt` and `plasticity` are ported (M5);
+//! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not).
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
 //! - **looser, on purpose**: the species tracker and the per-cell species ids are not validated
@@ -30,7 +30,7 @@
 
 use crate::config::{Config, MAX_WORLD_TILES};
 use crate::rng::{PyRandom, MT_N};
-use crate::world::{Cell, CellRef, Counters, Terrain, World, EMPTY};
+use crate::world::{Cell, CellRef, Counters, Terrain, Traits, World, EMPTY};
 use crate::{SaveError, N_GENES, SAVE_VERSION};
 use flate2::read::MultiGzDecoder;
 use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
@@ -146,9 +146,9 @@ struct RawTerrain {
 }
 
 /// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p, armor_p]`.
-/// Rules and diet must be empty with their flags off (checked by the cap of 0).
+/// Rules must be empty with their flag off (checked by the cap of 0); the diet is checked below.
 #[derive(Deserialize)]
-#[allow(dead_code)] // rules and diet (fields 9, 12) are only length-checked
+#[allow(dead_code)] // rules (field 9) are only length-checked
 struct RawCell(
     u64,
     u64,
@@ -162,7 +162,7 @@ struct RawCell(
     Capped<IgnoredAny, 0>,
     f64,
     f64,
-    Capped<IgnoredAny, 0>,
+    Capped<f64, 3>,
     f64,
     f64,
 );
@@ -391,7 +391,6 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         ("sensing", cfg.sensing),
         ("open_genome", cfg.open_genome),
         ("sex", cfg.sex),
-        ("plasticity", cfg.plasticity),
     ] {
         if on {
             return Err(err(format!(
@@ -429,6 +428,25 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     // `persistence.py` recomputes the light at load (`now = step_count`); it is not hashed.
     world.update_light(world.step_count);
     Ok(world)
+}
+
+/// CPython 3.12's `sum()` of floats: Neumaier compensated summation, the compensation added at
+/// the end when non-zero and finite. Plain `+` differs near the diet's 1e-6 tolerance.
+fn python_sum(values: &[f64]) -> f64 {
+    let (mut total, mut comp) = (0.0f64, 0.0f64);
+    for &x in values {
+        let t = total + x;
+        if total.abs() >= x.abs() {
+            comp += (total - t) + x;
+        } else {
+            comp += (x - t) + total;
+        }
+        total = t;
+    }
+    if comp != 0.0 && comp.is_finite() {
+        total += comp;
+    }
+    total
 }
 
 /// `Random.setstate((3, internal, gauss_next))`.
@@ -502,7 +520,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             _,
             sex_p,
             plast_p,
-            _,
+            diet,
             hgt_p,
             armor_p,
         ) = row;
@@ -528,12 +546,31 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 world.next_id
             )));
         }
-        // With sex and plasticity off (checked above) Python accepts only zero propensities.
+        // With sex off (checked above) Python accepts only a zero sex_p.
         if !(sex_p.is_finite() && sex_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid sex_p")));
         }
-        if !(plast_p.is_finite() && plast_p == 0.0) {
+        let cfg = &world.cfg;
+        // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless the flag is on.
+        let plast_ok = plast_p.is_finite()
+            && (0.0..=1.0).contains(&plast_p)
+            && (cfg.plasticity || plast_p == 0.0);
+        if !plast_ok {
             return Err(err(format!("cell #{id} has an invalid plast_p")));
+        }
+        // `_valid_diet`: empty with plasticity off, else 3 proportions in [0, 1] summing to 1.
+        let diet = diet.0;
+        let diet_ok = if cfg.plasticity {
+            diet.len() == 3
+                && diet
+                    .iter()
+                    .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+                && (python_sum(&diet) - 1.0).abs() < 1e-6
+        } else {
+            diet.is_empty()
+        };
+        if !diet_ok {
+            return Err(err(format!("cell #{id} has an invalid diet")));
         }
         // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless the flag is on.
         let hgt_ok =
@@ -556,10 +593,30 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             energy,
             genes,
             count(lineage, "cell lineage")?,
-            hgt_p, // both keep the sign of a -0.0 (they are hashed by bits)
-            armor_p,
+            // the propensities keep the sign of a -0.0 (they are hashed by bits)
+            Traits {
+                plast_p,
+                hgt_p,
+                armor_p,
+            },
             &world.cfg,
         );
+        if world.cfg.plasticity {
+            // such a diet never leaves the genetic split (`persistence.py`)
+            let frozen = world.cfg.plastic_neutral || plast_p == 0.0;
+            if frozen
+                && diet
+                    .iter()
+                    .zip(&cell.diet)
+                    .any(|(a, b)| (a - b).abs() > 1e-9)
+            {
+                return Err(err(format!(
+                    "cell #{id} has a diet that could not have moved"
+                )));
+            }
+            cell.diet = [diet[0], diet[1], diet[2]];
+            cell.apply_diet(&world.cfg);
+        }
         cell.age = count(age, "cell age")?;
         cell.sex_p = sex_p; // keeps the sign of a -0.0 (it is hashed by bits)
         world.slab.push(cell);

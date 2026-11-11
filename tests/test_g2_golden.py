@@ -65,6 +65,22 @@ def test_the_hgt_sets_are_not_vacuous():
         assert max(hgt_p) - min(hgt_p) > 0.5
 
 
+def test_the_plasticity_sets_are_not_vacuous():
+    """Diets moved away from the genetic split; in the neutral arm none did, though plast_p is spread."""
+    golden = ROOT / "engine-rs" / "tests" / "golden"
+    moved = {}
+    for s in ("plasticity", "plastic_neutral"):
+        world = load_world(golden / s / "start.json.gz")
+        moved[s] = 0
+        for c in world.cells:
+            acclimated = c.diet
+            c.express(world.cfg)                       # resets the diet to the genetic split
+            moved[s] += max(abs(a - b) for a, b in zip(acclimated, c.diet)) > 0.01
+        plast_p = [c.plast_p for c in world.cells]
+        assert max(plast_p) - min(plast_p) > 0.5
+    assert moved["plasticity"] > 50 and moved["plastic_neutral"] == 0
+
+
 @pytest.mark.parametrize("name", GOLDEN_SETS)
 def test_committed_set_matches_its_arguments(name):
     """The committed data was made with the arguments SETS declares (else regenerate with --all)."""

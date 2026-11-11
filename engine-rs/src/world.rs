@@ -1,5 +1,5 @@
 //! World state and the step (`worldsim/world.py`): the default flags (G2 M2) plus, from M5, the
-//! optional flags ported so far (`defence`, `hgt`). Other flags are refused by the loader.
+//! optional flags ported so far (`defence`, `hgt`, `plasticity`). Other flags are refused by the loader.
 //!
 //! Cells live in a slab (`World::slab`) and are referred to by slot ([`CellRef`]), never by
 //! pointer; `World::order` is Python's `World.cells` list (its order is part of the state: the
@@ -45,9 +45,15 @@ const NEIGH8: [(isize, isize); 8] = [
     (1, 1),
 ];
 
-/// Traits derived from the genes once at birth (`Cell.express`, default flags).
+/// Traits derived from the genes at birth (`Cell.express`); with `plasticity` on, the feeding
+/// shares and their `_k` powers follow the acclimated diet (`Cell.apply_diet`).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Phenotype {
+    /// Feeding shares (`Cell.photo` ...): they colour the cell in the render.
+    pub photo: f64,
+    pub sapro: f64,
+    pub pred: f64,
+    pub chemo: f64,
     pub photo_k: f64,
     pub sapro_k: f64,
     pub pred_k: f64,
@@ -61,10 +67,29 @@ pub struct Phenotype {
     pub upkeep: f64,
 }
 
+/// The heritable flag propensities a cell is born with (Python's `Cell(...)` keywords); each is 0
+/// while its flag is off.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Traits {
+    pub plast_p: f64,
+    pub hgt_p: f64,
+    pub armor_p: f64,
+}
+
+/// `genetic_diet`: the genetic split of the non-predatory share among photo / sapro / chemo.
+fn genetic_diet(photo: f64, sapro: f64, chemo: f64) -> [f64; 3] {
+    let s = photo + sapro + chemo;
+    if s > 0.0 {
+        [photo / s, sapro / s, chemo / s]
+    } else {
+        [1.0 / 3.0; 3]
+    }
+}
+
 impl Phenotype {
-    /// `Cell.express(cfg)` for the flags the kernel runs: `hgt_p` then `armor_p` cost upkeep when
-    /// their flag is on, added after the genetic terms in Python's order.
-    pub fn express(g: &[f64; N_GENES], hgt_p: f64, armor_p: f64, cfg: &Config) -> Self {
+    /// The genetic part of `Cell.express(cfg)`, then the flag upkeep terms in Python's order
+    /// (`plast_p`, `hgt_p`, `armor_p`). The diet is applied by [`Cell::express`].
+    pub fn express(g: &[f64; N_GENES], t: Traits, cfg: &Config) -> Self {
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
         if s == 0.0 {
             s = 1e-9; // Python: `... or 1e-9`
@@ -78,13 +103,20 @@ impl Phenotype {
         let e = cfg.spec_exp;
         let mv = g[G_MOVE];
         let mut upkeep = cfg.base_cost + cfg.pred_upkeep * pred + cfg.move_upkeep * mv;
+        if cfg.plasticity {
+            upkeep += cfg.plastic_upkeep * t.plast_p;
+        }
         if cfg.hgt {
-            upkeep += cfg.hgt_upkeep * hgt_p;
+            upkeep += cfg.hgt_upkeep * t.hgt_p;
         }
         if cfg.defence {
-            upkeep += cfg.defence_upkeep * armor_p;
+            upkeep += cfg.defence_upkeep * t.armor_p;
         }
         Self {
+            photo,
+            sapro,
+            pred,
+            chemo,
             photo_k: photo.powf(e),
             sapro_k: sapro.powf(e),
             pred_k: pred.powf(e),
@@ -114,6 +146,10 @@ pub struct Cell {
     pub bonds: Vec<CellRef>,
     /// F5a mating propensity; always 0 while `sex` is off (kept for the state hash).
     pub sex_p: f64,
+    /// F5b rate of diet acclimation; 0 unless `plasticity` is on.
+    pub plast_p: f64,
+    /// F5b acclimated (photo, sapro, chemo) split; all zero unless `plasticity` is on (Python: `()`).
+    pub diet: [f64; 3],
     /// F5c propensity to copy a neighbour's gene; 0 unless `hgt` is on.
     pub hgt_p: f64,
     /// F5e armour: share of attacks the cell can repel; 0 unless `defence` is on.
@@ -123,7 +159,7 @@ pub struct Cell {
 }
 
 impl Cell {
-    /// A newborn (age 0, no bonds), phenotype expressed from its genes and armour.
+    /// A newborn (age 0, no bonds), phenotype expressed from its genes and flag traits.
     #[allow(clippy::too_many_arguments)] // mirrors Python's Cell(...) constructor
     pub fn new(
         id: u64,
@@ -132,11 +168,10 @@ impl Cell {
         energy: f64,
         genes: [f64; N_GENES],
         lineage: u64,
-        hgt_p: f64,
-        armor_p: f64,
+        traits: Traits,
         cfg: &Config,
     ) -> Self {
-        Self {
+        let mut cell = Self {
             id,
             x,
             y,
@@ -146,11 +181,52 @@ impl Cell {
             lineage,
             bonds: Vec::new(),
             sex_p: 0.0,
-            hgt_p,
-            armor_p,
+            plast_p: traits.plast_p,
+            diet: [0.0; 3],
+            hgt_p: traits.hgt_p,
+            armor_p: traits.armor_p,
             alive: true,
-            pheno: Phenotype::express(&genes, hgt_p, armor_p, cfg),
+            pheno: Phenotype::default(),
+        };
+        cell.express(cfg);
+        cell
+    }
+
+    /// The traits the cell was born with (they never change during its life).
+    pub fn traits(&self) -> Traits {
+        Traits {
+            plast_p: self.plast_p,
+            hgt_p: self.hgt_p,
+            armor_p: self.armor_p,
         }
+    }
+
+    /// `Cell.express(cfg)`: phenotype from the genes; with `plasticity` on the diet is reset to
+    /// the genetic split and applied (also after a gene transfer, as in Python).
+    pub fn express(&mut self, cfg: &Config) {
+        self.pheno = Phenotype::express(&self.genes, self.traits(), cfg);
+        if cfg.plasticity {
+            let ph = &self.pheno;
+            self.diet = genetic_diet(ph.photo, ph.sapro, ph.chemo);
+            self.apply_diet(cfg);
+        }
+    }
+
+    /// `Cell.apply_diet` (F5b): feeding shares from the diet; the predation share stays genetic.
+    pub fn apply_diet(&mut self, cfg: &Config) {
+        let g = &self.genes;
+        // all four feeding genes at 0: the cell cannot feed (Python's truthiness: -0.0 is zero)
+        let feeds = g[G_PHOTO] != 0.0 || g[G_SAPRO] != 0.0 || g[G_PRED] != 0.0 || g[G_CHEMO] != 0.0;
+        let non_pred = if feeds { 1.0 - self.pheno.pred } else { 0.0 };
+        let [p, s, ch] = self.diet;
+        let e = cfg.spec_exp;
+        let ph = &mut self.pheno;
+        ph.photo = non_pred * p;
+        ph.sapro = non_pred * s;
+        ph.chemo = non_pred * ch;
+        ph.photo_k = ph.photo.powf(e);
+        ph.sapro_k = ph.sapro.powf(e);
+        ph.chemo_k = ph.chemo.powf(e);
     }
 }
 
@@ -318,15 +394,39 @@ impl World {
     }
 
     /// The flag draws of a founder (seeded or immigrant), after its genes, in Python's keyword
-    /// order: `(hgt_p, armor_p)`.
-    fn founder_traits(&mut self) -> (f64, f64) {
-        let hgt_p = if self.cfg.hgt { self.rng.random() } else { 0.0 };
-        let armor_p = if self.cfg.defence {
-            self.rng.random()
-        } else {
-            0.0
-        };
-        (hgt_p, armor_p)
+    /// order: `plast_p`, `hgt_p`, `armor_p`.
+    fn founder_traits(&mut self) -> Traits {
+        let mut draw = |on: bool| if on { self.rng.random() } else { 0.0 };
+        let plast_p = draw(self.cfg.plasticity);
+        let hgt_p = draw(self.cfg.hgt);
+        let armor_p = draw(self.cfg.defence);
+        Traits {
+            plast_p,
+            hgt_p,
+            armor_p,
+        }
+    }
+
+    /// `World.acclimate` (F5b): move the diet towards the split of what each diet would yield on
+    /// this tile at full specialisation. No RNG; with nothing to gain here the diet stays put.
+    fn acclimate(&mut self, r: CellRef, light_here: f64, organic_here: f64, chem_here: f64) {
+        let cfg = &self.cfg;
+        let yp = cfg.photo_gain * light_here;
+        let ys = cfg.sapro_eff * py_min(organic_here, cfg.sapro_rate);
+        let yc = cfg.chemo_gain * chem_here;
+        let total = yp + ys + yc;
+        if total <= 0.0 {
+            return;
+        }
+        let c = &mut self.slab[r as usize];
+        let rate = c.plast_p * cfg.plastic_rate;
+        let [p, s, ch] = c.diet;
+        c.diet = [
+            p + rate * (yp / total - p),
+            s + rate * (ys / total - s),
+            ch + rate * (yc / total - ch),
+        ];
+        c.apply_diet(cfg);
     }
 
     /// `min(1.0, max(0.0, p + gauss(0, sigma)))`: a propensity inherited with a mutation step.
@@ -357,7 +457,7 @@ impl World {
         let cfg = &self.cfg;
         let c = &mut self.slab[r as usize];
         c.genes[gene] = value;
-        c.pheno = Phenotype::express(&c.genes, c.hgt_p, c.armor_p, cfg);
+        c.express(cfg);
         let foreign = donor_lineage != c.lineage;
         self.counters.hgt_events += 1;
         if foreign {
@@ -449,7 +549,7 @@ impl World {
         for i in free {
             let id = self.new_id();
             let genes = self.random_genes();
-            let (hgt_p, armor_p) = self.founder_traits();
+            let traits = self.founder_traits();
             let cell = Cell::new(
                 id,
                 i % self.width,
@@ -457,8 +557,7 @@ impl World {
                 self.cfg.initial_energy,
                 genes,
                 id,
-                hgt_p,
-                armor_p,
+                traits,
                 &self.cfg,
             );
             self.place(cell);
@@ -548,6 +647,7 @@ impl World {
         let w = self.width;
         let (defence_on, armour) = (cfg.defence, cfg.defence && !cfg.defence_neutral);
         let (hgt_on, transfer) = (cfg.hgt, cfg.hgt && !cfg.hgt_neutral);
+        let (plastic_on, plastic) = (cfg.plasticity, cfg.plasticity && !cfg.plastic_neutral);
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -563,6 +663,16 @@ impl World {
             // 0: F5c horizontal transfer, before feeding so the whole turn uses one phenotype
             if transfer && self.rng.random() < self.slab[ri].hgt_p * cfg.hgt_rate {
                 self.transfer_gene(r);
+            }
+            // 1-3 (F5b): the diet first acclimates to this tile
+            if plastic && self.slab[ri].plast_p > 0.0 {
+                let tile = self.slab[ri].y * w + self.slab[ri].x;
+                let chem_here = if self.has_chem {
+                    self.terrain.chem[tile]
+                } else {
+                    0.0
+                };
+                self.acclimate(r, self.light[tile], self.organic[tile], chem_here);
             }
             let (x, y, ph) = {
                 let c = &self.slab[ri];
@@ -650,23 +760,32 @@ impl World {
                     let child_e = c.energy * ph.child_frac;
                     c.energy -= child_e;
                     let (parent_genes, lineage) = (c.genes, c.lineage);
-                    let (parent_hgt, parent_armor) = (c.hgt_p, c.armor_p);
+                    let parent = c.traits();
                     let genes = self.mutate(&parent_genes, ph.mut_sigma);
-                    // `offspring_hgt_p`, then `offspring_armor_p` (Python's order)
+                    // `offspring_plast_p`, `offspring_hgt_p`, then `offspring_armor_p` (Python's order)
+                    let plast_p = if plastic_on {
+                        self.offspring_propensity(parent.plast_p, ph.mut_sigma)
+                    } else {
+                        0.0
+                    };
                     let hgt_p = if hgt_on {
-                        self.offspring_propensity(parent_hgt, ph.mut_sigma)
+                        self.offspring_propensity(parent.hgt_p, ph.mut_sigma)
                     } else {
                         0.0
                     };
                     let armor_p = if defence_on {
-                        self.offspring_propensity(parent_armor, ph.mut_sigma)
+                        self.offspring_propensity(parent.armor_p, ph.mut_sigma)
                     } else {
                         0.0
                     };
                     let id = self.new_id();
-                    let child = self.alloc(Cell::new(
-                        id, sx, sy, child_e, genes, lineage, hgt_p, armor_p, &cfg,
-                    ));
+                    let traits = Traits {
+                        plast_p,
+                        hgt_p,
+                        armor_p,
+                    };
+                    let child =
+                        self.alloc(Cell::new(id, sx, sy, child_e, genes, lineage, traits, &cfg));
                     self.grid[sy * w + sx] = child;
                     newborns.push(child);
                     self.counters.births += 1;
@@ -704,7 +823,7 @@ impl World {
                 if self.grid[i] == EMPTY && !self.terrain.rock[i] {
                     let id = self.new_id();
                     let genes = self.random_genes();
-                    let (hgt_p, armor_p) = self.founder_traits();
+                    let traits = self.founder_traits();
                     let cell = Cell::new(
                         id,
                         i % w,
@@ -712,8 +831,7 @@ impl World {
                         cfg.initial_energy,
                         genes,
                         id,
-                        hgt_p,
-                        armor_p,
+                        traits,
                         &cfg,
                     );
                     self.place(cell);

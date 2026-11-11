@@ -22,7 +22,7 @@ pub fn state_digest(world: &World) -> [u8; 32] {
         h.update(n.to_le_bytes());
     }
     // flag fields are hashed only when their flag is on (M5)
-    let (hgt, defence) = (world.cfg.hgt, world.cfg.defence);
+    let (plastic, hgt, defence) = (world.cfg.plasticity, world.cfg.hgt, world.cfg.defence);
     if hgt {
         h.update(c.hgt_events.to_le_bytes());
         h.update(c.hgt_foreign.to_le_bytes());
@@ -63,6 +63,12 @@ pub fn state_digest(world: &World) -> [u8; 32] {
             h.update(world.cell(b).id.to_le_bytes());
         }
         h.update(cell.sex_p.to_le_bytes());
+        if plastic {
+            h.update(cell.plast_p.to_le_bytes());
+            for d in cell.diet {
+                h.update(d.to_le_bytes());
+            }
+        }
         if hgt {
             h.update(cell.hgt_p.to_le_bytes());
         }
@@ -162,6 +168,15 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             "bonds"
         } else if ca.sex_p.to_bits() != cb.sex_p.to_bits() {
             "sex_p"
+        } else if ca.plast_p.to_bits() != cb.plast_p.to_bits() {
+            "plast_p"
+        } else if ca
+            .diet
+            .iter()
+            .zip(&cb.diet)
+            .any(|(p, q)| p.to_bits() != q.to_bits())
+        {
+            "diet"
         } else if ca.hgt_p.to_bits() != cb.hgt_p.to_bits() {
             "hgt_p"
         } else if ca.armor_p.to_bits() != cb.armor_p.to_bits() {

@@ -3,13 +3,15 @@
 use std::path::PathBuf;
 
 /// The golden sets checked by every test.
-pub const GOLDEN_SETS: [&str; 6] = [
+pub const GOLDEN_SETS: [&str; 8] = [
     "default",
     "volcanic",
     "defence",
     "defence_neutral",
     "hgt",
     "hgt_neutral",
+    "plasticity",
+    "plastic_neutral",
 ];
 
 /// Root of the golden sets: `$WORLDSIM_GOLDEN_DIR` if set, else the committed

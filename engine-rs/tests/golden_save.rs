@@ -112,8 +112,8 @@ fn malformed_saves_are_refused() {
         ),
         (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
         (
-            with(|s| s["config"]["plasticity"] = json!(true)),
-            "plasticity is on",
+            with(|s| s["config"]["open_genome"] = json!(true)),
+            "open_genome is on",
         ),
         (with(|s| s["seed"] = json!(1.5)), BAD),
         (
@@ -222,7 +222,11 @@ fn malformed_saves_are_refused() {
         ),
         (
             with(|s| s["cells"][0][12] = json!([0.3, 0.3, 0.4])),
-            "list longer than 0",
+            "invalid diet",
+        ),
+        (
+            with(|s| s["cells"][0][12] = json!([0.3, 0.3, 0.2, 0.2])),
+            "list longer than 3",
         ),
         (
             with(|s| s["cells"][0][8] = json!([999_999_999])),
@@ -293,6 +297,46 @@ fn propensities_are_bounded_when_their_flag_is_on() {
     }
     for v in [json!(1.01), json!(-0.01), json!(true)] {
         assert!(hgt(v.clone()).is_err(), "hgt_p {v} accepted");
+    }
+    let plastic = |p: Value, diet: Value| {
+        let mut s = set_save("plasticity");
+        s["cells"][0][11] = p;
+        s["cells"][0][12] = diet;
+        load(&s)
+    };
+    let genetic = set_save("plasticity")["cells"][0][12].clone();
+    assert!(plastic(json!(0.5), json!([0.2, 0.3, 0.5])).is_ok());
+    // accepted by Python's sum, refused by plain `+` (review case)
+    let near = json!([0.5695322860023156, 0.15395422311071535, 0.276514490886969]);
+    assert!(plastic(json!(0.5), near).is_ok());
+    // neutral arm: plast_p > 0, but its diet can never have moved
+    let mut s = set_save("plastic_neutral");
+    s["cells"][0][11] = json!(0.5);
+    s["cells"][0][12] = json!([0.2, 0.3, 0.5]);
+    let e = load(&s).expect_err("moved diet in the neutral arm accepted");
+    assert!(
+        e.message().contains("could not have moved"),
+        "{}",
+        e.message()
+    );
+    for (p, diet, why) in [
+        (json!(1.01), genetic.clone(), "plast_p"),
+        (json!(-0.01), genetic.clone(), "plast_p"),
+        (json!(0.5), json!([0.2, 0.3, 0.6]), "diet"),
+        (json!(0.5), json!([-0.1, 0.5, 0.6]), "diet"),
+        (json!(0.5), json!([0.5, 0.5]), "diet"),
+        (json!(0.0), json!([0.2, 0.3, 0.5]), "could not have moved"),
+        // within 1e-6 of 1 for CPython 3.12's compensated sum, not for plain left-to-right `+`
+        (
+            json!(0.5),
+            json!([0.20299530701092813, 0.3695882399078084, 0.42741545308126344]),
+            "diet",
+        ),
+    ] {
+        match plastic(p.clone(), diet.clone()) {
+            Ok(_) => panic!("plast_p {p}, diet {diet} accepted"),
+            Err(e) => assert!(e.message().contains(why), "{why}: {}", e.message()),
+        }
     }
     // Python accepts a non-zero `defended` counter whatever the flag (it only reports it).
     let mut s = base_save();
