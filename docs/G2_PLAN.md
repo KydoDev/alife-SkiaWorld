@@ -54,7 +54,8 @@ SHA-256 over, in this order, little-endian:
 - **Flag fields (M5)**, only when their flag is on, so the hashes of worlds with the flag off never change:
   `hgt` adds the counters `hgt_events, hgt_foreign` (u64) after `sex_births`, then `defence` adds `defended`;
   per cell, after `sex_p`: `plast_p` and the 3 diet values (`plasticity`), `hgt_p` (`hgt`), then `armor_p`
-  (`defence`), all as f64 bits.
+  (`defence`), all as f64 bits; then (`open_genome`) the number of rules (u64) and each rule's 4 values as f64
+  bits, in order.
 Excluded: species and tracker (observer state), derived fields (`light`, phenotype),
 which are recomputed and would only hide where a difference started.
 
@@ -363,3 +364,25 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `sense_noise` 0 and the config bounds, and every ported flag on together; committed sets for the combinations
   belong to item 8. Regenerating all sets also refreshed the `meta` of `default` and `volcanic` (`set`,
   `counter_deltas`); their RNG vectors and hashes are unchanged.
+- **M5 item 7, `open_genome`** (2026-11-11, Windows 11): the kernel runs F4 rule genes. `Cell.rules` is a list of
+  4-value rules (empty for founders and with the flag off). After feeding, while not in the neutral arm, the rules
+  whose condition holds (always, energy / `div_max` above or below the threshold, light here / `light_max` above
+  or below) add their intensity `2v - 1` to a sensor weight, which `sensed_move` then uses, or shift the division
+  threshold by `intensity x rule_div_shift x (div_max - div_min)`, clamped to [`div_min`, `div_max`]. At division
+  `mutate_rules` runs after the genes and before the propensities: a gauss step on every value, then optional
+  duplication (copy next to the original), deletion and a new random rule, within `max_rules`. Upkeep gains
+  `rule_upkeep x len(rules)` between the sensor and plasticity terms. The loader accepts `open_genome` (every
+  optional flag now loads) and checks the rules like `_valid_rules`: at most `max_rules` (none with the flag off),
+  at most 64 read, each exactly 4 finite values in [0, 1]; the rules of all cells share a parse-time budget of
+  4M (`MAX_TOTAL_RULES`, 128 MiB), so a hostile save is refused before every cell allocates a list (the review
+  measured 2.85 GiB peak on a 3.6 MiB save without it, 780 MiB with it, inside the 1 GiB the C ABI documents). The state hash gains the rules when the flag is on
+  (Python's `state_hash` and `hash.rs`, both; other sets unchanged); `first_difference` names them. Golden sets
+  `open_genome` and `rules_neutral` (both with `sensing` on, since most rule targets are sensor weights): founders
+  have no rules, so at the default rates only 4 of 196 cells held one at the hashed start; the sets raise
+  `rule_new_rate` to 0.3 and `rule_dup_rate` to 0.2 (`RULES_TUNED` in `scripts/g2_golden.py`). Verdict (rules in
+  `PLAN.md`): **met**. Both sets equal Python at every one of the 1000 steps, at the first run; the twelve earlier
+  sets' hashes are byte-identical when regenerated. Not vacuous: at the `open_genome` start 123 of 231 cells hold
+  rules (up to 5); in 20 steps rules changed sensor weights 2093 times and the division threshold 107 times; in
+  `rules_neutral` 52 of 150 cells hold rules and none ever fires. Loader tests: 0, 1 and `max_rules` rules load;
+  `max_rules + 1`, 65, values outside [0, 1], 3 or 5 values, a boolean, a bare number and an object are refused; a
+  rule with the flag off is refused. Speed, alternating rounds against the previous commit (flag off): means of six rounds, 800 cells 0%, 10k +2%, 50k -2% (the first three rounds showed 50k -9%, the next three, run in the other order, +4%: noise level); Cell grows from 384 to 408 bytes (the rule Vec).

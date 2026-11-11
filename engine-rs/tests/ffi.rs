@@ -130,20 +130,20 @@ fn null_handles_and_wrong_buffers_are_refused() {
 }
 
 #[test]
-fn a_save_with_an_unsupported_flag_is_refused_with_its_reason() {
+fn a_refused_save_reports_its_reason() {
     use std::io::{Read, Write};
     let mut json = String::new();
     flate2::read::GzDecoder::new(&golden_bytes("default")[..])
         .read_to_string(&mut json)
         .unwrap();
-    let json = json.replacen("\"open_genome\":false", "\"open_genome\":true", 1);
+    let json = json.replacen("\"sensing\":false", "\"sensing\":1", 1);
     let mut gz = Vec::new();
     let mut e = flate2::write::GzEncoder::new(&mut gz, flate2::Compression::fast());
     e.write_all(json.as_bytes()).unwrap();
     e.finish().unwrap();
     assert!(load_bytes(&gz).is_null());
     assert!(
-        last_error().contains("open_genome is on"),
+        last_error().contains("sensing must be bool"),
         "{}",
         last_error()
     );

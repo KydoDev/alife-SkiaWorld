@@ -110,10 +110,6 @@ fn malformed_saves_are_refused() {
             with(|s| s["config"]["div_min"] = json!(100.0)),
             "div_min/mut_min",
         ),
-        (
-            with(|s| s["config"]["open_genome"] = json!(true)),
-            "open_genome is on",
-        ),
         (with(|s| s["seed"] = json!(1.5)), BAD),
         (
             with(|s| {
@@ -209,7 +205,7 @@ fn malformed_saves_are_refused() {
         ),
         (
             with(|s| s["cells"][0][9] = json!([[0.5, 0.5, 0.5, 0.5]])),
-            "list longer than 0",
+            "invalid rule genes",
         ),
         (with(|s| s["cells"][0][10] = json!(0.5)), "sex_p"),
         (with(|s| s["cells"][0][11] = json!(0.5)), "plast_p"),
@@ -348,6 +344,45 @@ fn propensities_are_bounded_when_their_flag_is_on() {
     for v in [json!(1.01), json!(-0.01), json!(true)] {
         assert!(sexual(v.clone()).is_err(), "sex_p {v} accepted");
     }
+    // F4 rule genes (`_valid_rules`): at most max_rules, each 4 values in [0, 1].
+    let with_rules = |rules: Value| {
+        let mut s = set_save("open_genome");
+        s["cells"][0][9] = rules;
+        load(&s)
+    };
+    let max_rules = set_save("open_genome")["config"]["max_rules"]
+        .as_u64()
+        .unwrap() as usize;
+    let rule = json!([0.0, 1.0, 0.5, -0.0]);
+    for ok in [
+        json!([]),
+        json!([rule]),
+        Value::Array(vec![rule.clone(); max_rules]),
+    ] {
+        assert!(with_rules(ok.clone()).is_ok(), "rules {ok} refused");
+    }
+    // integer values load like Python's (it keeps them as int; they hash as the same f64 bits)
+    assert!(with_rules(json!([[0, 1, 0, 1]])).is_ok());
+    // the config bound of max_rules (64) is the most the loader reads per cell
+    let mut s = set_save("open_genome");
+    s["config"]["max_rules"] = json!(64);
+    s["cells"][0][9] = Value::Array(vec![rule.clone(); 64]);
+    assert!(load(&s).is_ok());
+    s["config"]["max_rules"] = json!(65);
+    assert!(load(&s).is_err());
+    for bad in [
+        Value::Array(vec![rule.clone(); max_rules + 1]),
+        Value::Array(vec![rule.clone(); 65]),
+        json!([[0.5, 0.5, 0.5, 1.01]]),
+        json!([[0.5, -0.01, 0.5, 0.5]]),
+        json!([[0.5, 0.5, 0.5]]),
+        json!([[0.5, 0.5, 0.5, 0.5, 0.5]]),
+        json!([[0.5, 0.5, true, 0.5]]),
+        json!([0.5]),
+        json!({}),
+    ] {
+        assert!(with_rules(bad.clone()).is_err(), "rules {bad} accepted");
+    }
     // Python accepts a non-zero `defended` counter whatever the flag (it only reports it).
     let mut s = base_save();
     s["counters"]["defended"] = json!(7);
@@ -401,4 +436,35 @@ fn corrupted_json_never_panics() {
         bytes[at] = alphabet[(next() % alphabet.len() as u64) as usize];
         let _ = world_from_json(&bytes);
     }
+}
+
+/// The rule genes of all cells share one budget, checked while parsing: a hostile save cannot
+/// make every cell allocate a rule list before the per-cell checks refuse it (flag off here).
+#[test]
+fn rule_genes_share_one_budget() {
+    use worldsim_core::save::world_from_json_with_rule_budget;
+    let mut s = base_save();
+    let n = s["cells"].as_array().unwrap().len();
+    for k in 0..n {
+        s["cells"][k][9] = json!([[0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]]);
+    }
+    let bytes = serde_json::to_vec(&s).unwrap();
+    let err = world_from_json_with_rule_budget(&bytes, 2 * n - 1).expect_err("over budget");
+    assert!(
+        err.message()
+            .contains("more rule genes than any valid world"),
+        "{}",
+        err.message()
+    );
+    // within budget the parse succeeds and the per-cell check refuses rules with the flag off
+    let err = world_from_json_with_rule_budget(&bytes, 2 * n).expect_err("flag off");
+    assert!(
+        err.message().contains("invalid rule genes"),
+        "{}",
+        err.message()
+    );
+    // the budget is reset for each load
+    assert!(
+        world_from_json_with_rule_budget(&serde_json::to_vec(&base_save()).unwrap(), 0).is_ok()
+    );
 }

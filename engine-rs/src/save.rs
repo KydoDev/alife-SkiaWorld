@@ -5,7 +5,8 @@
 //! stays proportional to the real data. The JSON is therefore deserialized straight into typed,
 //! **capped** structures (no generic JSON tree, which costs ~30 bytes per value): every list has
 //! a maximum length, refused as soon as it is exceeded, matrices share a budget of
-//! [`MAX_WORLD_TILES`] elements, and ignored parts (the species tracker, species ids, unknown
+//! [`MAX_WORLD_TILES`] elements, the rule genes of all cells share a budget of
+//! [`MAX_TOTAL_RULES`] rules (each list stored without spare capacity), and ignored parts (the species tracker, species ids, unknown
 //! top-level keys) are skipped without being stored.
 //!
 //! The checks mirror `persistence.py` (`world_from_dict`) and `Config.validate()`, with
@@ -19,10 +20,11 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5 ports it): saves with `open_genome` on are refused;
-//!   `defence`, `hgt`, `plasticity`, `sex` and `sensing` are ported (M5);
+//! - every optional flag is ported (M5): `defence`, `hgt`, `plasticity`, `sex`, `sensing` and
+//!   `open_genome` (rule genes: at most `max_rules`, at most 64 read, each 4 values in [0, 1]);
 //! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
-//!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not).
+//!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not);
+//!   the same holds for rule values;
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
 //! - **looser, on purpose**: the species tracker and the per-cell species ids are not validated
 //!   (only skipped). They are observer state that never affects the dynamics (ADR-0003) and the
@@ -30,7 +32,7 @@
 
 use crate::config::{Config, MAX_WORLD_TILES};
 use crate::rng::{PyRandom, MT_N};
-use crate::world::{python_sum, Cell, CellRef, Counters, Terrain, Traits, World, EMPTY};
+use crate::world::{python_sum, Cell, CellRef, Counters, Rule, Terrain, Traits, World, EMPTY};
 use crate::{SaveError, N_GENES, SAVE_VERSION};
 use flate2::read::MultiGzDecoder;
 use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
@@ -57,6 +59,17 @@ pub const MAX_COUNT: u64 = 1 << 62;
 
 /// Most bonds a cell can have: bonded cells are neighbours (they never move), so at most 8.
 pub const MAX_BONDS: usize = 8;
+/// Upper bound of `max_rules` (`Config` bounds it to [0, 64]): the most rule genes a cell can hold.
+pub const MAX_RULES: usize = 64;
+/// Most rule genes a save may hold over all its cells (4M rules = 128 MiB), checked while parsing so
+/// a small hostile save cannot make every cell allocate a rule list before any check runs.
+/// Deliberately stricter than Python, which has no such bound but could not run such a world.
+pub const MAX_TOTAL_RULES: usize = 1 << 22;
+
+thread_local! {
+    /// Rules left in the budget of the save being parsed on this thread (see [`RuleList`]).
+    static RULE_BUDGET: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 const MAX_SIDE: usize = 10_000; // `_BOUNDS` of width and height
 const MAX_CELLS: usize = MAX_WORLD_TILES as usize; // at most one cell per tile
@@ -91,6 +104,16 @@ fn decompress(compressed: impl Read, max_bytes: u64) -> Result<Vec<u8>, SaveErro
 
 /// Load a save from its (decompressed) JSON text.
 pub fn world_from_json(json: &[u8]) -> Result<World, SaveError> {
+    world_from_json_with_rule_budget(json, MAX_TOTAL_RULES)
+}
+
+/// [`world_from_json`] with another total rule budget (tests use a small one).
+#[doc(hidden)]
+pub fn world_from_json_with_rule_budget(
+    json: &[u8],
+    rule_budget: usize,
+) -> Result<World, SaveError> {
+    RULE_BUDGET.with(|b| b.set(rule_budget));
     let raw: RawSave = serde_json::from_slice(json)
         .map_err(|e| SaveError::new(crate::bounded(format_args!("not a valid save file: {e}"))))?;
     build_world(raw)
@@ -146,9 +169,8 @@ struct RawTerrain {
 }
 
 /// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p, armor_p]`.
-/// Rules must be empty with their flag off (checked by the cap of 0); the diet is checked below.
+/// Rules (at most 64, the `max_rules` bound) and the diet are checked below.
 #[derive(Deserialize)]
-#[allow(dead_code)] // rules (field 9) are only length-checked
 struct RawCell(
     u64,
     u64,
@@ -159,7 +181,7 @@ struct RawCell(
     u64,
     IgnoredAny,
     Capped<u64, MAX_BONDS>,
-    Capped<IgnoredAny, 0>,
+    RuleList,
     f64,
     f64,
     Capped<f64, 3>,
@@ -252,6 +274,36 @@ impl<'de, T: Deserialize<'de>> Visitor<'de> for RowSeed<'_, T> {
             row.push(x);
         }
         Ok(row)
+    }
+}
+
+/// A cell's rule genes: at most [`MAX_RULES`], drawn from the save's [`MAX_TOTAL_RULES`] budget,
+/// stored without spare capacity.
+struct RuleList(Vec<Rule>);
+
+impl<'de> Deserialize<'de> for RuleList {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = RuleList;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a list of at most {MAX_RULES} rule genes")
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<RuleList, A::Error> {
+                let mut rules = Vec::new();
+                while let Some(rule) = seq.next_element::<Rule>()? {
+                    let left = RULE_BUDGET.with(|b| b.get());
+                    if rules.len() == MAX_RULES || left == 0 {
+                        return Err(de::Error::custom("more rule genes than any valid world"));
+                    }
+                    RULE_BUDGET.with(|b| b.set(left - 1));
+                    rules.push(rule);
+                }
+                rules.shrink_to_fit();
+                Ok(RuleList(rules))
+            }
+        }
+        d.deserialize_seq(V)
     }
 }
 
@@ -387,11 +439,6 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         )));
     }
     let cfg = Config::from_json(&raw.config.0)?;
-    if cfg.open_genome {
-        return Err(err(
-            "unsupported save: open_genome is on (this kernel does not run it yet, M5)",
-        ));
-    }
     let (w, h) = (cfg.w(), cfg.h());
     let terrain = match raw.terrain {
         None => Terrain::flat(w, h),
@@ -492,7 +539,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             lineage,
             _,
             bonds,
-            _,
+            rules,
             sex_p,
             plast_p,
             diet,
@@ -561,6 +608,21 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
         if !armor_ok {
             return Err(err(format!("cell #{id} has an invalid armor_p")));
         }
+        // `_valid_rules`: at most max_rules (none with open_genome off), each 4 values in [0, 1]
+        let rules = rules.0;
+        let cap = if cfg.open_genome {
+            cfg.max_rules as usize
+        } else {
+            0
+        };
+        let rules_ok = rules.len() <= cap
+            && rules
+                .iter()
+                .flatten()
+                .all(|v| v.is_finite() && (0.0..=1.0).contains(v));
+        if !rules_ok {
+            return Err(err(format!("cell #{id} has invalid rule genes")));
+        }
         let r = world.slab.len() as CellRef;
         let mut cell = Cell::new(
             id,
@@ -576,6 +638,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 hgt_p,
                 armor_p,
             },
+            rules,
             &world.cfg,
         );
         if world.cfg.plasticity {

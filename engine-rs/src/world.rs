@@ -37,6 +37,25 @@ pub(crate) const G_CHEMO: usize = 9;
 const G_W_LIGHT: usize = 10;
 const N_SENSE: usize = 6;
 
+/// F4 rule gene: (condition, threshold, target, intensity), each in [0, 1] (`RULE_LEN`).
+pub type Rule = [f64; 4];
+/// `len(RULE_CONDITIONS)`: always, energy>, energy<, light>, light<.
+const RULE_CONDITIONS: usize = 5;
+/// `len(RULE_TARGETS)`: the 6 sensor weights, then the division threshold (`RULE_DIV`).
+const RULE_TARGETS: usize = N_SENSE + 1;
+const RULE_DIV: usize = RULE_TARGETS - 1;
+
+/// `decode_rule`: (condition index, threshold, target index, intensity in [-1, 1]); `int()` of a
+/// non-negative float truncates like `as usize`.
+fn decode_rule(r: &Rule) -> (usize, f64, usize, f64) {
+    (
+        ((r[0] * RULE_CONDITIONS as f64) as usize).min(RULE_CONDITIONS - 1),
+        r[1],
+        ((r[2] * RULE_TARGETS as f64) as usize).min(RULE_TARGETS - 1),
+        2.0 * r[3] - 1.0,
+    )
+}
+
 /// `NEIGH8`: neighbour offsets in Python's order (it fixes which tile a `choice` picks).
 const NEIGH8: [(isize, isize); 8] = [
     (-1, -1),
@@ -230,8 +249,9 @@ fn genetic_diet(photo: f64, sapro: f64, chemo: f64) -> [f64; 3] {
 
 impl Phenotype {
     /// The genetic part of `Cell.express(cfg)`, then the flag upkeep terms in Python's order
-    /// (sensor weights, `plast_p`, `hgt_p`, `armor_p`). The diet is applied by [`Cell::express`].
-    pub fn express(g: &[f64; N_GENES], t: Traits, cfg: &Config) -> Self {
+    /// (sensor weights, rules, `plast_p`, `hgt_p`, `armor_p`). The diet is applied by
+    /// [`Cell::express`].
+    pub fn express(g: &[f64; N_GENES], t: Traits, n_rules: usize, cfg: &Config) -> Self {
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
         if s == 0.0 {
             s = 1e-9; // Python: `... or 1e-9`
@@ -248,6 +268,9 @@ impl Phenotype {
         if cfg.sensing {
             let abs = sense_weights(g).map(f64::abs);
             upkeep += cfg.sense_upkeep * python_sum(&abs) / N_SENSE as f64;
+        }
+        if cfg.open_genome {
+            upkeep += cfg.rule_upkeep * n_rules as f64;
         }
         if cfg.plasticity {
             upkeep += cfg.plastic_upkeep * t.plast_p;
@@ -300,6 +323,8 @@ pub struct Cell {
     pub hgt_p: f64,
     /// F5e armour: share of attacks the cell can repel; 0 unless `defence` is on.
     pub armor_p: f64,
+    /// F4 rule genes, in order; empty unless `open_genome` is on.
+    pub rules: Vec<Rule>,
     pub alive: bool,
     pub pheno: Phenotype,
 }
@@ -315,6 +340,7 @@ impl Cell {
         genes: [f64; N_GENES],
         lineage: u64,
         traits: Traits,
+        rules: Vec<Rule>,
         cfg: &Config,
     ) -> Self {
         let mut cell = Self {
@@ -331,6 +357,7 @@ impl Cell {
             diet: [0.0; 3],
             hgt_p: traits.hgt_p,
             armor_p: traits.armor_p,
+            rules,
             alive: true,
             pheno: Phenotype::default(),
         };
@@ -351,7 +378,7 @@ impl Cell {
     /// `Cell.express(cfg)`: phenotype from the genes; with `plasticity` on the diet is reset to
     /// the genetic split and applied (also after a gene transfer, as in Python).
     pub fn express(&mut self, cfg: &Config) {
-        self.pheno = Phenotype::express(&self.genes, self.traits(), cfg);
+        self.pheno = Phenotype::express(&self.genes, self.traits(), self.rules.len(), cfg);
         if cfg.plasticity {
             let ph = &self.pheno;
             self.diet = genetic_diet(ph.photo, ph.sapro, ph.chemo);
@@ -702,12 +729,13 @@ impl World {
     /// `World.sensed_move` (F3): score staying put and each free neighbour tile from the cell's
     /// sensor weights (environment of the tile, kin / strangers / danger among the mover's
     /// neighbours touching it) plus `sense_noise * random()` per candidate, in Python's order and
-    /// arithmetic; `None` = stay. No draw when no neighbour tile is free.
-    fn sensed_move(&mut self, r: CellRef) -> Option<(usize, usize)> {
+    /// arithmetic; `None` = stay. No draw when no neighbour tile is free. `sense` = the weights
+    /// adjusted by active F4 rules, else the genetic ones.
+    fn sensed_move(&mut self, r: CellRef, sense: Option<[f64; N_SENSE]>) -> Option<(usize, usize)> {
         let (w, h) = (self.width, self.height);
         let c = &self.slab[r as usize];
         let (x, y, lineage) = (c.x, c.y, c.lineage);
-        let [wl, wo, wc, wk, ws, wd] = sense_weights(&c.genes);
+        let [wl, wo, wc, wk, ws, wd] = sense.unwrap_or_else(|| sense_weights(&c.genes));
         // (dx, dy, is_kin, predator share) of the neighbours; candidates (dx, dy, x, y, view
         // index: 0 = stay, k + 1 = NEIGH8[k])
         let mut social = [(0isize, 0isize, false, 0.0f64); 8];
@@ -797,6 +825,71 @@ impl World {
         (k > 0).then(|| *self.rng.choice(&prey[..k]))
     }
 
+    /// `World.rule_effects` (F4): the sensor weights and division-threshold shift of the rules
+    /// whose condition holds now (energy / div_max, light here / light_max), in rule order.
+    fn rule_effects(&self, r: CellRef, light_here: f64) -> ([f64; N_SENSE], f64) {
+        let cfg = &self.cfg;
+        let c = &self.slab[r as usize];
+        let e = c.energy / cfg.div_max;
+        let lt = if cfg.light_max > 0.0 {
+            light_here / cfg.light_max
+        } else {
+            0.0
+        };
+        let (mut sense, mut div) = (sense_weights(&c.genes), 0.0f64);
+        for rule in &c.rules {
+            let (cond, thr, target, w) = decode_rule(rule);
+            let holds = match cond {
+                0 => true,
+                1 => e > thr,
+                2 => e < thr,
+                3 => lt > thr,
+                _ => lt < thr,
+            };
+            if holds {
+                if target == RULE_DIV {
+                    div += w;
+                } else {
+                    sense[target] += w;
+                }
+            }
+        }
+        (
+            sense,
+            div * cfg.rule_div_shift * (cfg.div_max - cfg.div_min),
+        )
+    }
+
+    /// `World.mutate_rules` (F4): point mutation of every value, then possibly one duplication
+    /// (the copy next to the original), one deletion and one new random rule, within `max_rules`.
+    fn mutate_rules(&mut self, rules: &[Rule], sigma: f64) -> Vec<Rule> {
+        let mut out: Vec<Rule> = Vec::with_capacity(rules.len());
+        for rule in rules {
+            let mut m = [0.0; 4];
+            for (o, &v) in m.iter_mut().zip(rule) {
+                *o = py_min(1.0, py_max(0.0, v + self.rng.gauss(0.0, sigma)));
+            }
+            out.push(m);
+        }
+        let max_rules = self.cfg.max_rules as usize;
+        if self.rng.random() < self.cfg.rule_dup_rate && !out.is_empty() && out.len() < max_rules {
+            let i = self.rng.randrange(out.len() as u64) as usize;
+            out.insert(i + 1, out[i]);
+        }
+        if self.rng.random() < self.cfg.rule_del_rate && !out.is_empty() {
+            let i = self.rng.randrange(out.len() as u64) as usize;
+            out.remove(i);
+        }
+        if self.rng.random() < self.cfg.rule_new_rate && out.len() < max_rules {
+            let mut fresh = [0.0; 4];
+            for v in &mut fresh {
+                *v = self.rng.random();
+            }
+            out.push(fresh);
+        }
+        out
+    }
+
     /// `World.mutate`: `min(1.0, max(0.0, v + gauss(0, sigma)))` per gene, in order.
     fn mutate(&mut self, genes: &[f64; N_GENES], sigma: f64) -> [f64; N_GENES] {
         let mut out = [0.0; N_GENES];
@@ -844,6 +937,7 @@ impl World {
                 genes,
                 id,
                 traits,
+                Vec::new(),
                 &self.cfg,
             );
             self.place(cell);
@@ -935,6 +1029,7 @@ impl World {
         let (hgt_on, transfer) = (cfg.hgt, cfg.hgt && !cfg.hgt_neutral);
         let (plastic_on, plastic) = (cfg.plasticity, cfg.plasticity && !cfg.plastic_neutral);
         let (sex_on, mating) = (cfg.sex, cfg.sex && !cfg.sex_neutral);
+        let rules_on = cfg.open_genome && !cfg.rules_neutral;
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -984,6 +1079,12 @@ impl World {
                 e += cfg.chemo_gain * ph.chemo_k * self.terrain.chem[tile];
             }
             self.slab[ri].energy = e;
+            // F4: active rules, evaluated once per step from the energy after feeding
+            let fx = if rules_on && !self.slab[ri].rules.is_empty() {
+                Some(self.rule_effects(r, self.light[tile]))
+            } else {
+                None
+            };
 
             // 4: predation
             if ph.pred_k > 0.0 && self.rng.random() < ph.pred_k {
@@ -1006,7 +1107,7 @@ impl World {
             // 5: movement (unbonded cells only); F3 sensing steers it, otherwise a random walk
             if self.slab[ri].bonds.is_empty() && ph.move_p > 0.0 && self.rng.random() < ph.move_p {
                 let dest = if cfg.sensing {
-                    self.sensed_move(r)
+                    self.sensed_move(r, fx.map(|f| f.0))
                 } else {
                     self.random_empty_neighbor(x, y)
                 };
@@ -1043,8 +1144,14 @@ impl World {
                 continue;
             }
 
-            // 7: division
-            if energy >= ph.div_thr {
+            // 7: division (F4: a division rule shifts the threshold, clamped to the config range)
+            let mut thr = ph.div_thr;
+            if let Some((_, shift)) = fx {
+                if shift != 0.0 {
+                    thr = py_min(cfg.div_max, py_max(cfg.div_min, thr + shift));
+                }
+            }
+            if energy >= thr {
                 let (cx, cy) = (self.slab[ri].x, self.slab[ri].y);
                 if let Some((sx, sy)) = self.random_empty_neighbor(cx, cy) {
                     // F5a: mating needs enough energy for its cost and the body (no negative energy)
@@ -1071,6 +1178,14 @@ impl World {
                         self.slab[ri].genes
                     };
                     let genes = self.mutate(&parent_genes, ph.mut_sigma);
+                    let rules = if cfg.open_genome {
+                        let parent_rules = std::mem::take(&mut self.slab[ri].rules);
+                        let rules = self.mutate_rules(&parent_rules, ph.mut_sigma);
+                        self.slab[ri].rules = parent_rules;
+                        rules
+                    } else {
+                        Vec::new()
+                    };
                     // offspring sex_p, plast_p, hgt_p, then armor_p (Python's order)
                     let sex_p = if sex_on {
                         self.offspring_propensity(parent.sex_p, ph.mut_sigma)
@@ -1099,8 +1214,9 @@ impl World {
                         hgt_p,
                         armor_p,
                     };
-                    let child =
-                        self.alloc(Cell::new(id, sx, sy, child_e, genes, lineage, traits, &cfg));
+                    let child = self.alloc(Cell::new(
+                        id, sx, sy, child_e, genes, lineage, traits, rules, &cfg,
+                    ));
                     self.grid[sy * w + sx] = child;
                     newborns.push(child);
                     self.counters.births += 1;
@@ -1147,6 +1263,7 @@ impl World {
                         genes,
                         id,
                         traits,
+                        Vec::new(),
                         &cfg,
                     );
                     self.place(cell);

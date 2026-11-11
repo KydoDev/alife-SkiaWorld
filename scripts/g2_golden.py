@@ -42,6 +42,9 @@ RANDRANGE_NS = (1, 2, 3, 7, 10, 100, 1000, 10_240, 2**31 - 1, 2**32 + 5)
 REPO = Path(__file__).resolve().parent.parent
 # The golden sets: name -> arguments added to SET_COMMON. Planet paths are relative to the repository.
 SET_COMMON = ["--seed", "1", "--warmup", "200", "--steps", "1000"]
+# F4: founders carry no rules, so with the default rates few cells hold any by the hashed steps; the
+# open-genome sets raise the de novo and duplication rates so rules are common and fire.
+RULES_TUNED = ["--set", "rule_new_rate=0.3", "--set", "rule_dup_rate=0.2"]
 SETS = {
     "default": [],
     "volcanic": ["--planet", "examples/volcanic.json"],
@@ -55,6 +58,8 @@ SETS = {
     "sex_neutral": ["--set", "sex=1", "--set", "sex_neutral=1"],
     "sensing": ["--set", "sensing=1"],
     "sensing_volcanic": ["--planet", "examples/volcanic.json", "--set", "sensing=1"],
+    "open_genome": ["--set", "open_genome=1", "--set", "sensing=1", *RULES_TUNED],
+    "rules_neutral": ["--set", "open_genome=1", "--set", "sensing=1", "--set", "rules_neutral=1", *RULES_TUNED],
 }
 
 
@@ -73,6 +78,7 @@ def state_hash(world: World) -> str:
         h.update(u64(n))
     # flag fields are hashed only when their flag is on (M5)
     plastic, hgt, defence = world.cfg.plasticity, world.cfg.hgt, world.cfg.defence
+    open_genome = world.cfg.open_genome
     if hgt:
         h.update(u64(world.hgt_events) + u64(world.hgt_foreign))
     if defence:
@@ -95,6 +101,10 @@ def state_hash(world: World) -> str:
             h.update(f64(c.hgt_p))
         if defence:
             h.update(f64(c.armor_p))
+        if open_genome:
+            h.update(u64(len(c.rules)))
+            for r in c.rules:
+                h.update(struct.pack("<4d", *r))
     return h.hexdigest()
 
 

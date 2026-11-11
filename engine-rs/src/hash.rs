@@ -23,6 +23,7 @@ pub fn state_digest(world: &World) -> [u8; 32] {
     }
     // flag fields are hashed only when their flag is on (M5)
     let (plastic, hgt, defence) = (world.cfg.plasticity, world.cfg.hgt, world.cfg.defence);
+    let open_genome = world.cfg.open_genome;
     if hgt {
         h.update(c.hgt_events.to_le_bytes());
         h.update(c.hgt_foreign.to_le_bytes());
@@ -74,6 +75,12 @@ pub fn state_digest(world: &World) -> [u8; 32] {
         }
         if defence {
             h.update(cell.armor_p.to_le_bytes());
+        }
+        if open_genome {
+            h.update((cell.rules.len() as u64).to_le_bytes());
+            for v in cell.rules.iter().flatten() {
+                h.update(v.to_le_bytes());
+            }
         }
     }
     h.finalize().into()
@@ -181,6 +188,15 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             "hgt_p"
         } else if ca.armor_p.to_bits() != cb.armor_p.to_bits() {
             "armor_p"
+        } else if ca.rules.len() != cb.rules.len()
+            || ca
+                .rules
+                .iter()
+                .flatten()
+                .zip(cb.rules.iter().flatten())
+                .any(|(p, q)| p.to_bits() != q.to_bits())
+        {
+            "rules"
         } else {
             continue;
         };

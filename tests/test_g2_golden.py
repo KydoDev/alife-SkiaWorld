@@ -123,6 +123,32 @@ def test_the_sensing_sets_are_not_vacuous(name):
         assert world.has_chem and beside_rock > 0
 
 
+def test_the_open_genome_sets_are_not_vacuous():
+    """Cells carry rule genes (several per cell, so duplication and point mutation ran) in both arms; in
+    open_genome the rules fire and change sensor weights and the division threshold, in rules_neutral never."""
+    golden = ROOT / "engine-rs" / "tests" / "golden"
+    for name, active in (("open_genome", True), ("rules_neutral", False)):
+        world = load_world(golden / name / "start.json.gz")
+        lengths = [len(c.rules) for c in world.cells]
+        assert sum(n > 0 for n in lengths) > 40 and max(lengths) >= 2
+        fired = {"sense": 0, "div": 0}
+        rule_effects = world.rule_effects
+
+        def counting(c, light_here, _effects=rule_effects, _fired=fired):
+            sense, div = _effects(c, light_here)
+            _fired["sense"] += any(s != w for s, w in zip(sense, c.sense))
+            _fired["div"] += div != 0.0
+            return sense, div
+
+        world.rule_effects = counting
+        for _ in range(20):
+            world.step()
+        if active:
+            assert fired["sense"] > 500 and fired["div"] > 20
+        else:
+            assert fired == {"sense": 0, "div": 0}
+
+
 @pytest.mark.parametrize("name", GOLDEN_SETS)
 def test_committed_set_matches_its_arguments(name):
     """The committed data was made with the arguments SETS declares (else regenerate with --all)."""

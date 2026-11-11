@@ -11,8 +11,8 @@ design questions for later (they need an ADR). Detail of the milestone: `docs/G2
 4. [x] Flag `plasticity` in the kernel (diet, acclimation); render from the diet; golden set + renders
 5. [x] Flag `sex` in the kernel (mate choice, two-parent offspring); golden set `sex`
 6. [x] Flag `sensing` in the kernel (`sensed_move`); golden set tuned so sensed moves happen
-7. [ ] Flag `open_genome` in the kernel (variable-length rules, loader bounds); golden set `open_genome`
-8. [ ] Combined golden sets: all ported flags on; a small world that goes extinct and reseeds with flags on; width 2
+7. [x] Flag `open_genome` in the kernel (variable-length rules, loader bounds); golden set `open_genome`
+8. [ ] Combined golden sets: all ported flags on; small world that goes extinct and reseeds; width 2; open_genome w/o sensing
 9. [ ] Design (ADR): world creation in the kernel (planet forms, images, numpy pairwise mean)
 10. [ ] Design (ADR): interventions through the C ABI (write entry points, ABI version bump)
 

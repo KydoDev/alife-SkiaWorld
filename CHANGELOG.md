@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, `open_genome` in the Rust kernel**: saves with F4 rule genes load and run in the kernel, equal to
+  Python at every step of new golden sets `open_genome` and `rules_neutral` (with raised rule rates, so rules are
+  common). The state hash includes the rules when the flag is on. Every optional flag now loads in the kernel.
 - **G2 M5, `sensing` in the Rust kernel**: saves with F3 directed movement load and run in the kernel, equal to
   Python at every step of new golden sets `sensing` and `sensing_volcanic` (vents and rock). Earlier hashes
   unchanged; speed within noise. Only `open_genome` is still refused by the kernel's loader.
