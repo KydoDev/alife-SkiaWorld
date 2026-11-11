@@ -466,3 +466,25 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `World.set_terrain`, which the terrain edits of piece 3 will call; like `set_terrain` it leaves `light` alone
   (`from_parts` still starts it from `base_light`). Pure refactor. Verdict: **met**, all 20 golden sets (hashes,
   saves and both renders), the creation vectors and the FFI tests unchanged; no `hashes.csv` regenerated.
+- **ADR-0013 piece 3, `World::intervene`** (2026-11-11, Windows 11): the five `play.py` edits plus `_finish_edit`
+  in the kernel (`engine-rs/src/world/intervene.rs`): `Intervention` (built from the record `(kind, x, y, radius,
+  amount)` by `Intervention::from_raw`, kinds 1-5, an unused argument must be exactly 0) and
+  `World::intervene -> Result<u64, InterventionError>`, validated before any write (tile in the world, amounts finite
+  and not negative, `-0.0` included, no nutrient sum that turns non-finite). New golden kind: `interventions.json`
+  in the golden root (`scripts/g2_intervention_vectors.py`, written by `--all` after the sets, from their start
+  saves): `iv_default`, `iv_volcanic`, `iv_reseed`, `iv_width2`, `iv_game`, 30 actions; after each the return value,
+  state hash, terrain digest (live organic) and render SHA-256, then a hash per step to 200 steps after the last
+  action. The generator chooses save-dependent tiles (a bonded cell, the strongest natural vent, the seabed, the
+  ridge) from the live world and refuses to write when a non-vacuous condition fails. Verdict: **met** on the first
+  run: every return value, hash, digest and render equal, no divergent step; the 20 `hashes.csv` byte-identical
+  after a full `--all` into a fresh root (which also reproduced `interventions.json`). Non-vacuous (asserted by the
+  generator and by the Rust test): a bonded kill, a `raise_rock` kill, both transitions of `has_rock` and
+  `has_chem`, discs wrapping at `x = 0` and `x = W-1`, rows 0 and `H-1`, a capped vent on a natural vent, a
+  nutrient disc over rock, the no-op returns of `raise_rock`, a vent and `dig`, an extinction caused by an edit, and
+  for both early returns (`raise_rock` on rock, a vent on rock) a light left from the last step that a fresh
+  `update_light` would change (each sits a step after the last refresh). Mutation check: a kernel refreshing the
+  light on either early return fails the render verdict.
+  Refusals (`tests/interventions.rs`): bad kinds, used unused arguments, tiles outside, NaN/inf/negative/`-0.0`
+  amounts and a nutrient overflow leave the state hash, terrain digest and render unchanged; `radius = u32::MAX`
+  equals `W + H`; no edit draws from the RNG. pytest: the committed file equals this Python (xfail off its OS) and
+  `iv_game` ends where `play.replay` with free tools does.

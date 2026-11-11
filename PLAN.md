@@ -11,7 +11,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 4. [x] ADR-0012 piece 4: `World::new`; step-0 hashes and creation sets `create_default`, `create_volcanic`
 5. [x] ADR-0012 piece 5: `ws_world_create`, ABI 2, FFI tests, Unity "new world"; security review first
 6. [x] ADR-0013 piece 2: `refresh_terrain` refactor; all hashes and renders unchanged
-7. [ ] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
+7. [x] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
 8. [ ] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first
 9. [ ] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
 10. [ ] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)

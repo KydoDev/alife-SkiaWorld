@@ -63,9 +63,11 @@ cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 # regenerate every G2 golden set after any change to the dynamics (the sets are listed in SETS
 # in scripts/g2_golden.py; a new set also goes into GOLDEN_SETS in engine-rs/tests/common/mod.rs)
 python scripts/g2_golden.py --all engine-rs/tests/golden
-# (also writes engine-rs/tests/golden/terrain.json and create.json, the procedural-terrain and world-creation
-#  vectors; alone: python scripts/g2_terrain_vectors.py --out engine-rs/tests/golden/terrain.json
-#  and python scripts/g2_create_vectors.py --out engine-rs/tests/golden/create.json)
+# (also writes engine-rs/tests/golden/terrain.json, create.json and interventions.json, the procedural-terrain,
+#  world-creation and interventions vectors; alone: python scripts/g2_terrain_vectors.py --out
+#  engine-rs/tests/golden/terrain.json, python scripts/g2_create_vectors.py --out engine-rs/tests/golden/create.json
+#  and python scripts/g2_intervention_vectors.py --root engine-rs/tests/golden
+#  --out engine-rs/tests/golden/interventions.json, which reads the sets' start saves)
 # numpy mean vectors (ndarray.mean(), pairwise summation; tied to the installed numpy)
 python scripts/g2_mean_vectors.py --out engine-rs/tests/mean_vectors.json
 # seeding vectors (random.Random(seed) for int and str seeds; platform-independent)

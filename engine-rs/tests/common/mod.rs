@@ -64,3 +64,32 @@ pub fn hashes(set: &str) -> Vec<(u64, u64, String)> {
         })
         .collect()
 }
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// ADR-0012's terrain digest with the live organic field (ADR-0013): SHA-256 of rock as `u8`, then chem, sun
+/// and organic as little-endian `f64`, row-major. The state hash covers neither rock nor chem.
+#[allow(dead_code)] // not every test crate that includes this module uses it
+pub fn terrain_digest(world: &worldsim_core::world::World) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    let t = &world.terrain;
+    h.update(t.rock.iter().map(|&r| u8::from(r)).collect::<Vec<u8>>());
+    for values in [&t.chem, &t.sun, &world.organic] {
+        for v in values.iter() {
+            h.update(v.to_le_bytes());
+        }
+    }
+    hex(&h.finalize())
+}
+
+/// SHA-256 of the kernel's `render_rgb` (the interventions vectors store Python's render this way).
+#[allow(dead_code)] // not every test crate that includes this module uses it
+pub fn render_digest(world: &worldsim_core::world::World) -> String {
+    use sha2::{Digest, Sha256};
+    let mut rgb = vec![0u8; worldsim_core::render::rgb_len(world)];
+    worldsim_core::render::render_rgb(world, &mut rgb);
+    hex(&Sha256::digest(&rgb))
+}

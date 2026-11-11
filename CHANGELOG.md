@@ -5,11 +5,11 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-### Changed
-- **ADR-0013 piece 2, `refresh_terrain`**: the kernel derives its terrain state (base light, shade powers,
-  rock/chemical flags) in one `World::refresh_terrain()`, ready for the terrain edits; no output changes.
-
 ### Added
+- **ADR-0013 piece 3, `World::intervene`**: the kernel applies the five G1 edits (nutrients, meteorite, raise rock,
+  dig, vent) bit-exactly with Python's `play.py`, validating every input before any change; new golden kind
+  `interventions.json` (`scripts/g2_intervention_vectors.py`, written by `g2_golden.py --all`).
+
 - **ADR-0012 piece 5, `ws_world_create` (C ABI 2) and Unity "New world"**: a front-end creates a world in the kernel
   from an exported config and a `u64` seed; Unity has a seed field and a New world button, and
   `scripts/unity_sync.py --planet FORM` exports the config. The kernel now refuses duplicate config keys, in saves too;
@@ -170,6 +170,10 @@ All notable changes to this project are documented here. Format based on
   Species distance rescaled per gene; save format v3. Experiment script
   `scripts/f3_experiment.py` and results (phototaxis likely selected, modest effect on 2 seeds; no fleeing,
   hunting or consistent day/night migration). Viewer inspector shows sensor weights.
+
+### Changed
+- **ADR-0013 piece 2, `refresh_terrain`**: the kernel derives its terrain state (base light, shade powers,
+  rock/chemical flags) in one `World::refresh_terrain()`, ready for the terrain edits; no output changes.
 
 ### Fixed
 - **No numpy transcendentals left in terrain generation or interventions** (G2, before M5): the

@@ -17,6 +17,12 @@ use crate::rng::PyRandom;
 use crate::terrain::{generate_terrain, TerrainParams};
 use crate::N_GENES;
 
+mod intervene;
+pub use intervene::{
+    Intervention, InterventionError, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK,
+    KIND_VENT,
+};
+
 /// Index of a cell in [`World::slab`].
 pub type CellRef = u32;
 

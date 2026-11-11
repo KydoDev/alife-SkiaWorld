@@ -17,8 +17,9 @@ Golden files depend on the platform's maths library for gauss/pow/sin, so they r
 
 Every golden set is listed in SETS below, the single list that pytest, the Rust tests and CI follow;
 `--all ROOT` (re)writes each of them under ROOT/<name>, the procedural-terrain vectors as ROOT/terrain.json
-(scripts/g2_terrain_vectors.py) and the world-creation vectors as ROOT/create.json (scripts/g2_create_vectors.py);
-both use libm sin/exp, so they are regenerated per platform like the sets:
+(scripts/g2_terrain_vectors.py), the world-creation vectors as ROOT/create.json (scripts/g2_create_vectors.py) and
+the interventions vectors as ROOT/interventions.json (scripts/g2_intervention_vectors.py, from the sets' start saves);
+all use libm, so they are regenerated per platform like the sets:
 
     python scripts/g2_golden.py --all engine-rs/tests/golden
     python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --out engine-rs/target/try
@@ -212,6 +213,8 @@ def main(argv=None, repo_relative=False) -> None:
         if not args.renders_only:
             _sibling("g2_terrain_vectors").write(args.all / "terrain.json")
             _sibling("g2_create_vectors").write(args.all / "create.json")
+            # after the sets: the interventions cases start from their start saves
+            _sibling("g2_intervention_vectors").write(args.all, args.all / "interventions.json")
         return
     if args.out is None:
         ap.error("--out or --all is required")

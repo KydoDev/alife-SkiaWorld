@@ -336,6 +336,46 @@ def test_the_creation_sets_start_at_creation():
     assert volcanic["meta"]["planet"] == "examples/volcanic.json"
 
 
+def _intervention_module():
+    spec = importlib.util.spec_from_file_location("g2_intervention_vectors",
+                                                  ROOT / "scripts" / "g2_intervention_vectors.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_committed_intervention_vectors_match_this_python(request):
+    """engine-rs/tests/golden/interventions.json is what g2_intervention_vectors.py writes from the committed
+    start saves (ADR-0013 piece 3), on the OS it was made on."""
+    iv = _intervention_module()
+    golden = ROOT / "engine-rs" / "tests" / "golden"
+    committed = json.loads((golden / "interventions.json").read_text(encoding="utf-8"))
+    if platform.system() != committed["system"]:
+        request.applymarker(pytest.mark.xfail(strict=False, reason=f"made on {committed['system']}; libm may differ"))
+    built = iv.build(golden)
+    assert committed["cases"] == built["cases"], "regenerate the golden files"
+
+
+def test_the_game_case_is_the_game_path():
+    """iv_game, applied edit by edit as the generator does, ends in the state play.replay reaches from the same
+    G1 log with free tools: the generator's dispatcher cannot drift from the game (ADR-0013 Decision 6)."""
+    from worldsim.play import TOOLS, GameRules, replay
+    iv = _intervention_module()
+    golden = ROOT / "engine-rs" / "tests" / "golden"
+    specs, _ = iv.case_specs()
+    name, set_name, actions = next(s for s in specs if s[0] == "iv_game")
+    case = iv.run_case(name, set_name, actions, golden)
+    world = load_world(golden / set_name / "start.json.gz")
+    start = world.step_count
+    log = [(start + k, tool, x, y) for k, tool, x, y in iv.GAME_LOG]
+    game = replay(world, log, case["hashes"][-1][0], GameRules(cost={t: 0.0 for t in TOOLS}))
+    assert game.world.step_count == case["hashes"][-1][0]
+    assert g2.state_hash(game.world) == case["hashes"][-1][2]
+    # the expanded actions are the log with GameRules() parameters
+    assert [(a["step"], a["kind"], a["x"], a["y"]) for a in case["actions"]] == [
+        (s, iv.TOOL_KIND[tool], x, y) for s, tool, x, y in log]
+
+
 def test_committed_mean_vectors_match_this_numpy():
     """engine-rs/tests/mean_vectors.json is what this numpy's ndarray.mean() gives (ADR-0012 piece 2)."""
     spec = importlib.util.spec_from_file_location("g2_mean_vectors", ROOT / "scripts" / "g2_mean_vectors.py")
