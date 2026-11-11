@@ -6,10 +6,10 @@ Unity version: 6000.5.6f1 (owner's choice 2026-11-11).
 
 ## Checklist
 1. [x] Scope and plan (this file); editor version chosen
-2. [ ] A: `engine-rs/src/ffi.rs` C ABI: handle, load from bytes, free, step, sizes, hash, render, last error
-3. [ ] A: light computed at load (as Python); render ported from `render.py`, compared with Python on the golden save
-4. [ ] A: `tests/ffi.rs` (golden hashes through the ABI, bad input, null handle, short buffer, poisoned handle)
-5. [ ] A: docs (G2_PLAN, ARCHITECTURE, CHANGELOG, TEST.md), PR
+2. [x] A: `engine-rs/src/ffi.rs` C ABI: handle, load from bytes, free, step, sizes, hash, render, last error
+3. [x] A: light computed at load (as Python); render ported from `render.py`, compared with Python on the golden save
+4. [x] A: `tests/ffi.rs` (golden hashes through the ABI, bad input, null handle, short buffer, poisoned handle)
+5. [~] A: docs (G2_PLAN, ARCHITECTURE, CHANGELOG, TEST.md), PR
 6. [ ] B: `unity/` project (6000.5), P/Invoke wrapper, world texture, play/pause/speed, DLL + save copied by script
 7. [ ] B: EditMode test in batchmode: golden hashes through P/Invoke; on-screen check by the owner
 8. [ ] B: docs (USER_MANUAL, DEVELOPER_GUIDE, G2_PLAN, CHANGELOG), PR
@@ -23,9 +23,8 @@ Unity version: 6000.5.6f1 (owner's choice 2026-11-11).
 - `ws_abi_version()` lets the front-end refuse a stale DLL.
 - Light: the Rust loader computes the light at load like `persistence.py` (`update_light` at `now = step_count`).
   Light is not in the state hash, so `hashes.csv` stays unchanged.
-- Render: `render.py` in Rust, RGBA8, row 0 = surface (the front-end flips rows). Python computes in float32
-  and truncates; Rust mirrors the float32 order of operations, and the test allows a difference of at most 1
-  per channel (rounding of float32 expression order is not guaranteed equal), reporting the share of exact pixels.
+- Render: `render.py` in Rust, RGB8, row 0 = surface (the front-end flips rows). Rust mirrors numpy's
+  float32/float64 promotions and order of operations; result: equal byte for byte (no tolerance needed).
 
 ## B: Unity project (decisions)
 - `unity/` in this repository (ADR-0008). `Library/`, `Temp/`, `Obj/`, `Logs/`, `UserSettings/`, `*.csproj`,

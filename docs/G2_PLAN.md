@@ -224,3 +224,14 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   three worlds. The speed-up over CPython (12–27×) is below ADR-0008's 30–100× estimate; the kernel is
   unoptimised (it copies the organic field and the config every step, `Vec` bonds), so there is room before M6.
   Timings vary ±5% between runs; Python's baseline is the first steps of each world (a transient).
+- **M4 part A, C ABI** (2026-11-11, Windows 11): `engine-rs/src/ffi.rs` exposes an opaque world handle
+  (`ws_world_load` from gzip bytes, `ws_world_free`), `ws_world_step`, read-only views (`ws_world_info`,
+  `ws_world_state_hash`, `ws_world_render_rgb`), `ws_last_error` (per thread) and `ws_abi_version` (1). Every entry
+  point checks null pointers and exact buffer sizes and runs in `catch_unwind`; a panic in a step poisons the handle.
+  Nothing writes world fields. The Rust loader now computes the light at load like `persistence.py` (light is not
+  hashed: `hashes.csv` unchanged). `render.rs` ports `render.py` keeping numpy's float32/float64 promotions; it equals
+  Python byte for byte on the loaded start save and after 1000 steps, both sets (`render_start.rgb.gz`,
+  `render_end.rgb.gz`, written by `scripts/g2_golden.py`, `--renders-only` for existing sets). `tests/ffi.rs`: golden
+  hashes through the ABI in uneven chunks, bad and refused saves with their message, null handles, wrong buffers,
+  error truncation; a unit test checks the poisoned handle. Checked from outside Rust with Python `ctypes` on the
+  built `worldsim_core.dll` (volcanic, 1000 steps: hash equal).

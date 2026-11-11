@@ -9,7 +9,9 @@
 //! M2 ([`world`], `World::step` for the default flags, bit-exact against Python).
 
 pub mod config;
+pub mod ffi;
 pub mod hash;
+pub mod render;
 pub mod rng;
 pub mod save;
 pub mod world;

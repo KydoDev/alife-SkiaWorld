@@ -63,6 +63,11 @@ cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 # regenerate the G2 golden vectors after any change to the default dynamics
 python scripts/g2_golden.py --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/default
 python scripts/g2_golden.py --planet examples/volcanic.json --seed 1 --warmup 200 --steps 1000 --out engine-rs/tests/golden/volcanic
+# after a change to render.py only: rewrite the two golden renders of a set, nothing else
+python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/golden/default
+
+# C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract)
+cd engine-rs && cargo build --release
 ```
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).

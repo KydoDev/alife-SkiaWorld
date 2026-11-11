@@ -424,6 +424,8 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     world.next_id = count(raw.next_id, "next_id")?;
     world.counters = counters;
     load_cells(&mut world, raw.cells.0)?;
+    // `persistence.py` recomputes the light at load (`now = step_count`); it is not hashed.
+    world.update_light(world.step_count);
     Ok(world)
 }
 
