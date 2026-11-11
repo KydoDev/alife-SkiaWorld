@@ -46,3 +46,10 @@ on specialist predators barely touch it. The owner approved widening the grid.
 `spec_exp` in {3, 4} (default 2: a higher exponent shrinks the small shares of mixed diets, so `pred_k` of mostly
 photo cells falls) x `pred_eff` in {0.5, 0.35, 0.25} x `pred_upkeep` in {0.3, 1.0}: 12 settings x 4 runs.
 "Closest to the defaults" ranks first by the number of changed parameters, then by the size of the change.
+
+## Extended sweep result (2026-11-11, `docs/world_study_spec.csv`)
+No setting qualifies. Long lives occur only where predators fall below 2% of cells: the life and predator criteria
+conflict. Closest: `spec_exp` 3, `pred_eff` 0.25, `pred_upkeep` 1.0 -> median life 35, 37, 41, 52 (5-7x the
+default), population 1268-1398, no extinction, predators 0.5-1.8% (fails only the >= 2% criterion). Other
+long-life settings are unstable across runs (e.g. 4/0.35/1.0: median life 9-130, predators 0-3.1%).
+Next step needs the owner: relaxing the predator criterion would be a change made after seeing the data.
