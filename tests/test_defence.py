@@ -5,7 +5,7 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
-from worldsim.world import G_PHOTO, G_PRED, G_SAPRO, N_GENES, Cell
+from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, Cell
 
 ARMOR_COL = 14                                                   # armor_p in a v8 cell row
 
@@ -27,7 +27,7 @@ def put(w, x, y, genes, armor_p=0.0, energy=20.0):
 def hunter_and_prey(w, armor_p):
     """A pure predator next to a pure phototroph; both too poor to divide, lit and long-lived."""
     pred = [0.5] * N_GENES
-    pred[G_PRED], pred[G_PHOTO], pred[G_SAPRO] = 1.0, 0.0, 0.0
+    pred[G_PRED], pred[G_PHOTO], pred[G_SAPRO], pred[G_CHEMO] = 1.0, 0.0, 0.0, 0.0   # predation is its only food
     prey = [0.5] * N_GENES
     prey[G_PRED] = 0.0
     hunter = put(w, 5, 5, pred, energy=50.0)
@@ -60,6 +60,35 @@ def test_strong_armour_repels_most_attacks():
                 break
         defended, kills = defended + w.defended, kills + w.kills
     assert kills > 0 and defended / (defended + kills) > 0.85    # 95% of attacks fail
+
+
+def test_a_repelled_attack_moves_no_energy():
+    seen = 0
+    for seed in range(10):
+        w = world(seed=seed, defence_strength=0.95, max_age=10**6, div_min=1e3, div_max=1e3)
+        hunter, target = hunter_and_prey(w, armor_p=1.0)
+        for _ in range(30):
+            before, defended = hunter.energy, w.defended
+            w.step()
+            if w.kills:
+                break
+            if w.defended > defended:
+                seen += 1
+                assert hunter.energy < before                     # only its upkeep was paid
+                assert target.alive and w.deaths == 0
+    assert seen > 0
+
+
+def test_neutral_arm_draws_nothing_in_predation():
+    """With no cost, the neutral arm must follow the off world draw for draw (cells placed by hand)."""
+    states = []
+    for kw in ({"defence": False}, {"defence_neutral": True, "defence_upkeep": 0.0}):
+        w = world(max_age=10**6, div_min=1e3, div_max=1e3, **kw)
+        hunter_and_prey(w, armor_p=1.0 if w.cfg.defence else 0.0)
+        for _ in range(30):
+            w.step()
+        states.append(([(c.id, c.x, c.y, c.energy) for c in w.cells], w.kills, w.rng.getstate()))
+    assert states[0][1] > 0 and states[0] == states[1]          # an attack happened, with the same draws
 
 
 def test_unarmoured_prey_is_always_eaten_when_attacked():

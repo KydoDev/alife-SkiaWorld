@@ -88,6 +88,7 @@ python view.py --set sensing=1 --set open_genome=1  # cells evolve their own rul
 python view.py --set sex=1                        # cells may recombine with a partner (F5a)
 python view.py --set plasticity=1                 # cells adjust their diet during life (F5b)
 python view.py --set hgt=1                        # cells copy genes from neighbours (F5c)
+python view.py --set defence=1                    # prey can repel attacks with an armour (F5e)
 ```
 Keys: `SPACE` pause · `N` one step while paused · `+/-` speed · `O` organic
 matter · `S` snapshot PNG · `R` new seed on the same terrain · click to inspect
@@ -98,7 +99,8 @@ darker than 0.2 here, seek light more"; with `--set sex=1` its *mating propensit
 that it recombines with a similar cell nearby when it divides; with `--set plasticity=1` its
 *plasticity*, how fast it shifts its diet towards the food found where it is — its colour can
 change during its life; with `--set hgt=1` its *transfer propensity* (`hgt`), how often it copies
-one gene from a neighbour during its life) · `ESC` quit.
+one gene from a neighbour during its life; with `--set defence=1` its *armour* (`armor`), the share of
+attacks it can repel, which costs energy every step) · `ESC` quit.
 
 ## Headless runs (`run.py`)
 ```bash
@@ -108,8 +110,8 @@ python run.py --resume runs/v/world_003000.json.gz --steps 2000 --out runs/v2
 ```
 The output folder gets `stats.csv`, `stats.png`, `species_tree.png`,
 `novelty.png`, `species.csv`, snapshots and saves (written at the end of a run).
-Saves are tied to the genome format: a save from an older version (before the F5c
-gene transfer) is refused with a clear message, so re-run instead of resuming it.
+Saves are tied to the genome format: a save from an older version (before the F5e
+prey defence) is refused with a clear message, so re-run instead of resuming it.
 
 ## Colours
 | Colour | Meaning |
