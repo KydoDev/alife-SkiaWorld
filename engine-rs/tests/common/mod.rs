@@ -3,7 +3,14 @@
 use std::path::PathBuf;
 
 /// The golden sets checked by every test.
-pub const GOLDEN_SETS: [&str; 4] = ["default", "volcanic", "defence", "defence_neutral"];
+pub const GOLDEN_SETS: [&str; 6] = [
+    "default",
+    "volcanic",
+    "defence",
+    "defence_neutral",
+    "hgt",
+    "hgt_neutral",
+];
 
 /// Root of the golden sets: `$WORLDSIM_GOLDEN_DIR` if set, else the committed
 /// `tests/golden/` (the Windows reference). CI sets it to sets regenerated on Linux, since

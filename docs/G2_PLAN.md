@@ -52,7 +52,8 @@ SHA-256 over, in this order, little-endian:
   `energy` bits, `age` (u64), the 16 genes' bits, `lineage` (u64), number of bonds and
   bond ids **in insertion order**, `sex_p` bits.
 - **Flag fields (M5)**, only when their flag is on, so the hashes of worlds with the flag off never change:
-  `defence` adds the counter `defended` (u64) after `sex_births`, and each cell's `armor_p` bits after `sex_p`.
+  `hgt` adds the counters `hgt_events, hgt_foreign` (u64) after `sex_births`, then `defence` adds `defended`;
+  per cell, after `sex_p`: `hgt_p` bits (`hgt`), then `armor_p` bits (`defence`).
 Excluded: species and tracker (observer state), derived fields (`light`, phenotype),
 which are recomputed and would only hide where a difference started.
 
@@ -286,3 +287,21 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   (Python never writes it); a comment on `first_difference`. Open, for later: `WsInfo` does not expose `defended`
   (adding it changes the layout: ABI version 2, when the front-end needs it); `default`/`volcanic` `rng.json` meta
   lacks `set` and `counter_deltas` until their next regeneration.
+- **M5 item 3, `hgt`** (2026-11-11, Windows 11): the kernel runs F5c gene transfer. At the start of a cell's turn
+  (before feeding), with chance `hgt_p x hgt_rate` (no draw in the neutral arm), it copies one gene (`randrange(16)`)
+  from a random occupied neighbour (any lineage, bonded or not, this step's newborns included) and re-expresses its
+  phenotype; `hgt_events` and `hgt_foreign` count the copies. Upkeep adds `hgt_upkeep x hgt_p` before the armour
+  term; founders draw `hgt_p` before `armor_p`, children inherit `hgt_p` (clamped gauss step) before `armor_p`.
+  The loader accepts `hgt` and bounds `hgt_p` like `persistence.py`; the hgt counters are now dynamic state.
+  Golden sets `hgt` and `hgt_neutral`. Verdict (rules in `PLAN.md`): **met**. Both sets equal Python at every one of
+  the 1000 steps, at the first run; the hashes of the four earlier sets are byte-identical when regenerated. Not
+  vacuous: 26594 genes copied, 1935 of them across lineages (`hgt`); none in `hgt_neutral` (13657 kills), with
+  `hgt_p` spread over [0, 1] in both. Speed: the M3 benchmark of this build and of the previous commit, run side by
+  side, agree (800 / 10k / 50k: 6.05–6.20 vs 6.38, 8.03–8.71 vs 8.60, 2.84–2.89 vs 2.70 million cell-updates/s);
+  the 50k world is about half its item-2 figure for both builds, so that drop is the machine's state that day,
+  not the code.
+  Review (code-review-security, no blocking issue) ran five extra scratch sets against the kernel, all bit-exact:
+  `hgt` with `defence`, a volcanic world with `hgt_rate` 1 and large mutation steps, a 2-wide world (repeated
+  neighbour tiles), the neutral defence arm with heavy immigration, and a 20x20 world with `max_age` 2 (321
+  extinctions and reseeds). Open: no committed set yet combines flags or reseeds with flags on (taken into item 8);
+  `WsInfo` exposes neither `defended` nor the hgt counters (one ABI version 2 change, when the front-end needs them).

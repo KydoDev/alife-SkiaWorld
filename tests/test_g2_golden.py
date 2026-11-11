@@ -53,6 +53,18 @@ def test_the_neutral_defence_set_is_not_vacuous():
     assert load_world(golden / "start.json.gz").cfg.defence_neutral
 
 
+def test_the_hgt_sets_are_not_vacuous():
+    """Genes were copied, also across lineages; the neutral arm copies none but carries the propensity."""
+    golden = ROOT / "engine-rs" / "tests" / "golden"
+    meta = {s: json.loads((golden / s / "rng.json").read_text(encoding="utf-8"))["meta"]["counter_deltas"]
+            for s in ("hgt", "hgt_neutral")}
+    assert meta["hgt"]["hgt_events"] > 0 and meta["hgt"]["hgt_foreign"] > 0
+    assert meta["hgt_neutral"]["hgt_events"] == 0
+    for s in ("hgt", "hgt_neutral"):
+        hgt_p = [c.hgt_p for c in load_world(golden / s / "start.json.gz").cells]
+        assert max(hgt_p) - min(hgt_p) > 0.5
+
+
 @pytest.mark.parametrize("name", GOLDEN_SETS)
 def test_committed_set_matches_its_arguments(name):
     """The committed data was made with the arguments SETS declares (else regenerate with --all)."""

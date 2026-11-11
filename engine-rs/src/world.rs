@@ -1,5 +1,5 @@
 //! World state and the step (`worldsim/world.py`): the default flags (G2 M2) plus, from M5, the
-//! optional flags ported so far (`defence`). Other flags are refused by the loader.
+//! optional flags ported so far (`defence`, `hgt`). Other flags are refused by the loader.
 //!
 //! Cells live in a slab (`World::slab`) and are referred to by slot ([`CellRef`]), never by
 //! pointer; `World::order` is Python's `World.cells` list (its order is part of the state: the
@@ -62,9 +62,9 @@ pub struct Phenotype {
 }
 
 impl Phenotype {
-    /// `Cell.express(cfg)` for the flags the kernel runs; `armor_p` costs upkeep when `defence`
-    /// is on (added last, as Python does).
-    pub fn express(g: &[f64; N_GENES], armor_p: f64, cfg: &Config) -> Self {
+    /// `Cell.express(cfg)` for the flags the kernel runs: `hgt_p` then `armor_p` cost upkeep when
+    /// their flag is on, added after the genetic terms in Python's order.
+    pub fn express(g: &[f64; N_GENES], hgt_p: f64, armor_p: f64, cfg: &Config) -> Self {
         let mut s = g[G_PHOTO] + g[G_SAPRO] + g[G_PRED] + g[G_CHEMO];
         if s == 0.0 {
             s = 1e-9; // Python: `... or 1e-9`
@@ -78,6 +78,9 @@ impl Phenotype {
         let e = cfg.spec_exp;
         let mv = g[G_MOVE];
         let mut upkeep = cfg.base_cost + cfg.pred_upkeep * pred + cfg.move_upkeep * mv;
+        if cfg.hgt {
+            upkeep += cfg.hgt_upkeep * hgt_p;
+        }
         if cfg.defence {
             upkeep += cfg.defence_upkeep * armor_p;
         }
@@ -111,6 +114,8 @@ pub struct Cell {
     pub bonds: Vec<CellRef>,
     /// F5a mating propensity; always 0 while `sex` is off (kept for the state hash).
     pub sex_p: f64,
+    /// F5c propensity to copy a neighbour's gene; 0 unless `hgt` is on.
+    pub hgt_p: f64,
     /// F5e armour: share of attacks the cell can repel; 0 unless `defence` is on.
     pub armor_p: f64,
     pub alive: bool,
@@ -127,6 +132,7 @@ impl Cell {
         energy: f64,
         genes: [f64; N_GENES],
         lineage: u64,
+        hgt_p: f64,
         armor_p: f64,
         cfg: &Config,
     ) -> Self {
@@ -140,9 +146,10 @@ impl Cell {
             lineage,
             bonds: Vec::new(),
             sex_p: 0.0,
+            hgt_p,
             armor_p,
             alive: true,
-            pheno: Phenotype::express(&genes, armor_p, cfg),
+            pheno: Phenotype::express(&genes, hgt_p, armor_p, cfg),
         }
     }
 }
@@ -174,6 +181,10 @@ pub struct Counters {
     pub kills: u64,
     pub extinctions: u64,
     pub sex_births: u64,
+    /// F5c: genes copied from a neighbour, and those from another lineage (hashed only when
+    /// `hgt` is on).
+    pub hgt_events: u64,
+    pub hgt_foreign: u64,
     /// F5e: attacks repelled by armour (hashed only when `defence` is on).
     pub defended: u64,
 }
@@ -306,12 +317,51 @@ impl World {
         g
     }
 
-    /// The flag draws of a founder (seeded or immigrant), after its genes: `armor_p`.
-    fn founder_armor(&mut self) -> f64 {
-        if self.cfg.defence {
+    /// The flag draws of a founder (seeded or immigrant), after its genes, in Python's keyword
+    /// order: `(hgt_p, armor_p)`.
+    fn founder_traits(&mut self) -> (f64, f64) {
+        let hgt_p = if self.cfg.hgt { self.rng.random() } else { 0.0 };
+        let armor_p = if self.cfg.defence {
             self.rng.random()
         } else {
             0.0
+        };
+        (hgt_p, armor_p)
+    }
+
+    /// `min(1.0, max(0.0, p + gauss(0, sigma)))`: a propensity inherited with a mutation step.
+    fn offspring_propensity(&mut self, p: f64, sigma: f64) -> f64 {
+        py_min(1.0, py_max(0.0, p + self.rng.gauss(0.0, sigma)))
+    }
+
+    /// `World.transfer_gene` (F5c): copy one random gene from a random neighbour (any lineage,
+    /// bonded or not), then re-express. The genome changes for life and is inherited.
+    fn transfer_gene(&mut self, r: CellRef) {
+        let (x, y) = (self.slab[r as usize].x, self.slab[r as usize].y);
+        let (tiles, n) = self.neighbors(x, y);
+        let mut donors = [EMPTY; 8];
+        let mut k = 0;
+        for &(nx, ny) in &tiles[..n] {
+            let o = self.grid[ny * self.width + nx];
+            if o != EMPTY {
+                donors[k] = o;
+                k += 1;
+            }
+        }
+        if k == 0 {
+            return;
+        }
+        let donor = *self.rng.choice(&donors[..k]) as usize;
+        let gene = self.rng.randrange(N_GENES as u64) as usize;
+        let (value, donor_lineage) = (self.slab[donor].genes[gene], self.slab[donor].lineage);
+        let cfg = &self.cfg;
+        let c = &mut self.slab[r as usize];
+        c.genes[gene] = value;
+        c.pheno = Phenotype::express(&c.genes, c.hgt_p, c.armor_p, cfg);
+        let foreign = donor_lineage != c.lineage;
+        self.counters.hgt_events += 1;
+        if foreign {
+            self.counters.hgt_foreign += 1;
         }
     }
 
@@ -399,7 +449,7 @@ impl World {
         for i in free {
             let id = self.new_id();
             let genes = self.random_genes();
-            let armor_p = self.founder_armor();
+            let (hgt_p, armor_p) = self.founder_traits();
             let cell = Cell::new(
                 id,
                 i % self.width,
@@ -407,6 +457,7 @@ impl World {
                 self.cfg.initial_energy,
                 genes,
                 id,
+                hgt_p,
                 armor_p,
                 &self.cfg,
             );
@@ -496,6 +547,7 @@ impl World {
         let cfg = self.cfg.clone();
         let w = self.width;
         let (defence_on, armour) = (cfg.defence, cfg.defence && !cfg.defence_neutral);
+        let (hgt_on, transfer) = (cfg.hgt, cfg.hgt && !cfg.hgt_neutral);
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -507,9 +559,13 @@ impl World {
             if !self.slab[ri].alive {
                 continue;
             }
+            self.slab[ri].age += 1;
+            // 0: F5c horizontal transfer, before feeding so the whole turn uses one phenotype
+            if transfer && self.rng.random() < self.slab[ri].hgt_p * cfg.hgt_rate {
+                self.transfer_gene(r);
+            }
             let (x, y, ph) = {
-                let c = &mut self.slab[ri];
-                c.age += 1;
+                let c = &self.slab[ri];
                 (c.x, c.y, c.pheno)
             };
             let tile = y * w + x;
@@ -593,18 +649,23 @@ impl World {
                     c.energy -= cfg.body_cost;
                     let child_e = c.energy * ph.child_frac;
                     c.energy -= child_e;
-                    let (parent_genes, lineage, parent_armor) = (c.genes, c.lineage, c.armor_p);
+                    let (parent_genes, lineage) = (c.genes, c.lineage);
+                    let (parent_hgt, parent_armor) = (c.hgt_p, c.armor_p);
                     let genes = self.mutate(&parent_genes, ph.mut_sigma);
-                    // `World.offspring_armor_p`
+                    // `offspring_hgt_p`, then `offspring_armor_p` (Python's order)
+                    let hgt_p = if hgt_on {
+                        self.offspring_propensity(parent_hgt, ph.mut_sigma)
+                    } else {
+                        0.0
+                    };
                     let armor_p = if defence_on {
-                        let a = parent_armor + self.rng.gauss(0.0, ph.mut_sigma);
-                        py_min(1.0, py_max(0.0, a))
+                        self.offspring_propensity(parent_armor, ph.mut_sigma)
                     } else {
                         0.0
                     };
                     let id = self.new_id();
                     let child = self.alloc(Cell::new(
-                        id, sx, sy, child_e, genes, lineage, armor_p, &cfg,
+                        id, sx, sy, child_e, genes, lineage, hgt_p, armor_p, &cfg,
                     ));
                     self.grid[sy * w + sx] = child;
                     newborns.push(child);
@@ -643,7 +704,7 @@ impl World {
                 if self.grid[i] == EMPTY && !self.terrain.rock[i] {
                     let id = self.new_id();
                     let genes = self.random_genes();
-                    let armor_p = self.founder_armor();
+                    let (hgt_p, armor_p) = self.founder_traits();
                     let cell = Cell::new(
                         id,
                         i % w,
@@ -651,6 +712,7 @@ impl World {
                         cfg.initial_energy,
                         genes,
                         id,
+                        hgt_p,
                         armor_p,
                         &cfg,
                     );

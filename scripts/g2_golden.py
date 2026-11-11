@@ -47,6 +47,8 @@ SETS = {
     "volcanic": ["--planet", "examples/volcanic.json"],
     "defence": ["--set", "defence=1"],
     "defence_neutral": ["--set", "defence=1", "--set", "defence_neutral=1"],
+    "hgt": ["--set", "hgt=1"],
+    "hgt_neutral": ["--set", "hgt=1", "--set", "hgt_neutral=1"],
 }
 
 
@@ -63,7 +65,9 @@ def state_hash(world: World) -> str:
     h.update(u64(world.step_count) + u64(world.next_id))
     for n in (world.births, world.deaths, world.kills, world.extinctions, world.sex_births):
         h.update(u64(n))
-    defence = world.cfg.defence          # flag fields are hashed only when their flag is on (M5)
+    hgt, defence = world.cfg.hgt, world.cfg.defence   # flag fields are hashed only when their flag is on (M5)
+    if hgt:
+        h.update(u64(world.hgt_events) + u64(world.hgt_foreign))
     if defence:
         h.update(u64(world.defended))
     _, internal, gauss_next = world.rng.getstate()
@@ -78,6 +82,8 @@ def state_hash(world: World) -> str:
         for b in c.bonds:
             h.update(u64(b.id))
         h.update(f64(c.sex_p))
+        if hgt:
+            h.update(f64(c.hgt_p))
         if defence:
             h.update(f64(c.armor_p))
     return h.hexdigest()

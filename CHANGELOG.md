@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M5, `hgt` in the Rust kernel**: saves with F5c gene transfer load and run in the kernel, equal to Python at
+  every step of new golden sets `hgt` (26594 genes copied in 1000 steps) and `hgt_neutral`; the state hash covers
+  `hgt_p` and the transfer counters when the flag is on (earlier hashes unchanged). No speed change.
 - **G2 M5, `defence` in the Rust kernel**: saves with F5e prey defence now load and run in the kernel, equal to
   Python at every step of new golden sets `defence` (13002 attacks repelled in its 1000 steps) and `defence_neutral`; the state hash
   covers `armor_p` and `defended` when the flag is on, so the existing hashes are unchanged. `rng.json` meta

@@ -111,7 +111,6 @@ fn malformed_saves_are_refused() {
             "div_min/mut_min",
         ),
         (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
-        (with(|s| s["config"]["hgt"] = json!(true)), "hgt is on"),
         (
             with(|s| s["config"]["plasticity"] = json!(true)),
             "plasticity is on",
@@ -262,9 +261,10 @@ fn malformed_saves_are_refused() {
     }
 }
 
-/// With `defence` on, `armor_p` must be in [0, 1] (`persistence.py`); the bounds load, values past them do not.
+/// With `defence` (`hgt`) on, `armor_p` (`hgt_p`) must be in [0, 1] (`persistence.py`); the bounds
+/// load, values past them do not.
 #[test]
-fn armour_is_bounded_when_defence_is_on() {
+fn propensities_are_bounded_when_their_flag_is_on() {
     let armoured = |v: Value| {
         let mut s = set_save("defence");
         s["cells"][0][14] = v;
@@ -282,6 +282,17 @@ fn armour_is_bounded_when_defence_is_on() {
             "{v}: {}",
             e.message()
         );
+    }
+    let hgt = |v: Value| {
+        let mut s = set_save("hgt");
+        s["cells"][0][13] = v;
+        load(&s)
+    };
+    for v in [json!(0.0), json!(-0.0), json!(1.0), json!(0.5)] {
+        assert!(hgt(v.clone()).is_ok(), "hgt_p {v} refused");
+    }
+    for v in [json!(1.01), json!(-0.01), json!(true)] {
+        assert!(hgt(v.clone()).is_err(), "hgt_p {v} accepted");
     }
     // Python accepts a non-zero `defended` counter whatever the flag (it only reports it).
     let mut s = base_save();

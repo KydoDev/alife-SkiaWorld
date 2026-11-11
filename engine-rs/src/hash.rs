@@ -21,7 +21,12 @@ pub fn state_digest(world: &World) -> [u8; 32] {
     for n in [c.births, c.deaths, c.kills, c.extinctions, c.sex_births] {
         h.update(n.to_le_bytes());
     }
-    let defence = world.cfg.defence; // flag fields are hashed only when their flag is on (M5)
+    // flag fields are hashed only when their flag is on (M5)
+    let (hgt, defence) = (world.cfg.hgt, world.cfg.defence);
+    if hgt {
+        h.update(c.hgt_events.to_le_bytes());
+        h.update(c.hgt_foreign.to_le_bytes());
+    }
     if defence {
         h.update(c.defended.to_le_bytes());
     }
@@ -58,6 +63,9 @@ pub fn state_digest(world: &World) -> [u8; 32] {
             h.update(world.cell(b).id.to_le_bytes());
         }
         h.update(cell.sex_p.to_le_bytes());
+        if hgt {
+            h.update(cell.hgt_p.to_le_bytes());
+        }
         if defence {
             h.update(cell.armor_p.to_le_bytes());
         }
@@ -76,7 +84,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// The first field, in state-hash order, where two worlds differ (`None` if the hashed state
-/// is identical). It also compares the flag fields (`defended`, `armor_p`) when their flag is
+/// is identical). It also compares the flag fields (e.g. `defended`, `armor_p`) when their flag is
 /// off, where the hash skips them: equal hashes do not guarantee `None` for hand-made worlds. Used to diagnose a golden mismatch against a Python save of the same step
 /// (`scripts/g2_golden.py --dump-step`).
 pub fn first_difference(a: &World, b: &World) -> Option<String> {
@@ -92,6 +100,12 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             b.counters.extinctions,
         ),
         ("sex_births", a.counters.sex_births, b.counters.sex_births),
+        ("hgt_events", a.counters.hgt_events, b.counters.hgt_events),
+        (
+            "hgt_foreign",
+            a.counters.hgt_foreign,
+            b.counters.hgt_foreign,
+        ),
         ("defended", a.counters.defended, b.counters.defended),
     ];
     if let Some((name, x, y)) = scalars.iter().find(|(_, x, y)| x != y) {
@@ -148,6 +162,8 @@ pub fn first_difference(a: &World, b: &World) -> Option<String> {
             "bonds"
         } else if ca.sex_p.to_bits() != cb.sex_p.to_bits() {
             "sex_p"
+        } else if ca.hgt_p.to_bits() != cb.hgt_p.to_bits() {
+            "hgt_p"
         } else if ca.armor_p.to_bits() != cb.armor_p.to_bits() {
             "armor_p"
         } else {

@@ -19,9 +19,9 @@
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object are refused;
-//! - **unsupported** (until milestone M5 ports them): saves with `sensing`, `open_genome`, `sex`,
-//!   `plasticity` or `hgt` on are refused; `defence` is ported (M5);
-//! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, `sex_p`, `armor_p`) becomes
+//! - **unsupported** (until milestone M5 ports them): saves with `sensing`, `open_genome`, `sex` or
+//!   `plasticity` on are refused; `defence` and `hgt` are ported (M5);
+//! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, `sex_p`, `hgt_p`, `armor_p`) becomes
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not).
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
 //! - **looser, on purpose**: the species tracker and the per-cell species ids are not validated
@@ -392,7 +392,6 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         ("open_genome", cfg.open_genome),
         ("sex", cfg.sex),
         ("plasticity", cfg.plasticity),
-        ("hgt", cfg.hgt),
     ] {
         if on {
             return Err(err(format!(
@@ -412,10 +411,11 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         kills: count(c.kills, "counter kills")?,
         extinctions: count(c.extinctions, "counter extinctions")?,
         sex_births: count(c.sex_births, "counter sex_births")?,
+        hgt_events: count(c.hgt_events, "counter hgt_events")?,
+        hgt_foreign: count(c.hgt_foreign, "counter hgt_foreign")?,
         defended: count(c.defended, "counter defended")?,
     };
-    // Observer-only counters (F5c): validated as Python does, never read by the kernel.
-    if count(c.hgt_foreign, "counter hgt_foreign")? > count(c.hgt_events, "counter hgt_events")? {
+    if counters.hgt_foreign > counters.hgt_events {
         return Err(err("invalid counters: hgt_foreign exceeds hgt_events"));
     }
     let rng = build_rng(&raw.rng)?;
@@ -528,14 +528,17 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 world.next_id
             )));
         }
-        // With sex, plasticity and hgt off (checked above) Python accepts only zero propensities.
+        // With sex and plasticity off (checked above) Python accepts only zero propensities.
         if !(sex_p.is_finite() && sex_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid sex_p")));
         }
         if !(plast_p.is_finite() && plast_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid plast_p")));
         }
-        if !(hgt_p.is_finite() && hgt_p == 0.0) {
+        // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless the flag is on.
+        let hgt_ok =
+            hgt_p.is_finite() && (0.0..=1.0).contains(&hgt_p) && (world.cfg.hgt || hgt_p == 0.0);
+        if !hgt_ok {
             return Err(err(format!("cell #{id} has an invalid hgt_p")));
         }
         // `persistence.py`: finite, in [0, 1], and zero (or -0.0) unless defence is on.
@@ -553,7 +556,8 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             energy,
             genes,
             count(lineage, "cell lineage")?,
-            armor_p, // keeps the sign of a -0.0 (it is hashed by bits)
+            hgt_p, // both keep the sign of a -0.0 (they are hashed by bits)
+            armor_p,
             &world.cfg,
         );
         cell.age = count(age, "cell age")?;

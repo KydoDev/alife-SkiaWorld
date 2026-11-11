@@ -136,13 +136,13 @@ fn a_save_with_an_unsupported_flag_is_refused_with_its_reason() {
     flate2::read::GzDecoder::new(&golden_bytes("default")[..])
         .read_to_string(&mut json)
         .unwrap();
-    let json = json.replacen("\"hgt\":false", "\"hgt\":true", 1);
+    let json = json.replacen("\"sex\":false", "\"sex\":true", 1);
     let mut gz = Vec::new();
     let mut e = flate2::write::GzEncoder::new(&mut gz, flate2::Compression::fast());
     e.write_all(json.as_bytes()).unwrap();
     e.finish().unwrap();
     assert!(load_bytes(&gz).is_null());
-    assert!(last_error().contains("hgt is on"), "{}", last_error());
+    assert!(last_error().contains("sex is on"), "{}", last_error());
 }
 
 #[test]
