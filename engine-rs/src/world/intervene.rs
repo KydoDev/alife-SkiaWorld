@@ -15,6 +15,12 @@ pub const KIND_RAISE_ROCK: u32 = 3;
 pub const KIND_DIG: u32 = 4;
 pub const KIND_VENT: u32 = 5;
 
+/// Largest organic matter a nutrient edit may leave on a tile. Stricter than Python, which has no bound
+/// (`GameRules` adds 15.0): "finite after the edit" is not enough, since the next step's diffusion sums
+/// neighbours and a tile near `f64::MAX` turns the field infinite, then NaN (ADR-0013 piece 4 security
+/// review). At 1e12 the diffusion sums stay far from overflow, and no game action comes near it.
+pub const MAX_EDIT_ORGANIC: f64 = 1e12;
+
 /// One edit: the record `(kind, x, y, radius, amount)` of ADR-0013 with its unused arguments dropped.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Intervention {
@@ -160,14 +166,17 @@ impl World {
                 amount,
             } => {
                 check_amount("nutrient amount", amount)?;
-                // stricter than Python, which has no bound: every edited tile must stay finite
+                // stricter than Python, which has no bound: every edited tile stays <= MAX_EDIT_ORGANIC
                 let mask = self.disc(x, y, radius);
                 let overflow = (0..mask.len()).any(|i| {
-                    mask[i] && !self.terrain.rock[i] && !(self.organic[i] + amount).is_finite()
+                    mask[i] && !self.terrain.rock[i] && {
+                        let after = self.organic[i] + amount;
+                        after.is_nan() || after > MAX_EDIT_ORGANIC
+                    }
                 });
                 if overflow {
                     return Err(InterventionError::new(format!(
-                        "adding {amount} would make organic matter non-finite"
+                        "adding {amount} would push organic matter above {MAX_EDIT_ORGANIC} on a tile"
                     )));
                 }
                 Ok(())

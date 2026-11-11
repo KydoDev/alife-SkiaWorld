@@ -124,7 +124,8 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
 - Every constant comes from the loaded `Config`; unknown config keys are an error.
 - Save loading in Rust validates like `persistence.py` (untrusted input) and returns an
   error, never panics.
-- FFI (M4, from the M1c security review): expose only the save loaders, `ws_world_create` (ADR-0012) and
+- FFI (M4, from the M1c security review): expose only the save loaders, `ws_world_create` (ADR-0012),
+  `ws_world_intervene` (ADR-0013: validated domain edits, refused with `WS_ERR_INVALID` before any write) and
   `step` (plus read-only views), never `World::from_parts` or raw field writes; wrap every entry point in `catch_unwind` (`rng.rs` still
   has `assert!`s). Before the cdylib ships: CI builds with `--locked` and runs `cargo audit`/`cargo deny`.
 - A rule change in `worldsim/` that touches the default dynamics regenerates the golden
@@ -488,3 +489,23 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   amounts and a nutrient overflow leave the state hash, terrain digest and render unchanged; `radius = u32::MAX`
   equals `W + H`; no edit draws from the RNG. pytest: the committed file equals this Python (xfail off its OS) and
   `iv_game` ends where `play.replay` with free tools does.
+- **ADR-0013 piece 4, `ws_world_intervene` (C ABI 3)** (2026-11-11, Windows 11, Unity 6000.5.6f1): the C ABI gains
+  `ws_world_intervene(handle, kind, x, y, radius, amount, out_changed)` with `WS_EDIT_NUTRIENTS..WS_EDIT_VENT` (1-5)
+  and `WS_ERR_INVALID = -5` (a refusal: nothing changed, `*out_changed` untouched, handle not poisoned; a panic
+  still poisons); **`WS_ABI_VERSION` 2 -> 3**, with the Unity wrapper (`NativeWorld.Intervene`, `Edit`,
+  `WorldSimException.Status` and the status constants). Security review before the commit: one blocker, fixed. The
+  nutrient check of piece 3 refused only sums that were non-finite at once, so an edit just under `f64::MAX` was
+  accepted and the next step's diffusion overflowed to inf, then NaN (unsaveable state, NaN energy). Nutrient edits
+  are now refused when any edited tile would exceed `MAX_EDIT_ORGANIC = 1e12`; this is stricter than Python (no
+  bound; `GameRules` adds 15.0) and only refuses, as ADR-0013 Decision 3 allows. Regression test: a whole-world edit
+  at the cap, then 50 steps, all organic and energy finite. Should-fixes applied: the FFI rule above, boundary
+  refusal tests compare the render too (rock, chem, light), the Unity vector test asserts step order. Review notes
+  left as they are: two O(W*H) masks per nutrient call and a plume per vent call (a few ms and up to about 16 MB at
+  10^6 tiles: a front-end applies edits on clicks, not every frame); a null `out_changed` on a poisoned handle
+  reports `WS_ERR_ARGUMENT`. Verdict: **met**. FFI tests: every interventions case through the ABI (return value and
+  hash after each action, hashes at action steps and at the end), the handle equal to `World::intervene` over five
+  edits with steps between, and 17 refusals (null handle, null `out_changed`, kinds 0 and 6, `x = W`, `y = H`,
+  `x = u32::MAX`, non-zero unused arguments, NaN, infinite, negative and `-0.0` amounts, sums above the cap) each
+  leaving hash and render unchanged and the handle usable; the poisoned handle refuses an edit. Unity EditMode
+  **12/12** (new: every interventions case through P/Invoke; a refused edit throws `StatusInvalid` and changes
+  neither hash nor render).

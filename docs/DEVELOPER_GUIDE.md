@@ -103,6 +103,9 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
 - **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
   form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms
   and images themselves stay in Python; a kernel-made world cannot be saved yet.
+- **Edits** (ADR-0013): `NativeWorld.Intervene(Edit, x, y, radius, amount)` applies a G1 tool between steps,
+  bit-exact with `worldsim/play.py`; a refusal throws `WorldSimException` with `Status == StatusInvalid` and leaves
+  the world as it was. The viewer's tools come with piece 5.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

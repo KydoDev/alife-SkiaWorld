@@ -1,4 +1,4 @@
-// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 2).
+// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 3).
 // No UnityEngine dependency: this file is plain C# and is exercised by the EditMode tests.
 using System;
 using System.Runtime.InteropServices;
@@ -19,10 +19,35 @@ namespace WorldSim
         public ulong Kills;
     }
 
+    /// <summary>The five G1 edits of `ws_world_intervene` (`WS_EDIT_*`; ADR-0013).</summary>
+    public enum Edit : uint
+    {
+        Nutrients = 1,
+        Meteorite = 2,
+        RaiseRock = 3,
+        Dig = 4,
+        Vent = 5,
+    }
+
     /// <summary>A call into the kernel failed; the message comes from `ws_last_error`.</summary>
     public sealed class WorldSimException : Exception
     {
-        public WorldSimException(string message) : base(message) { }
+        /// <summary>`WS_ERR_INVALID`: an edit the kernel refused; the world is unchanged and still usable.</summary>
+        public const int StatusInvalid = -5;
+
+        /// <summary>`WS_ERR_PANIC`: the kernel caught a panic; the world may be half-updated and is now unusable.</summary>
+        public const int StatusPanic = -3;
+
+        /// <summary>`WS_ERR_POISONED`: the world was made unusable by an earlier panic.</summary>
+        public const int StatusPoisoned = -4;
+
+        public WorldSimException(string message, int status = 0) : base(message)
+        {
+            Status = status;
+        }
+
+        /// <summary>The kernel's status code, or 0 when the failure has none (a null handle from load or create).</summary>
+        public int Status { get; }
     }
 
     /// <summary>Owns one kernel world; released exactly once by the runtime.</summary>
@@ -59,6 +84,10 @@ namespace WorldSim
         internal static extern int ws_world_step(WorldHandle handle, uint steps);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_intervene(WorldHandle handle, uint kind, uint x, uint y, uint radius,
+                                                      double amount, out ulong changed);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int ws_world_info(WorldHandle handle, out WorldInfo info);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
@@ -77,7 +106,7 @@ namespace WorldSim
     public sealed class NativeWorld : IDisposable
     {
         /// <summary>The ABI this wrapper was written for (`WS_ABI_VERSION`).</summary>
-        public const uint AbiVersion = 2;
+        public const uint AbiVersion = 3;
 
         private const int HashLength = 64;
         private readonly WorldHandle _handle;
@@ -161,6 +190,19 @@ namespace WorldSim
             Check(Native.ws_world_step(_handle, steps));
         }
 
+        /// <summary>
+        /// Apply one G1 edit between steps, as Python's `play.py` does, and return its value: tiles changed
+        /// (nutrients, rock, dig), cells killed (meteorite), or 1/0 for a vent (0 on rock). <paramref name="radius"/>
+        /// must be 0 for a vent; <paramref name="amount"/> (organic per tile, or `max_chem` for a vent) must be 0 for
+        /// the other edits. A refusal throws <see cref="WorldSimException"/> with
+        /// <see cref="WorldSimException.StatusInvalid"/> and leaves the world unchanged.
+        /// </summary>
+        public ulong Intervene(Edit kind, uint x, uint y, uint radius, double amount)
+        {
+            Check(Native.ws_world_intervene(_handle, (uint)kind, x, y, radius, amount, out ulong changed));
+            return changed;
+        }
+
         /// <summary>The state hash, comparable with the golden `hashes.csv`.</summary>
         public string StateHash()
         {
@@ -192,7 +234,7 @@ namespace WorldSim
             }
             if (status != 0)
             {
-                throw new WorldSimException($"kernel error {status}: {LastError()}");
+                throw new WorldSimException($"kernel error {status}: {LastError()}", status);
             }
         }
 

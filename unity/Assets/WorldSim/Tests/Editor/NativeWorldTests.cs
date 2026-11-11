@@ -27,6 +27,34 @@ namespace WorldSim.Tests
         private static NativeWorld LoadStart(string set) =>
             NativeWorld.Load(File.ReadAllBytes(Path.Combine(GoldenDir(set), "start.json.gz")));
 
+        // interventions.json (scripts/g2_intervention_vectors.py), the fields this test reads
+        [System.Serializable]
+        private class IvAction
+        {
+            public ulong step;
+            public uint kind;
+            public uint x;
+            public uint y;
+            public uint radius;
+            public double amount;
+            public ulong ret;
+            public string hash;
+        }
+
+        [System.Serializable]
+        private class IvCase
+        {
+            public string name;
+            public string set;
+            public IvAction[] actions;
+        }
+
+        [System.Serializable]
+        private class IvFile
+        {
+            public IvCase[] cases;
+        }
+
         private static byte[] Gunzip(string path)
         {
             using var file = File.OpenRead(path);
@@ -81,6 +109,49 @@ namespace WorldSim.Tests
             Assert.AreEqual(rows[0][2], world.StateHash(), $"{set}: step 0");
             world.Step(100);
             Assert.AreEqual(rows[100][2], world.StateHash(), $"{set}: step 100");
+        }
+
+        [Test]
+        public void EditsFollowTheInterventionsVectors()
+        {
+            string path = Path.Combine(GoldenDir(""), "interventions.json");
+            IvFile file = JsonUtility.FromJson<IvFile>(File.ReadAllText(path));
+            Assert.AreEqual(5, file.cases.Length);
+            foreach (IvCase c in file.cases)
+            {
+                using NativeWorld world = LoadStart(c.set);
+                foreach (IvAction a in c.actions)
+                {
+                    ulong now = world.Info.StepCount;
+                    Assert.GreaterOrEqual(a.step, now, $"{c.name}: actions in step order, after the save");
+                    world.Step((uint)(a.step - now));
+                    ulong changed = world.Intervene((Edit)a.kind, a.x, a.y, a.radius, a.amount);
+                    Assert.AreEqual(a.ret, changed, $"{c.name} at step {a.step}: return value");
+                    Assert.AreEqual(a.hash, world.StateHash(), $"{c.name} at step {a.step}: state hash");
+                }
+            }
+        }
+
+        [Test]
+        public void ARefusedEditThrowsAndChangesNothing()
+        {
+            using NativeWorld world = LoadStart("default");
+            string before = world.StateHash();
+            var rgbBefore = new byte[world.RgbLength];
+            world.RenderRgb(rgbBefore);
+            var e = Assert.Throws<WorldSimException>(
+                () => world.Intervene(Edit.Nutrients, world.Info.Width, 0, 2, 15.0));
+            Assert.AreEqual(WorldSimException.StatusInvalid, e.Status);
+            StringAssert.Contains("outside", e.Message);
+            e = Assert.Throws<WorldSimException>(() => world.Intervene(Edit.Vent, 3, 3, 1, 4.0));
+            StringAssert.Contains("radius must be 0", e.Message);
+            e = Assert.Throws<WorldSimException>(() => world.Intervene(Edit.Dig, 3, 3, 2, 1.0));
+            StringAssert.Contains("amount must be 0", e.Message);
+            Assert.AreEqual(before, world.StateHash());
+            var rgbAfter = new byte[world.RgbLength];
+            world.RenderRgb(rgbAfter);
+            CollectionAssert.AreEqual(rgbBefore, rgbAfter);   // rock, chem and light untouched too
+            world.Step(1);   // still usable after a refused edit
         }
 
         [Test]

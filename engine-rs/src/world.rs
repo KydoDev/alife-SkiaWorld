@@ -20,7 +20,7 @@ use crate::N_GENES;
 mod intervene;
 pub use intervene::{
     Intervention, InterventionError, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK,
-    KIND_VENT,
+    KIND_VENT, MAX_EDIT_ORGANIC,
 };
 
 /// Index of a cell in [`World::slab`].

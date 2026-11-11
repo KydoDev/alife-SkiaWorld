@@ -1,8 +1,9 @@
 //! C ABI for front-ends (G2 M4: Unity through P/Invoke).
 //!
 //! Only what `docs/G2_PLAN.md` allows across the boundary: loading a save, creating a world from a
-//! config and a seed (ADR-0012), stepping, and read-only views (sizes, state hash, an RGB render).
-//! Nothing writes world fields.
+//! config and a seed (ADR-0012), stepping, the five validated G1 edits (ADR-0013), and read-only views
+//! (sizes, state hash, an RGB render). No raw field writes: an edit is a domain operation that the core
+//! validates before changing anything.
 //!
 //! Contract for every function:
 //! - A world is an opaque handle from [`ws_world_load`] or [`ws_world_create`], released with
@@ -10,14 +11,17 @@
 //! - Status codes: [`WS_OK`] (0) or a negative error; the message of the last failure on this
 //!   thread is copied out by [`ws_last_error`].
 //! - Pointers are checked for null and buffers for their exact length; no panic crosses the
-//!   boundary (each entry point runs inside `catch_unwind`). A panic inside a step may leave the
-//!   world half-updated, so the handle is then poisoned and every later call on it fails.
+//!   boundary (each entry point runs inside `catch_unwind`). A panic inside a step or an edit may
+//!   leave the world half-updated, so the handle is then poisoned and every later call on it fails.
+//!   A refused edit ([`WS_ERR_INVALID`]) changed nothing and does not poison the handle.
 //! - A handle must not be used from two threads at once, nor after it is freed.
 
 use crate::hash::state_hash;
 use crate::render::{render_rgb, rgb_len};
 use crate::save::{config_from_json, world_from_gzip, MAX_SAVE_BYTES};
-use crate::world::World;
+use crate::world::{
+    Intervention, World, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK, KIND_VENT,
+};
 use std::cell::RefCell;
 use std::fmt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -27,8 +31,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 compile_error!("the C ABI needs panic = unwind");
 
 /// One counter for the whole ABI, bumped once per commit that changes it (an added entry point
-/// included, ADR-0012); front-ends refuse a mismatch. 2: [`ws_world_create`].
-pub const WS_ABI_VERSION: u32 = 2;
+/// included, ADR-0012); front-ends refuse a mismatch. 2: [`ws_world_create`]; 3:
+/// [`ws_world_intervene`] and [`WS_ERR_INVALID`] (ADR-0013).
+pub const WS_ABI_VERSION: u32 = 3;
 
 pub const WS_OK: i32 = 0;
 /// A null pointer or a buffer of the wrong size.
@@ -37,6 +42,16 @@ pub const WS_ERR_ARGUMENT: i32 = -1;
 pub const WS_ERR_PANIC: i32 = -3;
 /// The handle was poisoned by an earlier panic.
 pub const WS_ERR_POISONED: i32 = -4;
+/// An edit the core refused (bad kind, tile or amount); nothing changed and the handle stays usable.
+/// (-2 is unused; the list is appended to, not back-filled.)
+pub const WS_ERR_INVALID: i32 = -5;
+
+/// Edit kinds of [`ws_world_intervene`]; 0 is never an action, so zeroed memory is refused.
+pub const WS_EDIT_NUTRIENTS: u32 = KIND_NUTRIENTS;
+pub const WS_EDIT_METEORITE: u32 = KIND_METEORITE;
+pub const WS_EDIT_RAISE_ROCK: u32 = KIND_RAISE_ROCK;
+pub const WS_EDIT_DIG: u32 = KIND_DIG;
+pub const WS_EDIT_VENT: u32 = KIND_VENT;
 
 /// Length of the hex state hash written by [`ws_world_state_hash`].
 pub const WS_HASH_LEN: usize = 64;
@@ -243,6 +258,45 @@ pub unsafe extern "C" fn ws_world_step(handle: *mut WsWorld, steps: u32) -> i32 
     }
 }
 
+/// Apply one G1 edit between steps (`worldsim/play.py`, bit-exact; ADR-0013) and write its value into
+/// `*out_changed`: tiles changed for nutrients, raise rock and dig, cells killed for a meteorite, 1 or 0
+/// (on rock) for a vent. `kind` is a `WS_EDIT_*` code; `radius` is unused (must be 0) for a vent and
+/// `amount` (organic per tile for nutrients, `max_chem` for a vent) must be 0 for the other kinds.
+/// Refused with [`WS_ERR_INVALID`], the reason in [`ws_last_error`], `*out_changed` untouched and the
+/// world unchanged: an unknown kind, a tile outside the world, a used unused argument, an amount that
+/// is NaN, infinite or negative (`-0.0` included), or nutrients that would leave more than
+/// `world::MAX_EDIT_ORGANIC` (1e12) on a tile, so later steps stay finite. Work is O(width * height) per call (at most 10^6 tiles); it blocks the calling thread.
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out_changed` is null or writable.
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_intervene(
+    handle: *mut WsWorld,
+    kind: u32,
+    x: u32,
+    y: u32,
+    radius: u32,
+    amount: f64,
+    out_changed: *mut u64,
+) -> i32 {
+    if out_changed.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null out_changed pointer");
+    }
+    // SAFETY: forwarded caller guarantee; `out_changed` checked non-null.
+    unsafe {
+        with_world_mut(handle, |w| {
+            match Intervention::from_raw(kind, x, y, radius, amount).and_then(|iv| w.intervene(iv))
+            {
+                Ok(changed) => {
+                    *out_changed = changed;
+                    WS_OK
+                }
+                Err(e) => fail(WS_ERR_INVALID, e.message()),
+            }
+        })
+    }
+}
+
 /// Copy sizes and counters into `*out`.
 ///
 /// # Safety
@@ -377,6 +431,12 @@ mod tests {
             );
             let mut rgb = vec![0u8; 3];
             assert_eq!(ws_world_render_rgb(h, rgb.as_mut_ptr(), 3), WS_ERR_POISONED);
+            let mut changed = 7u64;
+            assert_eq!(
+                ws_world_intervene(h, WS_EDIT_NUTRIENTS, 1, 1, 2, 15.0, &mut changed),
+                WS_ERR_POISONED
+            );
+            assert_eq!(changed, 7);
             ws_world_free(h);
         }
     }

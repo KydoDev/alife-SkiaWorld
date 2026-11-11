@@ -295,3 +295,197 @@ fn bad_configs_return_null_with_a_message() {
         last_error()
     );
 }
+
+// ------------------------------------------------------------------ interventions (ADR-0013)
+
+fn intervene(h: *mut WsWorld, kind: u32, x: u32, y: u32, radius: u32, amount: f64) -> (i32, u64) {
+    let mut changed = u64::MAX; // a refusal must leave it untouched
+    let code = unsafe { ws_world_intervene(h, kind, x, y, radius, amount, &mut changed) };
+    (code, changed)
+}
+
+fn render_of(h: *mut WsWorld) -> Vec<u8> {
+    let mut info = WsInfo::default();
+    assert_eq!(unsafe { ws_world_info(h, &mut info) }, WS_OK);
+    let mut rgb = vec![0u8; info.width as usize * info.height as usize * 3];
+    assert_eq!(
+        unsafe { ws_world_render_rgb(h, rgb.as_mut_ptr(), rgb.len()) },
+        WS_OK
+    );
+    rgb
+}
+
+fn interventions_vectors() -> serde_json::Value {
+    let path = common::golden_root().join("interventions.json");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    serde_json::from_str(&text).expect("interventions.json")
+}
+
+#[test]
+fn interventions_through_the_abi_follow_the_vectors() {
+    let v = interventions_vectors();
+    for case in v["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let h = load_bytes(&golden_bytes(case["set"].as_str().unwrap()));
+        assert!(!h.is_null(), "{name}: {}", last_error());
+        let hashes = case["hashes"].as_array().unwrap();
+        let mut info = WsInfo::default();
+        let mut row = 0;
+        for a in case["actions"].as_array().unwrap() {
+            let step = a["step"].as_u64().unwrap();
+            assert_eq!(unsafe { ws_world_info(h, &mut info) }, WS_OK);
+            if step > info.step_count {
+                assert_eq!(
+                    unsafe { ws_world_step(h, (step - info.step_count) as u32) },
+                    WS_OK
+                );
+                row += (step - info.step_count) as usize;
+                assert_eq!(
+                    hash_of(h),
+                    hashes[row][2].as_str().unwrap(),
+                    "{name}: step {step}"
+                );
+            }
+            let u = |k: &str| a[k].as_u64().unwrap() as u32;
+            let (code, changed) = intervene(
+                h,
+                u("kind"),
+                u("x"),
+                u("y"),
+                u("radius"),
+                a["amount"].as_f64().unwrap(),
+            );
+            assert_eq!(code, WS_OK, "{name} at step {step}: {}", last_error());
+            assert_eq!(changed, a["ret"].as_u64().unwrap(), "{name} at step {step}");
+            assert_eq!(
+                hash_of(h),
+                a["hash"].as_str().unwrap(),
+                "{name} at step {step}"
+            );
+        }
+        let rest = (hashes.len() - 1 - row) as u32;
+        assert_eq!(unsafe { ws_world_step(h, rest) }, WS_OK);
+        assert_eq!(
+            hash_of(h),
+            hashes.last().unwrap()[2].as_str().unwrap(),
+            "{name}: end"
+        );
+        unsafe { ws_world_free(h) };
+    }
+}
+
+#[test]
+fn the_handle_of_an_edited_world_equals_world_intervene() {
+    use worldsim_core::world::Intervention;
+    let bytes = golden_bytes("volcanic");
+    let h = load_bytes(&bytes);
+    let mut world =
+        worldsim_core::save::world_from_gzip(&bytes, worldsim_core::save::MAX_SAVE_BYTES).unwrap();
+    let edits = [
+        (WS_EDIT_NUTRIENTS, 10, 5, 4, 15.0),
+        (WS_EDIT_METEORITE, 70, 30, 6, 0.0),
+        (WS_EDIT_RAISE_ROCK, 20, 2, 3, 0.0),
+        (WS_EDIT_VENT, 120, 30, 0, 4.0),
+        (WS_EDIT_DIG, 20, 2, 5, 0.0),
+    ];
+    for (kind, x, y, radius, amount) in edits {
+        let (code, changed) = intervene(h, kind, x, y, radius, amount);
+        assert_eq!(code, WS_OK, "{}", last_error());
+        let want = world
+            .intervene(Intervention::from_raw(kind, x, y, radius, amount).unwrap())
+            .unwrap();
+        assert_eq!(changed, want, "kind {kind}");
+        assert_eq!(
+            hash_of(h),
+            worldsim_core::hash::state_hash(&world),
+            "kind {kind}"
+        );
+        assert_eq!(unsafe { ws_world_step(h, 3) }, WS_OK);
+        for _ in 0..3 {
+            world.step();
+        }
+    }
+    assert_eq!(hash_of(h), worldsim_core::hash::state_hash(&world));
+    unsafe { ws_world_free(h) };
+}
+
+#[test]
+fn refused_edits_change_nothing_and_keep_the_handle_usable() {
+    let bytes = golden_bytes("default");
+    let h = load_bytes(&bytes);
+    let mut info = WsInfo::default();
+    assert_eq!(unsafe { ws_world_info(h, &mut info) }, WS_OK);
+    let (w, hh) = (info.width, info.height);
+    let mut changed = 0u64;
+    // null handle and null out pointer are argument errors
+    assert_eq!(
+        unsafe {
+            ws_world_intervene(
+                std::ptr::null_mut(),
+                WS_EDIT_DIG,
+                0,
+                0,
+                1,
+                0.0,
+                &mut changed,
+            )
+        },
+        WS_ERR_ARGUMENT
+    );
+    assert!(last_error().contains("null world handle"));
+    assert_eq!(
+        unsafe { ws_world_intervene(h, WS_EDIT_DIG, 0, 0, 1, 0.0, std::ptr::null_mut()) },
+        WS_ERR_ARGUMENT
+    );
+    assert!(last_error().contains("out_changed"));
+    // a big nutrient pile on one tile, so a second one passes the cap
+    assert_eq!(intervene(h, WS_EDIT_NUTRIENTS, 5, 5, 0, 5e11), (WS_OK, 1));
+    let before = (hash_of(h), render_of(h));
+    let bad: [(u32, u32, u32, u32, f64, &str); 17] = [
+        (0, 1, 1, 1, 0.0, "unknown intervention kind 0"),
+        (6, 1, 1, 1, 0.0, "unknown intervention kind 6"),
+        (WS_EDIT_METEORITE, w, 0, 1, 0.0, "outside"),
+        (WS_EDIT_DIG, 0, hh, 1, 0.0, "outside"),
+        (WS_EDIT_VENT, u32::MAX, 0, 0, 4.0, "outside"),
+        (WS_EDIT_METEORITE, 1, 1, 1, 1.0, "amount must be 0"),
+        (WS_EDIT_RAISE_ROCK, 1, 1, 1, -0.0, "amount must be 0"),
+        (WS_EDIT_DIG, 1, 1, 1, f64::NAN, "amount must be 0"),
+        (WS_EDIT_VENT, 1, 1, 1, 4.0, "radius must be 0"),
+        (WS_EDIT_NUTRIENTS, 1, 1, 1, f64::NAN, "finite"),
+        (WS_EDIT_NUTRIENTS, 1, 1, 1, f64::INFINITY, "finite"),
+        (WS_EDIT_NUTRIENTS, 1, 1, 1, -1.0, ">= 0"),
+        (WS_EDIT_NUTRIENTS, 1, 1, 1, -0.0, ">= 0"),
+        (WS_EDIT_VENT, 1, 1, 0, f64::NAN, "max_chem"),
+        (WS_EDIT_VENT, 1, 1, 0, -2.0, "max_chem"),
+        (WS_EDIT_NUTRIENTS, 5, 5, 2, 6e11, "above"),
+        (WS_EDIT_NUTRIENTS, 30, 30, 2, f64::MAX, "above"),
+    ];
+    for (kind, x, y, radius, amount, msg) in bad {
+        let (code, changed) = intervene(h, kind, x, y, radius, amount);
+        assert_eq!(
+            code, WS_ERR_INVALID,
+            "{kind} ({x}, {y}) r {radius} a {amount}"
+        );
+        assert!(last_error().contains(msg), "{}", last_error());
+        assert_eq!(changed, u64::MAX, "out_changed written on refusal");
+        // the state hash covers organic and cells, the render rock, chem and light
+        assert_eq!(
+            (hash_of(h), render_of(h)),
+            before,
+            "{kind}: refused but changed"
+        );
+    }
+    // still usable: steps like a handle that never saw the refusals
+    let twin = load_bytes(&bytes);
+    assert_eq!(
+        intervene(twin, WS_EDIT_NUTRIENTS, 5, 5, 0, 5e11),
+        (WS_OK, 1)
+    );
+    assert_eq!(unsafe { ws_world_step(h, 5) }, WS_OK);
+    assert_eq!(unsafe { ws_world_step(twin, 5) }, WS_OK);
+    assert_eq!(hash_of(h), hash_of(twin));
+    unsafe {
+        ws_world_free(h);
+        ws_world_free(twin);
+    }
+}

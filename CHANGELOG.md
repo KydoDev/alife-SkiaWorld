@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0013 piece 4, `ws_world_intervene` (C ABI 3)**: front-ends apply the five G1 edits through the C ABI;
+  a refused edit returns `WS_ERR_INVALID` and changes nothing. The Unity wrapper gains `NativeWorld.Intervene`.
 - **ADR-0013 piece 3, `World::intervene`**: the kernel applies the five G1 edits (nutrients, meteorite, raise rock,
   dig, vent) bit-exactly with Python's `play.py`, validating every input before any change; new golden kind
   `interventions.json` (`scripts/g2_intervention_vectors.py`, written by `g2_golden.py --all`).
@@ -274,6 +276,8 @@ All notable changes to this project are documented here. Format based on
 - CI smoke run also generates planets from a form and an image.
 
 ### Security
+- **Nutrient edits are capped at 1e12 organic per tile** (`MAX_EDIT_ORGANIC`): an edit near the float maximum
+  passed the "finite" check and the next step turned the field infinite, then NaN (ADR-0013 piece 4 review).
 - Planet forms, images and saves are treated as untrusted (review 2026-11-10): bounded
   config values, file-size and decompressed-size caps (gzip bombs), image format whitelist
   (PNG/JPEG/WEBP/BMP/GIF) and pixel cap, counter whitelist, finite/range checks on maps,

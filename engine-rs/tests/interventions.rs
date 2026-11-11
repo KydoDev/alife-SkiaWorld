@@ -9,6 +9,7 @@ use worldsim_core::hash::state_hash;
 use worldsim_core::save::load_world;
 use worldsim_core::world::{
     Intervention, World, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK, KIND_VENT,
+    MAX_EDIT_ORGANIC,
 };
 
 fn world(set: &str) -> World {
@@ -120,21 +121,59 @@ fn a_nutrient_overflow_is_refused_before_any_tile_changes() {
         x: 5,
         y: 5,
         radius: 0,
-        amount: f64::MAX,
+        amount: 0.5 * MAX_EDIT_ORGANIC,
     };
     assert_eq!(w.intervene(big), Ok(1));
     let before = fingerprint(&w);
-    // the disc of radius 3 holds one tile that would overflow and many that would not: none may change
+    // the disc of radius 3 holds one tile that would pass the cap and many that would not: none may change
     let err = w
         .intervene(Intervention::Nutrients {
             x: 5,
             y: 5,
             radius: 3,
-            amount: f64::MAX,
+            amount: 0.6 * MAX_EDIT_ORGANIC,
         })
         .expect_err("overflow accepted");
-    assert!(err.message().contains("non-finite"), "{}", err.message());
+    assert!(err.message().contains("above"), "{}", err.message());
     assert_eq!(fingerprint(&w), before);
+    for amount in [f64::MAX, MAX_EDIT_ORGANIC] {
+        let edit = Intervention::Nutrients {
+            x: 30,
+            y: 30,
+            radius: 1,
+            amount,
+        };
+        assert!(w.intervene(edit).is_err(), "{amount} accepted");
+    }
+}
+
+#[test]
+fn the_largest_accepted_nutrients_keep_every_later_step_finite() {
+    // regression (piece 4 security review): an edit just under f64::MAX passed a "finite now" check and the
+    // next step's diffusion overflowed; at the cap, the whole world stepped on stays finite
+    let mut w = world("default");
+    let whole = (w.width + w.height) as u32;
+    let top = w.organic.iter().copied().fold(0.0, f64::max);
+    let edit = Intervention::Nutrients {
+        x: 0,
+        y: 0,
+        radius: whole,
+        amount: MAX_EDIT_ORGANIC - top,
+    };
+    assert!(w.intervene(edit).unwrap() > 0);
+    for _ in 0..50 {
+        w.step();
+        assert!(
+            w.organic.iter().all(|o| o.is_finite()),
+            "step {}",
+            w.step_count
+        );
+        assert!(
+            w.cells().all(|c| c.energy.is_finite()),
+            "step {}",
+            w.step_count
+        );
+    }
 }
 
 #[test]
