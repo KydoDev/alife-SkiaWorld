@@ -100,6 +100,8 @@ runs (same seed, before/after), not only by unit tests.
   diet update uses no RNG and the phenotype is always derived from the diet when on (ADR-0009).
 - **Gene transfer (F5c)**: `Cell.hgt_p` and `transfer_gene()` act only when `cfg.hgt` is on (no RNG when off);
   a transfer changes the genome for life and re-runs `express()`; species stay as assigned at birth (ADR-0010).
+- **Prey defence (F5e)**: `Cell.armor_p` exists only when `cfg.defence` is on; the failed-attack draw happens only
+  when on and not `defence_neutral` (no RNG otherwise); a repelled attack moves no energy (ADR-0011).
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **F5e Prey defence** (ADR-0011): `--set defence=1` gives cells an evolvable armour `armor_p`; an attack
+  fails with chance `armor_p` x `defence_strength` (0.8, capped at 0.95), at a cost of `defence_upkeep` (0.2)
+  x `armor_p` per step; neutral arm `defence_neutral`. Save format v8 (`armor_p` per cell, counter `defended`;
+  Rust loader reads v8 and refuses `defence` until M5, golden saves regenerated, hashes unchanged); stats
+  `armor_p_mean`/`defended`; `armor` in the viewer inspector. Experiment `scripts/f5e_experiment.py` (P1
+  standard): armour beneficial (20/20) and selected (19/20), lives about 4x longer (median 28 vs 7.5 steps,
+  20/20), but the pre-registered long-life-world criterion fails at 15/20 (short lives on volcanic runs with
+  many predators).
 - **World study** (`scripts/world_study.py`, criteria pre-registered): lives are short because predation is diffuse
   (most kills by mostly photo/chemo cells). No predation, cost or specialisation setting gives a stable long-life
   world: the best 10k-step setting failed the 30k check on 20 pairs (7/20). A pilot of memory regulators (not

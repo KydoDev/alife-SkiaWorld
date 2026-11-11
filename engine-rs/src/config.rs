@@ -120,6 +120,11 @@ config_fields! {
     hgt_neutral: bool,
     hgt_rate: f64 [0, 1],
     hgt_upkeep: f64 [0, 10],
+    // prey defence (F5e)
+    defence: bool,
+    defence_neutral: bool,
+    defence_strength: f64 [0, 0.95],
+    defence_upkeep: f64 [0, 10],
     // reproduction
     body_cost: f64,
     div_min: f64,

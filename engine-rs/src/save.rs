@@ -46,7 +46,7 @@ pub const FORMAT: &str = "worldsim-save";
 pub const MAX_SAVE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// `persistence.CELL_ROW_LEN`: fields per cell row.
-pub const CELL_ROW_LEN: usize = 14;
+pub const CELL_ROW_LEN: usize = 15;
 
 /// Largest step, id, age, lineage or event counter accepted from a save: far above anything a
 /// run reaches, and far enough below `u64::MAX` that no later increment can overflow.
@@ -124,6 +124,7 @@ struct RawCounters {
     sex_births: u64,
     hgt_events: u64,
     hgt_foreign: u64,
+    defended: u64,
 }
 
 #[derive(Deserialize)]
@@ -141,7 +142,7 @@ struct RawTerrain {
     sun: Capped<f64, MAX_SIDE>,
 }
 
-/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p]`.
+/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p, armor_p]`.
 /// Rules and diet must be empty with their flags off (checked by the cap of 0).
 #[derive(Deserialize)]
 #[allow(dead_code)] // rules and diet (fields 9, 12) are only length-checked
@@ -159,6 +160,7 @@ struct RawCell(
     f64,
     f64,
     Capped<IgnoredAny, 0>,
+    f64,
     f64,
 );
 
@@ -388,6 +390,7 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         ("sex", cfg.sex),
         ("plasticity", cfg.plasticity),
         ("hgt", cfg.hgt),
+        ("defence", cfg.defence),
     ] {
         if on {
             return Err(err(format!(
@@ -408,7 +411,8 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
         extinctions: count(c.extinctions, "counter extinctions")?,
         sex_births: count(c.sex_births, "counter sex_births")?,
     };
-    // Observer-only counters (F5c): validated as Python does, never read by the kernel.
+    // Observer-only counters (F5c, F5e): validated as Python does, never read by the kernel.
+    count(c.defended, "counter defended")?;
     if count(c.hgt_foreign, "counter hgt_foreign")? > count(c.hgt_events, "counter hgt_events")? {
         return Err(err("invalid counters: hgt_foreign exceeds hgt_events"));
     }
@@ -481,8 +485,23 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
     let mut by_id: HashMap<u64, CellRef> = HashMap::new();
     let mut bond_ids: Vec<Vec<u64>> = Vec::with_capacity(rows.len().min(w * h));
     for row in rows {
-        let RawCell(id, x, y, energy, age, genes, lineage, _, bonds, _, sex_p, plast_p, _, hgt_p) =
-            row;
+        let RawCell(
+            id,
+            x,
+            y,
+            energy,
+            age,
+            genes,
+            lineage,
+            _,
+            bonds,
+            _,
+            sex_p,
+            plast_p,
+            _,
+            hgt_p,
+            armor_p,
+        ) = row;
         if !(x < w as u64 && y < h as u64) {
             return Err(err(format!("cell #{id} outside the grid at ({x}, {y})")));
         }
@@ -505,7 +524,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
                 world.next_id
             )));
         }
-        // With sex, plasticity and hgt off (checked above) Python accepts only zero sex_p / plast_p / hgt_p.
+        // With sex, plasticity, hgt and defence off (checked above) Python accepts only zero propensities.
         if !(sex_p.is_finite() && sex_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid sex_p")));
         }
@@ -514,6 +533,9 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
         }
         if !(hgt_p.is_finite() && hgt_p == 0.0) {
             return Err(err(format!("cell #{id} has an invalid hgt_p")));
+        }
+        if !(armor_p.is_finite() && armor_p == 0.0) {
+            return Err(err(format!("cell #{id} has an invalid armor_p")));
         }
         let r = world.slab.len() as CellRef;
         let mut cell = Cell::new(

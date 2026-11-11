@@ -107,6 +107,10 @@ fn malformed_saves_are_refused() {
         ),
         (with(|s| s["config"]["sex"] = json!(true)), "sex is on"),
         (with(|s| s["config"]["hgt"] = json!(true)), "hgt is on"),
+        (
+            with(|s| s["config"]["defence"] = json!(true)),
+            "defence is on",
+        ),
         (with(|s| s["seed"] = json!(1.5)), BAD),
         (
             with(|s| {
@@ -207,6 +211,7 @@ fn malformed_saves_are_refused() {
         (with(|s| s["cells"][0][10] = json!(0.5)), "sex_p"),
         (with(|s| s["cells"][0][11] = json!(0.5)), "plast_p"),
         (with(|s| s["cells"][0][13] = json!(0.5)), "hgt_p"),
+        (with(|s| s["cells"][0][14] = json!(0.5)), "armor_p"),
         (
             with(|s| s["counters"]["hgt_foreign"] = json!(1)),
             "hgt_foreign exceeds hgt_events",

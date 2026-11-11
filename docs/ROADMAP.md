@@ -210,6 +210,27 @@ See the dedicated section. In short: from a fixed vector to a **variable-length 
 - **Check at 30k steps on the 20 P1 pairs** ([world_study_check.csv](world_study_check.csv)): **rejected, 7/20** (needed 16). Predation comes back over the longer run (predators median 4.7%), median life 15.5 (3–86) against 7.5 in the default world.
 - **Conclusion**: with the existing parameters there is no stable world where cells live long enough for within-life mechanisms (learning, regulation, differentiation). A prey defence or a structural change to predation would be a new mechanism, the owner's call.
 
+**F5e — prey defence** ([ADR-0011](adr/0011-prey-defence-and-save-v8.md)). Goal: a world where cells live long enough for within-life mechanisms (F5d learning, regulators and F3 sensing were nearly inert with median lives of 6–8 steps, because predation is diffuse and re-evolves). `--set defence=1`: each cell carries an evolvable armour `armor_p`; when a predator picks it, the attack fails with probability `armor_p` x `defence_strength` (0.8, capped at 0.95) and nobody gains or loses. Cost `defence_upkeep` 0.2 x `armor_p` per step. Predators have no counter-trait (one mechanism at a time). Off by default and then bit-identical to `36b4d21` (eight configurations); save format v8. The values come from a 30k pilot on seeds 41/43 (3/4 runs passed); the owner chose them after seeing the pilot data, which is a post-hoc choice.
+
+**Experiment** (`python scripts/f5e_experiment.py --steps 30000`, [f5e_experiment.csv](f5e_experiment.csv)), P1 standard, rules fixed in PLAN.md and committed before the run (`d1b01f0`): immigration 0, flat world with day/night + seasons and `volcanic.json`, seeds 1–19 odd = 20 pairs, second half, descendants only. Arms: off / on / neutral (no effect, no cost) / neutral_cost (no effect, the same cost as `on`) / control (no effect, cost 1.0).
+
+| Question | Result (seeds 1–19) | Verdict |
+|---|---|---|
+| **Primary: is `on` a long-life world?** (median life of descendants ≥ 20, population ≥ 300, no extinction, predators present in the last third, all four in ≥ 16/20) | all four in **15/20**; failures: median life 5 (12–17 steps), extinction 1, population 0, predators 0. Flat 9/10, volcanic 6/10 | **not a long-life world** by the pre-registered rule (one pair short) |
+| Positive control: `armor_p` control < neutral | 20/20 (median 0.03 vs 0.47) | fires |
+| **Is armour favoured?** `armor_p` on vs neutral_cost | higher in **20/20** (median 0.97 vs 0.07) | **beneficial** |
+| Net selection: `armor_p` on vs neutral | higher in **19/20** | **selected** |
+| Mechanism | 78% of attacks repelled (57–78%) | |
+| Median life, on vs neutral_cost / off | higher 20/20 / 20/20 (median 28 steps, range 12–39; off 7.5, range 5–9) | **longer**, about 4x |
+| Kills per death, on vs neutral_cost / off | lower 20/20 / 20/20 (median 82% vs 95%) | **lower** |
+| Population, on vs neutral_cost / off | higher 18/20 / 13/20 | higher than the cost-matched arm; no consistent sign against off |
+| Predator share in the last third, on vs neutral_cost / off | lower 12/20 / 13/20 (median 1.3% vs 10%) | no consistent sign |
+
+- **Armour is strongly selected and lives get about four times longer, but the pre-registered world criterion fails by one pair.** Every pair has longer lives than off (20/20), yet five runs stay below the median of 20 steps that the rule asked for.
+- **Where it fails** (post-hoc, not a rule): four of the five short-life runs are on `volcanic.json`, and they are the runs with the most predators left in the last third (10–20%); on the flat world predators fall to 0.1–1.5% in most runs and lives reach 25–39 steps. The fifth (flat, seed 5) had two extinctions and a lower mean armour (0.48), its population re-seeded. Whether vents feed a predator population that armour cannot suppress is a hypothesis, not tested.
+- The pilot (3/4 at 0.8 / 0.2) did not anticipate the planet difference; it had 2 volcanic runs and both passed.
+- Not run: a counter-trait for predators (arms race), other strengths, confirmation seeds (the rule requires them only at exactly 16/20).
+
 Original scope:
 See the dedicated section: sexual reproduction, plasticity, learning, horizontal gene transfer.
 
