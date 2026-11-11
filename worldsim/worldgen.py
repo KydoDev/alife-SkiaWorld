@@ -87,7 +87,9 @@ def terrain_from_rgb(rgb: np.ndarray, cfg: Config) -> Terrain:
 
     # strong edges -> rock barriers (geographic isolation); the surface row stays water
     gy, gx = np.gradient(lum)
-    grad = np.hypot(gx, gy)
+    # sqrt of the sum of squares, not np.hypot: IEEE-exact on every platform and in Rust (G2_PLAN);
+    # equal to np.hypot on Windows' libm, while CPython's math.hypot is not libm and differs
+    grad = np.sqrt(gx * gx + gy * gy)
     if grad.max() > 0:
         grad /= grad.max()
     terrain.rock = grad >= EDGE_THRESHOLD

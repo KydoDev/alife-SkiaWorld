@@ -104,10 +104,15 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
 ## Rules for the port
 - No global RNG, no `HashMap` iteration in the dynamics (use `Vec` + ids, or an
   insertion-ordered map for bonds); no `-ffast-math` equivalents, no `mul_add`.
-- Transcendentals in the Python dynamics go through libm (`math.exp`, `math.pow`, `math.sin`), never numpy's
-  ufuncs: on AVX-512 CPUs numpy takes SIMD paths that are not correctly rounded (see the M2 Linux entry). Still
-  numpy and to be moved before M5 ports them: the vent field of `terrain.py` (generation) and of the G1 vent
-  intervention in `play.py` (`np.exp`, `np.hypot`); they do not affect M2, which reads terrain from saves.
+- Transcendentals in the Python dynamics and in terrain generation go through libm (`math.exp`, `math.pow`,
+  `math.sin`), never numpy's ufuncs: on AVX-512 CPUs numpy takes SIMD paths that are not correctly rounded
+  (see the M2 Linux entry). This covers the light (`World.set_terrain`), the vent field (`terrain.vent_plume`,
+  used by generation and by the G1 vent tool) and the seabed profile (`seabed_heights`). Distances are never
+  `math.hypot` (CPython's own algorithm, not libm: it differs from `np.hypot`/UCRT on ~17% of float pairs):
+  vents use `sqrt` of an exact integer `dx*dx + dy*dy`, the image gradient uses `np.sqrt(gx*gx + gy*gy)`;
+  IEEE `sqrt`, `+`, `*`, `/` are correctly rounded everywhere, so numpy may vectorise them. Rust mirrors them
+  with plain `sqrt` and no `mul_add`. Not a transcendental but an M5 concern: `seabed_heights` and
+  `terrain_from_rgb` call `ndarray.mean()`, numpy's pairwise summation, which the port must reproduce.
 - Every constant comes from the loaded `Config`; unknown config keys are an error.
 - Save loading in Rust validates like `persistence.py` (untrusted input) and returns an
   error, never panics.
@@ -182,6 +187,24 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   libm, so the committed `hashes.csv` are unchanged (regenerated: identical over 1200 steps on both sets);
   Linux runs made before this change are no longer reproducible bit-for-bit on AVX-512 CPUs. Regression test:
   `tests/test_environment.py::test_light_transcendentals_come_from_libm`.
+- **M2 open points** (2026-11-10, Windows 11, numpy 2.5.4, no AVX-512): the remaining numpy transcendentals
+  moved off numpy before M5 ports terrain generation and interventions: `np.exp`/`np.hypot` of the vent field
+  (generation and `play.add_vent`, now one helper `terrain.vent_plume`), `np.sin` of `seabed_heights`, and
+  `np.hypot` of the image gradient in `worldgen.terrain_from_rgb`. Deviation from the brief, measured: CPython's
+  `math.hypot` is not libm (differs from `np.hypot` on 33,352 of 200,000 random float pairs on Windows, while
+  `np.sqrt(a*a + b*b)` differs on 0), so distances use exact `sqrt` instead. The list of every distinct `np.<name>(`
+  call under `worldsim/` has no other transcendental (`**` on Python floats is CPython `pow`, i.e. libm). Checks: old vs new
+  expressions equal bit for bit (plumes on 4 grid sizes with x-wrap, `seabed_heights` on 150 seeds, the
+  gradient of `examples/planet.png`); both golden sets regenerated (1000 steps) → `hashes.csv`, `rng.json`
+  and decompressed `start.json.gz` identical to the committed ones (volcanic has 6 vents and rock); new test
+  `tests/test_environment.py::test_terrain_transcendentals_come_from_libm`. It cannot fail on this CPU even
+  against the old code (numpy used libm here): it guards Linux/AVX-512 runners. Only Windows was measured: on Linux the gradient change replaces glibc `hypot` (not compared), so photo
+  planets may change at the rock threshold there. Cost: `vent_field` at the
+  1M-tile cap takes ~0.75 s per vent (was ~0.18 s); default worlds are unaffected (< 10 ms).
+  CI (security review advisory): the `rust-core` job builds and tests with `--locked` and runs
+  `cargo deny check advisories` (cargo-deny 0.20.2, prebuilt via `taiki-e/install-action`, pinned by commit
+  SHA). No `deny.toml`: defaults, which also reject unmaintained crates, so a new dependency (e.g. M3's bench
+  harness) may need one.
 - **M3** (2026-11-10, Windows 11, Intel Core i9-14900HX, rustc 1.98.1 release, single thread):
   `python scripts/g2_bench.py --out engine-rs/target/bench` writes three step-0 saves and times Python on them;
   `cd engine-rs && cargo run --release --example bench -- target/bench 1000` steps each for 1000 steps. The
