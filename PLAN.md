@@ -7,10 +7,10 @@ within-life mechanisms (learning, regulation, differentiation). Branch `feat/f5e
 ## Checklist
 1. [x] Pilot (throwaway engine, 30k, seeds 41/43): strength 0.8 / upkeep 0.2 passes 3/4 runs (below)
 2. [x] Design and pre-registered rules (this file); ADR-0011
-3. [ ] Engine: `Config.defence*`, `Cell.armor_p`, failed attacks in predation, stats; no RNG when off
-4. [ ] Save v8 (`armor_p` per cell, `defended` counter); Rust loader v8, golden sets regenerated
-5. [ ] Tests; off-world fingerprints equal to `36b4d21` (8 configurations); speed off/on
-6. [ ] Experiment `scripts/f5e_experiment.py`, 30k steps, 20 pairs; verdict per the rules below
+3. [x] Engine: `Config.defence*`, `Cell.armor_p`, failed attacks in predation, stats; no RNG when off
+4. [x] Save v8 (`armor_p` per cell, `defended` counter); Rust loader v8, golden sets regenerated
+5. [x] Tests; off-world fingerprints equal to `36b4d21` (8 configurations); speed off/on
+6. [~] Experiment `scripts/f5e_experiment.py`, 30k steps, 20 pairs; verdict per the rules below
 7. [ ] Review (code-review-security), docs (ROADMAP, ARCHITECTURE, CLAUDE.md, USER_MANUAL, CHANGELOG, TEST.md)
 
 ## Pilot (2026-11-11, before this design; pass rule fixed before running)

@@ -17,7 +17,7 @@ pub mod world;
 use std::fmt;
 
 /// Save format version this kernel reads (`worldsim/persistence.py`, ADR-0010).
-pub const SAVE_VERSION: u32 = 7;
+pub const SAVE_VERSION: u32 = 8;
 
 /// Number of fixed genes per cell (`worldsim/world.py::N_GENES`).
 pub const N_GENES: usize = 16;

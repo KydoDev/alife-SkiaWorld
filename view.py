@@ -151,6 +151,8 @@ def main():
                     extra.append(f"plast {selected.plast_p:.2f}")
                 if cfg.hgt:
                     extra.append(f"hgt {selected.hgt_p:.2f}")
+                if cfg.defence:
+                    extra.append(f"armor {selected.armor_p:.2f}")
                 if extra:
                     lines.append("  ".join(extra))
                 lines.append("")

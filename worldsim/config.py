@@ -21,6 +21,7 @@ _BOUNDS = {
     "mate_radius": (1, 5), "mate_distance": (0, 10), "sex_cost": (0, 10),
     "plastic_rate": (0, 1), "plastic_upkeep": (0, 10),
     "hgt_rate": (0, 1), "hgt_upkeep": (0, 10),
+    "defence_strength": (0, 0.95), "defence_upkeep": (0, 10),
 }
 
 
@@ -103,6 +104,11 @@ class Config:
     hgt_neutral: bool = False        # control arm: hgt_p is inherited and mutates, but no gene is copied
     hgt_rate: float = 0.1            # per-step chance of a transfer at hgt_p = 1
     hgt_upkeep: float = 0.05         # cost per step x hgt_p (paid in the neutral arm too)
+    # --- prey defence (F5e). Off by default: every attack on a prey succeeds ---
+    defence: bool = False            # cells carry an evolvable armour armor_p that can make an attack fail
+    defence_neutral: bool = False    # control arm: armor_p is inherited and mutates, costs, but never protects
+    defence_strength: float = 0.8    # chance an attack fails at armor_p = 1 (capped below 1: nobody is immune)
+    defence_upkeep: float = 0.2      # cost per step x armor_p (paid in the neutral arm too)
 
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)
