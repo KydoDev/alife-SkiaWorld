@@ -14,7 +14,7 @@ design questions for later (they need an ADR). Detail of the milestone: `docs/G2
 7. [x] Flag `open_genome` in the kernel (variable-length rules, loader bounds); golden set `open_genome`
 8. [x] Combined golden sets: all ported flags on; small world that goes extinct and reseeds; width 2; open_genome w/o sensing
 9. [x] Design (ADR): world creation in the kernel (planet forms, images, numpy pairwise mean)
-10. [ ] Design (ADR): interventions through the C ABI (write entry points, ABI version bump)
+10. [?] Design (ADR): interventions through the C ABI (write entry points, ABI version bump)
 
 ## Rules for every flag piece (fixed before any run)
 - **Verdict**: no divergent step in 1000 against the golden set made on the same OS, and `hashes.csv` of the

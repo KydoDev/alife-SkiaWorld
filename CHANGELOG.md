@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0013 (Proposed), interventions through the C ABI**: the five G1 world edits move into the kernel as a
+  validated, RNG-free `World::intervene` behind one entry point `ws_world_intervene` (new `WS_ERR_INVALID`, which
+  does not poison the handle); budget, milestones and the game flow stay in Python until G3, never in C#. Proof by
+  a new "interventions" golden kind replayed against `play.replay`. Awaiting the owner's decision.
 - **ADR-0012, world creation in the Rust kernel**: the kernel would create the default world and every
   procedural planet from a full config and a `u64` seed (`World::new`, CPython's integer and string seeding, numpy's
   pairwise mean, `generate_terrain`), behind a new `ws_world_create` entry point (ABI 2); planet forms and images stay
