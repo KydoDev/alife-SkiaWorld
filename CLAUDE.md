@@ -31,6 +31,8 @@ Repository: `github.com/KydoDev/alife-SkiaWorld`.
 - **tests/**: pytest suite.
 - **docs/**: research, design, theory, roadmap, governance docs — start at `docs/INDEX.md`.
 - **engine-rs/**: Rust core (G2 port, ADR-0008), crate `worldsim-core`; golden vectors in `tests/golden/`.
+- **unity/**: Unity 6 front-end of the kernel (G2 M4, viewer only); `scripts/unity_sync.py` copies the DLL
+  and a save in. Not in CI.
 - **runs/**: simulation output (git-ignored).
 </structure>
 </project_context>
@@ -179,10 +181,12 @@ result lives in `TEST.md`. Keep the two distinct.
   `refactor`, `test`, `chore`, `perf`, `build`, `ci`. Scopes: `engine`,
   `viewer`, `runner`, `docs`. The body explains *why*.
 - Never add `Co-Authored-By: Claude` or other AI-attribution lines.
-- Branches: `feat/…`, `fix/…`, `chore/…`, `exp/…` (experiments) off a
-  protected `main`. Squash-merge.
-- **Keep PRs small** — especially AI-generated ones.
-- CI (lint, test, secret scan) is the merge gate.
+- **Work directly on `main`** (owner's rule, 2026-11-11): no feature branches or PRs for
+  this solo project. Commit small, self-contained changes; ask the owner before each push.
+- Since CI (lint, test, secret scan) runs after the push, run the same checks locally
+  first (`pytest`, `ruff check .`, and `cargo fmt --check` / `clippy` / `test` in
+  `engine-rs/` when Rust changed). A red CI on `main` is fixed at once.
+- `main` keeps its ruleset: no force-push, no deletion. Dependabot PRs are the exception.
 </git_conventions>
 
 <workflow_rules>

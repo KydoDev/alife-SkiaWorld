@@ -69,6 +69,24 @@ python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/go
 # C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract)
 cd engine-rs && cargo build --release
 ```
+
+### Unity front-end (G2 M4, `unity/`)
+Unity 6 (6000.5.6f1) project that loads a save into the Rust kernel through P/Invoke and shows it.
+Not in CI (Unity needs a licence): run its tests locally after a change to `ffi.rs` or `unity/`.
+```bash
+# build the kernel and copy the DLL + a save into the project (both git-ignored)
+python scripts/unity_sync.py                                  # default golden start save
+python scripts/unity_sync.py --save runs/a/world_final.json.gz  # or any v8 save, default flags
+# regenerate the scene from code (Assets/Scenes/WorldSim.unity)
+Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
+# EditMode tests: golden hashes and renders through P/Invoke
+Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResults unity-tests.xml
+```
+- The editor locks a loaded native library: close it before re-running `unity_sync.py` after a
+  kernel change (the script says so when the copy fails).
+- Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
+  `WorldSimView.cs` (texture, controls), `Editor/WorldSimSetup.cs` (scene), `Tests/Editor/`.
+- The kernel cannot create worlds or run optional flags yet (M5): saves come from the Python engine.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 
@@ -80,8 +98,9 @@ the same seed before and after a change.
 ## Standards and conventions
 [`CLAUDE.md`](../CLAUDE.md) is the authority. In short: English for all new
 code/docs, every tunable in `Config`, all randomness through `World.rng`,
-Conventional Commits (`feat(engine): ...`), small PRs into a protected `main`
-(CI must pass, no force-push — branch protection should be enabled on GitHub).
+Conventional Commits (`feat(engine): ...`), small commits straight to `main`
+(no feature branches or PRs; run the CI checks locally before pushing; the GitHub
+ruleset forbids force-push and deleting `main`).
 
 Target: a new contributor goes from clone to a running viewer in under 30
 minutes following only this document.

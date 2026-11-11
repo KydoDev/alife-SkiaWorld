@@ -1,0 +1,18 @@
+# Unity generated folders and IDE files (never committed)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Bb]uild/
+/[Bb]uilds/
+/.vs/
+*.csproj
+*.sln
+*.user
+
+# Copied in by scripts/unity_sync.py, never committed: the native kernel and the sample save
+/Assets/Plugins/
+/Assets/Plugins.meta
+/Assets/StreamingAssets/
+/Assets/StreamingAssets.meta

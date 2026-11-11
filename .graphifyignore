@@ -1,3 +1,11 @@
 # Tracked but not worth graphing
 docs/*.png
 runs/
+
+# Unity generated folders (git-ignored, huge)
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/UserSettings/
+unity/Assets/Plugins/
+unity/Assets/StreamingAssets/

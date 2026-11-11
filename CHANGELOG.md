@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M4 part B, Unity front-end** (`unity/`, Unity 6000.5.6f1): loads a save into the Rust kernel through
+  P/Invoke and shows it as a texture with play/pause, step and speed. `scripts/unity_sync.py` builds the kernel
+  and copies the DLL and a save into the project (git-ignored). EditMode tests check golden hashes and renders
+  through P/Invoke. Viewer only; not in CI (Unity needs a licence).
 - **G2 M4 part A, C ABI**: `engine-rs` exports a C interface for front-ends (`ws_world_load` from save bytes,
   `ws_world_step`, `ws_world_info`, `ws_world_state_hash`, `ws_world_render_rgb`, `ws_last_error`,
   `ws_abi_version`), panic-safe and checked on every pointer and buffer. The kernel renders the world like
@@ -196,6 +200,8 @@ All notable changes to this project are documented here. Format based on
 - Graphify knowledge graph setup (`.graphifyignore`; output git-ignored).
 
 ### Changed
+- Workflow: work directly on `main`, no feature branches or PRs (owner's rule 2026-11-11); CI checks run
+  locally before each push.
 - `docs/G2_PLAN.md`: M1c and the golden data no longer name a fixed save version (current
   `SAVE_VERSION`); M5 lists F5b `plasticity` and later flagged F-phases; new section on running
   G2 in parallel with the F-phases (flagged features only, default dynamics frozen while M2

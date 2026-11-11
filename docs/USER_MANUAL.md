@@ -102,6 +102,14 @@ change during its life; with `--set hgt=1` its *transfer propensity* (`hgt`), ho
 one gene from a neighbour during its life; with `--set defence=1` its *armour* (`armor`), the share of
 attacks it can repel, which costs energy every step) · `ESC` quit.
 
+## Unity front-end (preview, G2)
+A first Unity front-end runs the world on the Rust kernel, which is much faster than Python and
+gives the same result step for step. For now it only **shows** a world: it loads a save made by
+the Python engine (default options only) and offers play/pause, single step and speed (1–480
+steps/s). Controls: the buttons on top, or `Space` play/pause, `N` one step (when paused), `+`/`-`
+speed. Planets, interventions and the optional mechanisms arrive later; to play, use `game.py`.
+Setup is in the Developer Guide (Unity front-end).
+
 ## Headless runs (`run.py`)
 ```bash
 python run.py --steps 10000 --seed 1 --out runs/test1

@@ -7,6 +7,12 @@
 *.yaml text eol=lf
 *.py text eol=lf
 
+# Unity YAML assets and metadata (Unity writes LF)
+*.unity text eol=lf
+*.asset text eol=lf
+*.meta text eol=lf
+*.asmdef text eol=lf
+
 # Git hooks have no extension: force LF or `#!/bin/sh\r` breaks on Windows checkouts
 .githooks/* text eol=lf
 
