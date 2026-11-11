@@ -1,7 +1,36 @@
 # PLAN
 
-No plan in progress. F3 P1 re-run closed (2026-11-10, see docs/plan_history.md). F5d learning not built
-(precondition not met). G2 continues in its own session (docs/G2_PLAN.md).
+World study: find settings where cells live long enough for within-life mechanisms (learning, regulation,
+differentiation) to have something to act on. A parameter study, not a new mechanism: the default world is not
+changed; the result is a named set of overrides for later experiments.
 
 ## Checklist
-(empty)
+1. [x] Death probe: 96-97% of deaths are predation (below)
+2. [x] Goal and selection criteria (this file), written before the sweep
+3. [ ] Coarse sweep of predation pressure, 10k steps, seeds 41 and 43, both planets
+4. [ ] Pick a setting by the criteria; check it at 30k steps on 20 pairs
+5. [ ] Re-run the regulator pilot in the chosen world
+6. [ ] Docs (ROADMAP, CHANGELOG, TEST.md), commit, ask to push
+
+## Why (probes, 2026-11-10/11)
+F5d, the F3 P1 re-run and the regulator pilot all hit the same limit: median life 6-8 steps, 0.4-2.5 sensed moves
+per life, chains of rules in 0-7% of cells. Death probe (immigration 0, seeds 41/43, steps 5-10k): 96-97% of
+deaths are kills by predators, which are 4-8% of cells; deaths of old age are a few dozen of 200-375 thousand.
+
+## Sweep (scratchpad first, then `scripts/world_study.py`)
+Immigration 0; flat day/night + seasons and `examples/volcanic.json`; seeds 41 and 43 (not the P1 seeds 1-39);
+10k steps, measured over steps 5-10k. Grid: `pred_eff` in {0.5, 0.35, 0.25} x `pred_upkeep` in {0.3, 0.6, 1.0}
+(defaults 0.5, 0.3). Measures: median age at death of descendants, mean population, predator share, killed share
+of deaths, share of cells in colonies of >= 4, extinctions.
+
+## Selection criteria (fixed before the sweep)
+A setting qualifies if, on all 4 planet x seed runs:
+- median age at death of descendants >= 3 x the default world's (>= ~20 steps);
+- mean population >= 300 and no extinction;
+- predators keep >= 2% of cells (the trophic level survives).
+Among qualifying settings, pick the one closest to the defaults (fewest and smallest changes). If none
+qualifies, report it and ask the owner before widening the grid.
+
+## Check (30k steps, P1 pairs)
+The chosen setting on the 20 P1 pairs, 30k steps: report median life, population, predator share, extinctions.
+It is accepted as the "long-life world" if the criteria hold in >= 16/20 pairs.
