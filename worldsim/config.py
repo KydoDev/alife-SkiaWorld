@@ -13,6 +13,8 @@ _BOUNDS = {
     "organic_diffusion": (0, 1), "organic_sink": (0, 1), "organic_decay": (0, 1),
     "decomp_fraction": (0, 1), "sapro_eff": (0, 1), "pred_eff": (0, 1),
     "rock_fraction": (0, 0.9), "vent_count": (0, 100), "max_bonds": (0, 8),
+    # 100 summed plumes stay finite (ADR-0012 security review)
+    "vent_strength": (0, 1e6),
     "max_age": (1, 10**9), "mut_min": (0, 1), "mut_max": (0, 1),
     "immigration_rate": (0, 100), "species_threshold": (1e-9, math.inf),
     "novelty_activity": (1, 10**12), "sense_noise": (0, 10), "sense_upkeep": (0, 10),

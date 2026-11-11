@@ -7,6 +7,8 @@ Writes into --out:
 - render_start.rgb.gz / render_end.rgb.gz  `render_rgb` of the loaded start save and of the world after
   the last step (raw RGB, row 0 = surface; gzip without timestamp). `--renders-only` writes just these two
   from an existing start.json.gz, leaving the other files untouched;
+- config.json    with --warmup 0 only (the creation sets): `cfg.to_dict()`, the config object the kernel's
+  `ws_world_create` takes, so Unity and the FFI tests can create the same world;
 - step_N.json.gz with --dump-step N, a save at step N, so a mismatching kernel can name the first
   field that differs (engine-rs/tests/golden_step.rs reads it from engine-rs/target/g2-dumps/<set>/).
 
@@ -234,6 +236,9 @@ def main(argv=None, repo_relative=False) -> None:
     for _ in range(args.warmup):
         world.step()
     save_world(world, args.out / "start.json.gz")
+    if args.warmup == 0:
+        config = json.dumps(world.cfg.to_dict(), separators=(",", ":"))
+        (args.out / "config.json").write_text(config + "\n", encoding="utf-8")
     start_hash = state_hash(world)
     start_counts = {name: getattr(world, name) for name in COUNTERS}
 

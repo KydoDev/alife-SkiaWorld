@@ -1,10 +1,12 @@
 //! C ABI for front-ends (G2 M4: Unity through P/Invoke).
 //!
-//! Only what `docs/G2_PLAN.md` allows across the boundary: loading a save, stepping, and
-//! read-only views (sizes, state hash, an RGB render). Nothing writes world fields.
+//! Only what `docs/G2_PLAN.md` allows across the boundary: loading a save, creating a world from a
+//! config and a seed (ADR-0012), stepping, and read-only views (sizes, state hash, an RGB render).
+//! Nothing writes world fields.
 //!
 //! Contract for every function:
-//! - A world is an opaque handle from [`ws_world_load`], released with [`ws_world_free`].
+//! - A world is an opaque handle from [`ws_world_load`] or [`ws_world_create`], released with
+//!   [`ws_world_free`].
 //! - Status codes: [`WS_OK`] (0) or a negative error; the message of the last failure on this
 //!   thread is copied out by [`ws_last_error`].
 //! - Pointers are checked for null and buffers for their exact length; no panic crosses the
@@ -14,7 +16,7 @@
 
 use crate::hash::state_hash;
 use crate::render::{render_rgb, rgb_len};
-use crate::save::{world_from_gzip, MAX_SAVE_BYTES};
+use crate::save::{config_from_json, world_from_gzip, MAX_SAVE_BYTES};
 use crate::world::World;
 use std::cell::RefCell;
 use std::fmt;
@@ -24,8 +26,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 #[cfg(panic = "abort")]
 compile_error!("the C ABI needs panic = unwind");
 
-/// Bumped whenever a signature or a struct below changes; front-ends refuse a mismatch.
-pub const WS_ABI_VERSION: u32 = 1;
+/// One counter for the whole ABI, bumped once per commit that changes it (an added entry point
+/// included, ADR-0012); front-ends refuse a mismatch. 2: [`ws_world_create`].
+pub const WS_ABI_VERSION: u32 = 2;
 
 pub const WS_OK: i32 = 0;
 /// A null pointer or a buffer of the wrong size.
@@ -41,6 +44,9 @@ pub const WS_HASH_LEN: usize = 64;
 /// Largest compressed save [`ws_world_load`] accepts (the decompressed cap is
 /// `save::MAX_SAVE_BYTES`; a front-end should still expect up to about 1 GiB of peak memory).
 pub const WS_MAX_SAVE_LEN: usize = 256 * 1024 * 1024;
+
+/// Largest config object [`ws_world_create`] accepts (as `worldgen.MAX_FORM_BYTES`).
+pub const WS_MAX_CONFIG_LEN: usize = 64 * 1024;
 
 /// An opaque world handle.
 pub struct WsWorld {
@@ -90,7 +96,7 @@ fn fail(code: i32, message: impl fmt::Display) -> i32 {
 /// Run `f` on a live, unpoisoned handle with exclusive access; a panic poisons the handle.
 ///
 /// # Safety
-/// `handle` is null or a live pointer from [`ws_world_load`], not used by another call meanwhile.
+/// `handle` is null or a live handle (see the module contract), not used by another call meanwhile.
 unsafe fn with_world_mut(handle: *mut WsWorld, f: impl FnOnce(&mut World) -> i32) -> i32 {
     // SAFETY: the caller guarantees a null or live, unaliased handle.
     let Some(h) = (unsafe { handle.as_mut() }) else {
@@ -111,7 +117,7 @@ unsafe fn with_world_mut(handle: *mut WsWorld, f: impl FnOnce(&mut World) -> i32
 /// Run `f` on a live, unpoisoned handle with shared access (read-only views).
 ///
 /// # Safety
-/// `handle` is null or a live pointer from [`ws_world_load`], not being stepped meanwhile.
+/// `handle` is null or a live handle (see the module contract), not being stepped meanwhile.
 unsafe fn with_world(handle: *const WsWorld, f: impl FnOnce(&World) -> i32) -> i32 {
     // SAFETY: the caller guarantees a null or live handle with no concurrent writer.
     let Some(h) = (unsafe { handle.as_ref() }) else {
@@ -166,10 +172,51 @@ pub unsafe extern "C" fn ws_world_load(data: *const u8, len: usize) -> *mut WsWo
     }
 }
 
+/// Create a world from a config object (UTF-8 JSON, `Config.to_dict()` as a save stores it, exported
+/// by `scripts/unity_sync.py`) and a seed, as Python's `World(cfg, seed)`: procedural terrain, then
+/// `initial_cells` founders. Returns a handle, or null with the reason in [`ws_last_error`]. The
+/// config is checked like a save's (every key, no unknown or duplicate key, `Config.validate()`
+/// bounds); creation work is bounded by them (at most 10^6 tiles and 100 vents: under 0.3 s in release;
+/// 10^6 founders take about 0.4 GB). It blocks the calling thread.
+///
+/// # Safety
+/// `config_json` is null or points to `len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_create(
+    config_json: *const u8,
+    len: usize,
+    seed: u64,
+) -> *mut WsWorld {
+    if config_json.is_null() || len == 0 {
+        set_error("empty config");
+        return std::ptr::null_mut();
+    }
+    if len > WS_MAX_CONFIG_LEN {
+        set_error(format_args!("config larger than {WS_MAX_CONFIG_LEN} bytes"));
+        return std::ptr::null_mut();
+    }
+    // SAFETY: checked non-null; the caller guarantees `len` readable bytes.
+    let bytes = unsafe { std::slice::from_raw_parts(config_json, len) };
+    match catch_unwind(|| config_from_json(bytes).map(|cfg| World::new(cfg, seed))) {
+        Ok(Ok(world)) => Box::into_raw(Box::new(WsWorld {
+            world,
+            poisoned: false,
+        })),
+        Ok(Err(e)) => {
+            set_error(e.message());
+            std::ptr::null_mut()
+        }
+        Err(payload) => {
+            set_error(panic_message(&*payload));
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Release a handle. Null is ignored.
 ///
 /// # Safety
-/// `handle` is null or a live pointer from [`ws_world_load`], not used afterwards.
+/// `handle` is null or a live handle (see the module contract), not used afterwards.
 #[no_mangle]
 pub unsafe extern "C" fn ws_world_free(handle: *mut WsWorld) {
     if !handle.is_null() {
@@ -182,7 +229,7 @@ pub unsafe extern "C" fn ws_world_free(handle: *mut WsWorld) {
 /// a front-end steps in small per-frame chunks.
 ///
 /// # Safety
-/// `handle` is null or a live pointer from [`ws_world_load`].
+/// `handle` is null or a live handle (see the module contract).
 #[no_mangle]
 pub unsafe extern "C" fn ws_world_step(handle: *mut WsWorld, steps: u32) -> i32 {
     // SAFETY: forwarded caller guarantee.

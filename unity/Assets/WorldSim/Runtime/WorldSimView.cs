@@ -1,6 +1,8 @@
-// G2 M4 front-end: shows a kernel world as a texture, with play / pause / step / speed.
+// G2 M4 front-end: shows a kernel world as a texture, with play / pause / step / speed, and (ADR-0012)
+// "New world": a world the kernel creates from an exported config and a seed typed in the bar.
 // IMGUI only (no prefabs, no input package): the controls are buttons and keys handled in OnGUI.
 using System;
+using System.Globalization;
 using System.IO;
 using UnityEngine;
 
@@ -10,8 +12,18 @@ namespace WorldSim
     {
         private static readonly int[] Speeds = { 1, 2, 5, 10, 20, 30, 60, 120, 240, 480 };
 
+        // The kernel's caps (WS_MAX_SAVE_LEN, WS_MAX_CONFIG_LEN): larger files are refused before being read.
+        private const long MaxSaveBytes = 256L * 1024 * 1024;
+        private const long MaxConfigBytes = 64 * 1024;
+
         [Tooltip("Save in StreamingAssets, copied by scripts/unity_sync.py")]
         public string saveFile = "world.json.gz";
+
+        [Tooltip("Config object in StreamingAssets for New world, exported by scripts/unity_sync.py")]
+        public string configFile = "world_config.json";
+
+        [Tooltip("Seed of the next New world (an unsigned 64-bit integer)")]
+        public string seedText = "1";
 
         [Tooltip("Index into the speed table (steps per second)")]
         public int speedIndex = 5;
@@ -34,24 +46,76 @@ namespace WorldSim
         private void Start()
         {
             string path = Path.Combine(Application.streamingAssetsPath, saveFile);
+            Open(() => NativeWorld.Load(ReadCapped(path, MaxSaveBytes)), $"save: {path}");
+        }
+
+        /// <summary>Replace the shown world by one the kernel creates from the exported config and the seed.</summary>
+        private void NewWorld()
+        {
+            string path = Path.Combine(Application.streamingAssetsPath, configFile);
+            if (!ulong.TryParse(seedText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out ulong seed))
+            {
+                _error = $"seed must be an integer from 0 to {ulong.MaxValue}";
+                return;
+            }
+            Open(() => NativeWorld.Create(ReadCapped(path, MaxConfigBytes), seed), $"config: {path}, seed {seed}");
+        }
+
+        private static byte[] ReadCapped(string path, long limit)
+        {
+            long length = new FileInfo(path).Length;
+            if (length > limit)
+            {
+                throw new IOException($"{path} is {length} bytes, more than the {limit} the kernel accepts");
+            }
+            return File.ReadAllBytes(path);
+        }
+
+        /// <summary>Show the world <paramref name="make"/> returns; on failure keep the current one.</summary>
+        private void Open(Func<NativeWorld> make, string source)
+        {
             try
             {
-                _world = NativeWorld.Load(File.ReadAllBytes(path));
-                _info = _world.Info;
-                _rgb = new byte[_world.RgbLength];
-                _flipped = new byte[_rgb.Length];
-                _texture = new Texture2D((int)_info.Width, (int)_info.Height, TextureFormat.RGB24, false)
+                NativeWorld world = make();
+                WorldInfo info;
+                int rgbLength;
+                try
                 {
-                    filterMode = FilterMode.Point,
-                    wrapMode = TextureWrapMode.Clamp,
-                    name = "WorldSim",
-                };
+                    info = world.Info;
+                    rgbLength = world.RgbLength;
+                }
+                catch
+                {
+                    world.Dispose();
+                    throw;
+                }
+                _world?.Dispose();   // only now: on failure the current world stays
+                _world = world;
+                _info = info;
+                _rgb = new byte[rgbLength];
+                _flipped = new byte[rgbLength];
+                if (_texture == null || _texture.width != (int)_info.Width || _texture.height != (int)_info.Height)
+                {
+                    if (_texture != null)
+                    {
+                        Destroy(_texture);
+                    }
+                    _texture = new Texture2D((int)_info.Width, (int)_info.Height, TextureFormat.RGB24, false)
+                    {
+                        filterMode = FilterMode.Point,
+                        wrapMode = TextureWrapMode.Clamp,
+                        name = "WorldSim",
+                    };
+                }
+                _pending = 0;
+                _error = null;
                 Redraw();
             }
             catch (Exception e) when (e is IOException || e is WorldSimException || e is DllNotFoundException
-                                      || e is EntryPointNotFoundException || e is UnauthorizedAccessException)
+                                      || e is EntryPointNotFoundException || e is UnauthorizedAccessException
+                                      || e is ArgumentException)
             {
-                _error = $"{e.GetType().Name}: {e.Message}\n(save: {path}; run scripts/unity_sync.py)";
+                _error = $"{e.GetType().Name}: {e.Message}\n({source}; run scripts/unity_sync.py)";
                 Debug.LogError(_error);
             }
         }
@@ -130,6 +194,13 @@ namespace WorldSim
             {
                 speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1);
             }
+            GUILayout.Label("seed", GUILayout.Width(32));
+            seedText = GUILayout.TextField(seedText, 20, GUILayout.Width(150));
+            if (GUILayout.Button("New world", GUILayout.Width(90)))
+            {
+                GUIUtility.keyboardControl = 0;   // give the keys back to the controls
+                NewWorld();
+            }
             GUILayout.Label(_world == null
                 ? "no world"
                 : $"step {_info.StepCount}   cells {_info.Population}   {StepsPerSecond} steps/s   "
@@ -146,6 +217,17 @@ namespace WorldSim
         {
             if (e.type != EventType.KeyDown)
             {
+                return;
+            }
+            if (GUIUtility.keyboardControl != 0)
+            {
+                // the seed field has the focus: keys type into it; Return creates the world
+                if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                {
+                    GUIUtility.keyboardControl = 0;
+                    NewWorld();
+                    e.Use();
+                }
                 return;
             }
             switch (e.keyCode)

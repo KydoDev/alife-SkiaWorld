@@ -175,3 +175,123 @@ fn last_error_truncates_to_the_buffer() {
     assert_eq!(n, full.len());
     assert_eq!(&small, &full.as_bytes()[..4]);
 }
+
+// ------------------------------------------------------------------ ws_world_create (ADR-0012)
+
+fn create(config: &[u8], seed: u64) -> *mut WsWorld {
+    unsafe { ws_world_create(config.as_ptr(), config.len(), seed) }
+}
+
+fn creation_config(set: &str) -> String {
+    std::fs::read_to_string(golden_dir(set).join("config.json")).expect("config.json")
+}
+
+fn creation_seed(set: &str) -> u64 {
+    let text = std::fs::read_to_string(golden_dir(set).join("rng.json")).expect("rng.json");
+    let v: serde_json::Value = serde_json::from_str(&text).expect("json");
+    v["seed"].as_u64().expect("seed")
+}
+
+/// `ws_world_create` with `config` edited as a JSON object, expecting null and `reason` in the error.
+fn refused(edit: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>), reason: &str) {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&creation_config("create_default")).unwrap();
+    edit(v.as_object_mut().unwrap());
+    let h = create(v.to_string().as_bytes(), 1);
+    assert!(h.is_null(), "accepted, expected: {reason}");
+    assert!(
+        last_error().contains(reason),
+        "{} (expected {reason})",
+        last_error()
+    );
+}
+
+#[test]
+fn created_worlds_follow_the_creation_sets() {
+    for set in common::CREATE_SETS {
+        let rows = hashes(set);
+        let h = create(creation_config(set).as_bytes(), creation_seed(set));
+        assert!(!h.is_null(), "{set}: {}", last_error());
+        assert_eq!(hash_of(h), rows[0].2, "{set}: step 0");
+        let (mut done, mut chunk) = (0usize, 1u32);
+        while done + 1 < rows.len() {
+            let n = chunk.min((rows.len() - 1 - done) as u32);
+            assert_eq!(unsafe { ws_world_step(h, n) }, WS_OK);
+            done += n as usize;
+            assert_eq!(hash_of(h), rows[done].2, "{set}: step {}", rows[done].0);
+            chunk = chunk % 37 + 7;
+        }
+        unsafe { ws_world_free(h) };
+    }
+}
+
+#[test]
+fn the_handle_of_a_created_world_equals_world_new() {
+    let config = creation_config("create_volcanic");
+    for seed in [0, 7, u64::MAX] {
+        let h = create(config.as_bytes(), seed);
+        assert!(!h.is_null(), "{}", last_error());
+        let cfg = worldsim_core::save::config_from_json(config.as_bytes()).unwrap();
+        let world = worldsim_core::world::World::new(cfg, seed);
+        assert_eq!(
+            hash_of(h),
+            worldsim_core::hash::state_hash(&world),
+            "seed {seed}"
+        );
+        unsafe { ws_world_free(h) };
+    }
+}
+
+#[test]
+fn bad_configs_return_null_with_a_message() {
+    assert!(unsafe { ws_world_create(std::ptr::null(), 10, 1) }.is_null());
+    assert!(last_error().contains("empty config"));
+    assert!(create(b"", 1).is_null());
+    assert!(last_error().contains("empty config"));
+    let huge = vec![b' '; WS_MAX_CONFIG_LEN + 1];
+    assert!(create(&huge, 1).is_null());
+    assert!(last_error().contains("larger than"), "{}", last_error());
+    for (text, reason) in [
+        (&b"not json"[..], "invalid config"),
+        (b"[1, 2]", "invalid config"),
+        (b"{\"width\": {\"nested\": 1}}", "invalid config"),
+        (b"\xff\xfe", "invalid config"),
+    ] {
+        assert!(create(text, 1).is_null());
+        assert!(last_error().contains(reason), "{}", last_error());
+    }
+    refused(
+        |m| drop(m.insert("no_such_field".into(), 1.into())),
+        "unknown key",
+    );
+    refused(|m| drop(m.remove("vent_count")), "vent_count");
+    refused(|m| drop(m.insert("width".into(), 0.into())), "width");
+    refused(
+        |m| drop(m.insert("rock_fraction".into(), 0.95.into())),
+        "rock_fraction",
+    );
+    refused(
+        |m| drop(m.insert("vent_strength".into(), 1.0e7.into())),
+        "vent_strength",
+    );
+    refused(
+        |m| drop(m.insert("sex".into(), 1.into())),
+        "sex must be bool",
+    );
+    refused(
+        |m| {
+            m.insert("width".into(), 10_000.into());
+            m.insert("height".into(), 10_000.into());
+        },
+        "exceeds",
+    );
+    // a duplicate key, which serde_json::Value cannot hold: edit the text
+    let config = creation_config("create_default");
+    let dup = config.replacen("{", "{\"width\":160,", 1);
+    assert!(create(dup.as_bytes(), 1).is_null());
+    assert!(
+        last_error().contains("duplicate config key"),
+        "{}",
+        last_error()
+    );
+}

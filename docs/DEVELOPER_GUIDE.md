@@ -88,6 +88,7 @@ Not in CI (Unity needs a licence): run its tests locally after a change to `ffi.
 # build the kernel and copy the DLL + a save into the project (both git-ignored)
 python scripts/unity_sync.py                                  # default golden start save
 python scripts/unity_sync.py --save runs/a/world_final.json.gz  # or any v8 save, default flags
+python scripts/unity_sync.py --planet examples/red_dwarf.json   # config for New world (default: volcanic)
 # regenerate the scene from code (Assets/Scenes/WorldSim.unity)
 Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
 # EditMode tests: golden hashes and renders through P/Invoke
@@ -97,7 +98,9 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
   kernel change (the script says so when the copy fails).
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
   `WorldSimView.cs` (texture, controls), `Editor/WorldSimSetup.cs` (scene), `Tests/Editor/`.
-- The kernel cannot create worlds or run optional flags yet (M5): saves come from the Python engine.
+- **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
+  form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms
+  and images themselves stay in Python; a kernel-made world cannot be saved yet.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

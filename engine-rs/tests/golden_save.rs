@@ -468,3 +468,18 @@ fn rule_genes_share_one_budget() {
         world_from_json_with_rule_budget(&serde_json::to_vec(&base_save()).unwrap(), 0).is_ok()
     );
 }
+
+#[test]
+fn a_duplicate_config_key_is_refused() {
+    // Python's json keeps the last value; the kernel refuses the ambiguity (ADR-0012)
+    let text = base_save()
+        .to_string()
+        .replacen("\"config\":{", "\"config\":{\"shade\":0.7,", 1);
+    let err =
+        worldsim_core::save::world_from_json(text.as_bytes()).expect_err("duplicate key accepted");
+    assert!(
+        err.message().contains("duplicate config key \"shade\""),
+        "{}",
+        err.message()
+    );
+}

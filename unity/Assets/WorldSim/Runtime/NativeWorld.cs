@@ -1,4 +1,4 @@
-// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 1).
+// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 2).
 // No UnityEngine dependency: this file is plain C# and is exercised by the EditMode tests.
 using System;
 using System.Runtime.InteropServices;
@@ -50,6 +50,9 @@ namespace WorldSim
         internal static extern WorldHandle ws_world_load(byte[] data, UIntPtr len);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern WorldHandle ws_world_create(byte[] configJson, UIntPtr len, ulong seed);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ws_world_free(IntPtr handle);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
@@ -74,7 +77,7 @@ namespace WorldSim
     public sealed class NativeWorld : IDisposable
     {
         /// <summary>The ABI this wrapper was written for (`WS_ABI_VERSION`).</summary>
-        public const uint AbiVersion = 1;
+        public const uint AbiVersion = 2;
 
         private const int HashLength = 64;
         private readonly WorldHandle _handle;
@@ -105,6 +108,26 @@ namespace WorldSim
             }
             CheckAbi();
             WorldHandle handle = Native.ws_world_load(save, (UIntPtr)save.Length);
+            if (handle.IsInvalid)
+            {
+                handle.Dispose();
+                throw new WorldSimException(LastError());
+            }
+            return new NativeWorld(handle);
+        }
+
+        /// <summary>
+        /// Create a world from a config object (UTF-8 JSON, `Config.to_dict()`, exported by scripts/unity_sync.py)
+        /// and a seed, as the Python engine's `World(cfg, seed)`: procedural terrain, then the founders.
+        /// </summary>
+        public static NativeWorld Create(byte[] configJson, ulong seed)
+        {
+            if (configJson == null || configJson.Length == 0)
+            {
+                throw new ArgumentException("empty config", nameof(configJson));
+            }
+            CheckAbi();
+            WorldHandle handle = Native.ws_world_create(configJson, (UIntPtr)configJson.Length, seed);
             if (handle.IsInvalid)
             {
                 handle.Dispose();

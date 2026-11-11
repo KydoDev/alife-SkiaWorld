@@ -236,3 +236,11 @@ def test_terrain_transcendentals_come_from_libm():
     profile = np.clip(np.array(profile), 0.0, None)
     profile *= 0.3 * H / profile.mean()
     assert np.array_equal(heights, np.clip(np.rint(profile), 0, H - 1).astype(np.int64))
+
+
+@pytest.mark.parametrize("value", [1e6 + 1, 1.7e308])
+def test_vent_strength_is_capped_so_summed_plumes_stay_finite(value):
+    """100 vents at the cap sum to a finite field; above it a world could hold inf chem (ADR-0012 review)."""
+    with pytest.raises(ValueError):
+        Config(vent_strength=value).validate()
+    Config(vent_strength=1e6).validate()

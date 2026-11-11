@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0012 piece 5, `ws_world_create` (C ABI 2) and Unity "New world"**: a front-end creates a world in the kernel
+  from an exported config and a `u64` seed; Unity has a seed field and a New world button, and
+  `scripts/unity_sync.py --planet FORM` exports the config. The kernel now refuses duplicate config keys, in saves too;
+  `vent_strength` is capped at 1e6 in both engines (summed plumes stay finite).
 - **ADR-0012 piece 4, `World::new` in the Rust kernel**: the kernel creates a world from a full config and a `u64`
   seed, equal to Python's `World(cfg, seed)` at step 0 on 52 cases (`scripts/g2_create_vectors.py`, `create.json`)
   and over 1000 steps on the new golden sets `create_default` and `create_volcanic` (20 sets now).

@@ -19,7 +19,7 @@
 //!   present (Python would fill in its defaults); the seed must be None, an int or a string; the
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
-//!   keys in the save object are refused;
+//!   keys in the save object and in its config are refused (Python keeps the last one);
 //! - every optional flag is ported (M5): `defence`, `hgt`, `plasticity`, `sex`, `sensing` and
 //!   `open_genome` (rule genes: at most `max_rules`, at most 64 read, each 4 values in [0, 1]);
 //! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
@@ -105,6 +105,16 @@ fn decompress(compressed: impl Read, max_bytes: u64) -> Result<Vec<u8>, SaveErro
 /// Load a save from its (decompressed) JSON text.
 pub fn world_from_json(json: &[u8]) -> Result<World, SaveError> {
     world_from_json_with_rule_budget(json, MAX_TOTAL_RULES)
+}
+
+/// Parse and validate a standalone config object (`Config.to_dict()`, the `config` of a save) with
+/// the rules of a save's config: scalar values, every key present, no unknown or duplicate key,
+/// `Config.validate()` bounds and relations (ADR-0012, the input of `ws_world_create`). The
+/// caller caps the byte length.
+pub fn config_from_json(json: &[u8]) -> Result<Config, SaveError> {
+    let map: ConfigMap = serde_json::from_slice(json)
+        .map_err(|e| SaveError::new(crate::bounded(format_args!("invalid config: {e}"))))?;
+    Config::from_json(&map.0)
 }
 
 /// [`world_from_json`] with another total rule budget (tests use a small one).
@@ -347,6 +357,12 @@ impl<'de> Deserialize<'de> for ConfigMap {
                 while let Some((k, Scalar(v))) = map.next_entry::<String, Scalar>()? {
                     if out.len() == MAX_CONFIG_KEYS {
                         return Err(de::Error::custom("config has too many keys"));
+                    }
+                    // Python's json keeps the last one; the kernel refuses the ambiguity (ADR-0012)
+                    if out.contains_key(&k) {
+                        return Err(de::Error::custom(crate::bounded(format_args!(
+                            "duplicate config key {k:?}"
+                        ))));
                     }
                     out.insert(k, v);
                 }

@@ -89,7 +89,7 @@ config_fields! {
     // terrain (F2)
     rock_fraction: f64 [0, 0.9],
     vent_count: i64 [0, 100],
-    vent_strength: f64,
+    vent_strength: f64 [0, 1e6],
     vent_radius: f64 [1e-6, INF],
     // sensing (F3)
     sensing: bool,

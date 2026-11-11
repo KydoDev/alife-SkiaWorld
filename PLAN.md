@@ -9,7 +9,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 2. [x] ADR-0012 piece 2: numpy pairwise mean (`numpy_mean`), bit-equal to `ndarray.mean()` on the fixed lengths
 3. [x] ADR-0012 piece 3: `generate_terrain` (incl. `vent_plume`); terrain digest equal on every listed case
 4. [x] ADR-0012 piece 4: `World::new`; step-0 hashes and creation sets `create_default`, `create_volcanic`
-5. [ ] ADR-0012 piece 5: `ws_world_create`, ABI 2, FFI tests, Unity "new world"; security review first
+5. [x] ADR-0012 piece 5: `ws_world_create`, ABI 2, FFI tests, Unity "new world"; security review first
 6. [ ] ADR-0013 piece 2: `refresh_terrain` refactor; all hashes and renders unchanged
 7. [ ] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
 8. [ ] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first

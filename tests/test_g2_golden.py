@@ -318,14 +318,22 @@ def test_committed_create_vectors_match_this_python(request):
 
 
 def test_the_creation_sets_start_at_creation():
-    """create_* sets hash from step 0 with the planet's own seed, so the kernel can build them with World::new."""
+    """create_* sets hash from step 0 with the planet's own seed, so the kernel can build them with World::new;
+    their config.json (what ws_world_create takes) is the start save's config, and their seeds are the ones the
+    Unity test hard-codes (create_default 1, create_volcanic 42)."""
+    seeds = {}
     for name in g2.CREATE_SETS:
         assert name in GOLDEN_SETS
-        meta = json.loads((ROOT / "engine-rs" / "tests" / "golden" / name / "rng.json").read_text(encoding="utf-8"))
+        d = ROOT / "engine-rs" / "tests" / "golden" / name
+        meta = json.loads((d / "rng.json").read_text(encoding="utf-8"))
         assert meta["meta"]["warmup"] == 0
+        seeds[name] = meta["seed"]
+        config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+        assert config == load_world(d / "start.json.gz").cfg.to_dict()
+    assert seeds == {"create_default": 1, "create_volcanic": 42}
     volcanic = json.loads((ROOT / "engine-rs" / "tests" / "golden" / "create_volcanic" / "rng.json").read_text(
         encoding="utf-8"))
-    assert volcanic["seed"] == 42 and volcanic["meta"]["planet"] == "examples/volcanic.json"
+    assert volcanic["meta"]["planet"] == "examples/volcanic.json"
 
 
 def test_committed_mean_vectors_match_this_numpy():

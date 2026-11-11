@@ -124,8 +124,8 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
 - Every constant comes from the loaded `Config`; unknown config keys are an error.
 - Save loading in Rust validates like `persistence.py` (untrusted input) and returns an
   error, never panics.
-- FFI (M4, from the M1c security review): expose only the save loaders and `step` (plus read-only views),
-  never `World::from_parts` or raw field writes; wrap every entry point in `catch_unwind` (`rng.rs` still
+- FFI (M4, from the M1c security review): expose only the save loaders, `ws_world_create` (ADR-0012) and
+  `step` (plus read-only views), never `World::from_parts` or raw field writes; wrap every entry point in `catch_unwind` (`rng.rs` still
   has `assert!`s). Before the cdylib ships: CI builds with `--locked` and runs `cargo audit`/`cargo deny`.
 - A rule change in `worldsim/` that touches the default dynamics regenerates the golden
   files in the same PR, and the Rust port follows (or the golden test is marked
@@ -446,3 +446,18 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   field by field (`first_difference`) and matches all 1000 hashed steps. They are also ordinary sets (20 now), so
   the load-and-step tests cover them. (3) A full `--all` regeneration left the 18 existing `hashes.csv` files and
   `terrain.json` byte-identical. No step, loader or ABI change; the entry point is piece 5.
+- **ADR-0012 piece 5, `ws_world_create` and Unity "New world"** (2026-11-11, Windows 11, Unity 6000.5.6f1):
+  the C ABI gains `ws_world_create(config_json, len, seed: u64)`, which returns a handle from `World::new`, or null
+  with the reason in `ws_last_error`; **`WS_ABI_VERSION` 1 -> 2**, with the Unity wrapper. The config is the save's
+  `config` object (`Config.to_dict()`), capped at 64 KiB before parsing and checked by the save path through the new
+  `save::config_from_json` (scalars only, every key, no unknown key, `Config.validate()` bounds); the kernel now
+  also refuses a **duplicate config key** (in saves too: Python keeps the last one, the kernel refuses the
+  ambiguity, as ADR-0012 states). The body runs inside `catch_unwind`. The creation sets now carry their
+  `config.json`, written by `g2_golden.py` for warm-up-0 sets. Verdict: **met**. FFI tests: both creation sets
+  through the ABI over all 1000 steps in uneven chunks; the handle's hash equals `World::new` for seeds 0, 7 and
+  `u64::MAX`; refused with a message: null, empty, over the cap, not JSON, not an object, a nested value, invalid
+  UTF-8, an unknown, missing or duplicate key, out-of-range `width` and `rock_fraction`, a non-bool flag, too many
+  tiles. Unity: `NativeWorld.Create`, a seed field and a **New world** button (Return in the field too) creating from
+  `StreamingAssets/world_config.json`, which `scripts/unity_sync.py --planet` (default `examples/volcanic.json`)
+  exports from a planet form; EditMode tests **10/10** in batchmode (new: both creation sets to step 100, a bad
+  config's message). On-screen check of the button: by the owner. Security review before the commit: no blockers (fuzzed through the FFI in debug and release). Fixed from its should-fix list: `vent_strength` gets a finite cap of 1e6 in both engines (100 summed plumes at 1.7e308 made inf chem that no save may carry, so such a world could not be saved and reloaded); Unity reads the save and the config with the kernel's size caps before loading them, catches `ArgumentException` (an empty config file), keeps the current world if a new one fails, and parses the seed as plain digits; `unity_sync.py` reads the form through `worldgen.planet_from_form` (64 KiB cap, validation) and prints the form's own seed. Also a load-path test of the duplicate-key refusal and a memory note on `ws_world_create` (10^6 founders take about 0.4 GB). Left as known: `initial_energy`, `organic_init` and `chemo_gain` near the float maximum can still reach inf through any path (pre-existing, Python behaves the same).
