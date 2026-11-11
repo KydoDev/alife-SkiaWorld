@@ -77,7 +77,7 @@ fn decompress(compressed: impl Read, max_bytes: u64) -> Result<Vec<u8>, SaveErro
     MultiGzDecoder::new(compressed)
         .take(max_bytes.saturating_add(1))
         .read_to_end(&mut data)
-        .map_err(|e| SaveError::new(format!("not a valid save file: {e}")))?;
+        .map_err(|e| SaveError::new(crate::bounded(format_args!("not a valid save file: {e}"))))?;
     if data.len() as u64 > max_bytes {
         return Err(SaveError::new(format!(
             "save decompresses to more than {max_bytes} bytes"
@@ -89,7 +89,7 @@ fn decompress(compressed: impl Read, max_bytes: u64) -> Result<Vec<u8>, SaveErro
 /// Load a save from its (decompressed) JSON text.
 pub fn world_from_json(json: &[u8]) -> Result<World, SaveError> {
     let raw: RawSave = serde_json::from_slice(json)
-        .map_err(|e| SaveError::new(format!("not a valid save file: {e}")))?;
+        .map_err(|e| SaveError::new(crate::bounded(format_args!("not a valid save file: {e}"))))?;
     build_world(raw)
 }
 
@@ -424,6 +424,8 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     world.next_id = count(raw.next_id, "next_id")?;
     world.counters = counters;
     load_cells(&mut world, raw.cells.0)?;
+    // `persistence.py` recomputes the light at load (`now = step_count`); it is not hashed.
+    world.update_light(world.step_count);
     Ok(world)
 }
 

@@ -21,16 +21,16 @@ pub type CellRef = u32;
 pub const EMPTY: CellRef = CellRef::MAX;
 
 // Gene indices (`worldsim/world.py`).
-const G_PHOTO: usize = 0;
-const G_SAPRO: usize = 1;
-const G_PRED: usize = 2;
+pub(crate) const G_PHOTO: usize = 0;
+pub(crate) const G_SAPRO: usize = 1;
+pub(crate) const G_PRED: usize = 2;
 const G_MOVE: usize = 3;
 const G_DIV: usize = 4;
 const G_CHILD: usize = 5;
 const G_ATTACH: usize = 6;
 const G_SHARE: usize = 7;
 const G_MUT: usize = 8;
-const G_CHEMO: usize = 9;
+pub(crate) const G_CHEMO: usize = 9;
 
 /// `NEIGH8`: neighbour offsets in Python's order (it fixes which tile a `choice` picks).
 const NEIGH8: [(isize, isize); 8] = [
@@ -188,8 +188,8 @@ pub struct World {
     base_light: Vec<f64>,
     /// `shade ** k` for `k` cells above, `k = 0..H` (`np.power(shade, above)`, tabulated).
     shade_pow: Vec<f64>,
-    has_rock: bool,
-    has_chem: bool,
+    pub(crate) has_rock: bool,
+    pub(crate) has_chem: bool,
 }
 
 impl World {
@@ -410,7 +410,7 @@ impl World {
     }
 
     /// `World.update_light` at step `now`: base light x `shade ** (cells above)` x factor.
-    fn update_light(&mut self, now: u64) {
+    pub(crate) fn update_light(&mut self, now: u64) {
         let w = self.width;
         let f = self.light_factor(now);
         let mut above = vec![0usize; w];

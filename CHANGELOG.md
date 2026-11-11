@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G2 M4 part A, C ABI**: `engine-rs` exports a C interface for front-ends (`ws_world_load` from save bytes,
+  `ws_world_step`, `ws_world_info`, `ws_world_state_hash`, `ws_world_render_rgb`, `ws_last_error`,
+  `ws_abi_version`), panic-safe and checked on every pointer and buffer. The kernel renders the world like
+  `render.py`, byte for byte (new golden renders), and computes the light at load like Python.
 - **F5e Prey defence** (ADR-0011): `--set defence=1` gives cells an evolvable armour `armor_p`; an attack
   fails with chance `armor_p` x `defence_strength` (0.8, capped at 0.95), at a cost of `defence_upkeep` (0.2)
   x `armor_p` per step; neutral arm `defence_neutral`. Save format v8 (`armor_p` per cell, counter `defended`;

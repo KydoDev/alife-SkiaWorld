@@ -12,7 +12,7 @@ the F-phase experiments).
 4. [x] M1c Load a save (current `SAVE_VERSION`) in Rust; state hash at step 0 equals Python's
 5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
-7. [ ] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
+7. [~] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
 8. [ ] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
 
@@ -224,3 +224,20 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   three worlds. The speed-up over CPython (12–27×) is below ADR-0008's 30–100× estimate; the kernel is
   unoptimised (it copies the organic field and the config every step, `Vec` bonds), so there is room before M6.
   Timings vary ±5% between runs; Python's baseline is the first steps of each world (a transient).
+- **M4 part A, C ABI** (2026-11-11, Windows 11): `engine-rs/src/ffi.rs` exposes an opaque world handle
+  (`ws_world_load` from gzip bytes, `ws_world_free`), `ws_world_step`, read-only views (`ws_world_info`,
+  `ws_world_state_hash`, `ws_world_render_rgb`), `ws_last_error` (per thread) and `ws_abi_version` (1). Every entry
+  point checks null pointers and exact buffer sizes and runs in `catch_unwind`; a panic in a step poisons the handle.
+  Nothing writes world fields. The Rust loader now computes the light at load like `persistence.py` (light is not
+  hashed: `hashes.csv` unchanged). `render.rs` ports `render.py` keeping numpy's float32/float64 promotions; it equals
+  Python byte for byte on the loaded start save and after 1000 steps, both sets (`render_start.rgb.gz`,
+  `render_end.rgb.gz`, written by `scripts/g2_golden.py`, `--renders-only` for existing sets). `tests/ffi.rs`: golden
+  hashes through the ABI in uneven chunks, bad and refused saves with their message, null handles, wrong buffers,
+  error truncation; a unit test checks the poisoned handle. Checked from outside Rust with Python `ctypes` on the
+  built `worldsim_core.dll` (volcanic, 1000 steps: hash equal).
+  Security review (no blocking issue) follow-ups, done: error messages capped at 512 bytes while formatting (a
+  hostile save echoed a 10 MB string into the error), read-only calls take a shared reference, `ws_last_error` and
+  `set_error` never panic (`try_with`), a build with `panic = "abort"` fails to compile, compressed saves above
+  256 MiB refused, `WsInfo` layout asserted (48 bytes), panic text kept in the message. Open, for later: the
+  light factor (day/night, seasons) is not covered by a golden set (both have it off); render reads the genes,
+  so plasticity at M5 must switch it to the diet (a debug assertion marks it).

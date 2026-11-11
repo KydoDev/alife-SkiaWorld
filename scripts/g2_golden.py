@@ -4,6 +4,9 @@ Writes into --out:
 - start.json.gz  a save (current format) after --warmup steps (default flags, no species tracker);
 - rng.json       draws from CPython's random.Random, floats stored as IEEE-754 bit patterns (hex);
 - hashes.csv     step,hash for each of the --steps steps that follow the save;
+- render_start.rgb.gz / render_end.rgb.gz  `render_rgb` of the loaded start save and of the world after
+  the last step (raw RGB, row 0 = surface; gzip without timestamp). `--renders-only` writes just these two
+  from an existing start.json.gz, leaving the other files untouched;
 - step_N.json.gz with --dump-step N, a save at step N, so a mismatching kernel can name the first
   field that differs (engine-rs/tests/golden_step.rs reads it from engine-rs/target/g2-dumps/<set>/).
 
@@ -16,6 +19,7 @@ Golden files depend on the platform's maths library for gauss/pow/sin, so they r
 """
 import argparse
 import csv
+import gzip
 import hashlib
 import json
 import platform
@@ -27,7 +31,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from worldsim.config import Config  # noqa: E402
-from worldsim.persistence import VERSION, save_world  # noqa: E402
+from worldsim.persistence import VERSION, load_world, save_world  # noqa: E402
+from worldsim.render import render_rgb  # noqa: E402
 from worldsim.world import World  # noqa: E402
 from worldsim.worldgen import load_planet  # noqa: E402
 
@@ -60,6 +65,25 @@ def state_hash(world: World) -> str:
             h.update(u64(b.id))
         h.update(f64(c.sex_p))
     return h.hexdigest()
+
+
+def write_render(world: World, path: Path) -> None:
+    """Raw RGB bytes of `render_rgb`, gzip with mtime 0 so regenerating gives identical files."""
+    with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as f:
+        f.write(render_rgb(world).tobytes(order="C"))
+
+
+def write_renders(out: Path, steps: int) -> None:
+    """Render the loaded start save and the world `steps` steps later; check the final hash."""
+    world = load_world(out / "start.json.gz")
+    write_render(world, out / "render_start.rgb.gz")
+    for _ in range(steps):
+        world.step()
+    with open(out / "hashes.csv", encoding="utf-8") as f:
+        last = list(csv.reader(f))[-1]
+    if [str(world.step_count), state_hash(world)] != [last[0], last[2]]:
+        raise SystemExit(f"{out}: the loaded save does not reproduce hashes.csv; regenerate the set")
+    write_render(world, out / "render_end.rgb.gz")
 
 
 def rng_vectors(seed: int) -> dict:
@@ -96,7 +120,12 @@ def main(argv=None) -> None:
     ap.add_argument("--planet", type=Path, help="planet form (.json) or image; default: the flat default world")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--dump-step", type=int, help="also write a save at this step (step_N.json.gz)")
+    ap.add_argument("--renders-only", action="store_true", help="only (re)write the two golden renders")
     args = ap.parse_args(argv)
+    if args.renders_only:
+        write_renders(args.out, args.steps)
+        print(f"{args.out}: renders written")
+        return
     if args.steps < 1 or args.warmup < 0:
         ap.error("--steps must be >= 1 and --warmup >= 0")
 
@@ -126,6 +155,7 @@ def main(argv=None) -> None:
                    "save_version": VERSION, "warmup": args.warmup, "steps": args.steps,
                    "planet": args.planet.as_posix() if args.planet else None}
     (args.out / "rng.json").write_text(json.dumps(rng, separators=(",", ":")) + "\n", encoding="utf-8")
+    write_renders(args.out, args.steps)
     print(f"{args.out}: start step {args.warmup} hash {start_hash[:12]}, "
           f"{args.steps} steps, final population {len(world.cells)}")
 
