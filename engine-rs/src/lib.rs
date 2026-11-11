@@ -15,6 +15,7 @@ pub mod numpy;
 pub mod render;
 pub mod rng;
 pub mod save;
+pub mod terrain;
 pub mod world;
 
 use std::fmt;

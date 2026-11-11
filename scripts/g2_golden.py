@@ -14,7 +14,8 @@ The state hash is defined in docs/G2_PLAN.md ("State hash"); both engines must i
 Golden files depend on the platform's maths library for gauss/pow/sin, so they record where they were made.
 
 Every golden set is listed in SETS below, the single list that pytest, the Rust tests and CI follow;
-`--all ROOT` (re)writes each of them under ROOT/<name>:
+`--all ROOT` (re)writes each of them under ROOT/<name>, and the procedural-terrain vectors as ROOT/terrain.json
+(scripts/g2_terrain_vectors.py; libm sin/exp, so they are regenerated per platform like the sets):
 
     python scripts/g2_golden.py --all engine-rs/tests/golden
     python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --out engine-rs/target/try
@@ -23,6 +24,7 @@ import argparse
 import csv
 import gzip
 import hashlib
+import importlib.util
 import json
 import platform
 import random
@@ -162,6 +164,14 @@ def rng_vectors(seed: int) -> dict:
     return out
 
 
+def _terrain_vectors():
+    path = Path(__file__).with_name("g2_terrain_vectors.py")
+    spec = importlib.util.spec_from_file_location("g2_terrain_vectors", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=1)
@@ -191,6 +201,8 @@ def main(argv=None, repo_relative=False) -> None:
         renders = ["--renders-only"] if args.renders_only else []
         for name, extra in SETS.items():
             main([*SET_COMMON, *extra, "--out", str(args.all / name), *renders], repo_relative=True)
+        if not args.renders_only:
+            _terrain_vectors().write(args.all / "terrain.json")
         return
     if args.out is None:
         ap.error("--out or --all is required")

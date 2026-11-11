@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0012 piece 3, procedural terrain in the Rust kernel**: `terrain::generate_terrain` and `vent_plume` equal
+  Python's maps bit for bit on 44 terrains and 27 plumes (`scripts/g2_terrain_vectors.py`, written by
+  `g2_golden.py --all` as `terrain.json`, so CI checks it on Linux too); 71 ms for a 10 000 x 100 world with 100
+  vents. `vent_plume` also covers ADR-0013 piece 1.
+- **Plan item 11**: the owner's idea of obstacles and scattered resources that make exploration pay (with item 10).
 - **ADR-0012 piece 2, numpy's pairwise mean in the Rust kernel**: `numpy::numpy_mean` equals `ndarray.mean()` bit
   for bit on 34 lengths around every block boundary (`scripts/g2_mean_vectors.py`); numpy sums the whole array from
   its identity, not from the first element.

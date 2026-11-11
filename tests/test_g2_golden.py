@@ -268,6 +268,39 @@ def test_committed_seed_vectors_match_this_python():
     assert committed["cases"] == fresh and committed["draws"] == sv.DRAWS
 
 
+def _terrain_module():
+    spec = importlib.util.spec_from_file_location("g2_terrain_vectors", ROOT / "scripts" / "g2_terrain_vectors.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_committed_terrain_vectors_match_this_python(request):
+    """engine-rs/tests/golden/terrain.json lists the cases of g2_terrain_vectors.py (ADR-0012 piece 3) and, on
+    the OS it was made on, holds this Python's digests (the two widest cases are skipped here for time)."""
+    tv = _terrain_module()
+    committed = json.loads((ROOT / "engine-rs" / "tests" / "golden" / "terrain.json").read_text(encoding="utf-8"))
+    cases = [(n, p, str(s)) for n, p, seeds in tv.terrain_specs() for s in seeds]
+    assert [(c["name"], c["params"], c["seed"]) for c in committed["terrain"]] == cases
+    assert [(c["width"], c["height"], c["vx"], c["vy"], c["strength"], c["radius"])
+            for c in committed["plumes"]] == tv.plume_specs()
+    if platform.system() != committed["system"]:
+        request.applymarker(pytest.mark.xfail(strict=False, reason=f"made on {committed['system']}; libm may differ"))
+    for c in committed["terrain"]:
+        if c["params"]["width"] < 10_000:
+            assert c == tv.terrain_case(c["name"], c["params"], int(c["seed"])), "regenerate the golden files"
+    assert committed["plumes"] == [tv.plume_case(*spec) for spec in tv.plume_specs()]
+
+
+def test_the_terrain_vectors_are_not_vacuous():
+    committed = json.loads((ROOT / "engine-rs" / "tests" / "golden" / "terrain.json").read_text(encoding="utf-8"))
+    rocky = [c for c in committed["terrain"] if c["rock_tiles"] > 0]
+    vented = [c for c in committed["terrain"] if c["chem_tiles"] > 0]
+    assert len(rocky) >= 30 and len(vented) >= 30
+    assert any(c["rock_tiles"] == 0 and c["chem_tiles"] > 0 for c in committed["terrain"])   # vents on a flat floor
+    assert any(p["nonzero"] == 1 for p in committed["plumes"])                                # exp underflow
+
+
 def test_committed_mean_vectors_match_this_numpy():
     """engine-rs/tests/mean_vectors.json is what this numpy's ndarray.mean() gives (ADR-0012 piece 2)."""
     spec = importlib.util.spec_from_file_location("g2_mean_vectors", ROOT / "scripts" / "g2_mean_vectors.py")

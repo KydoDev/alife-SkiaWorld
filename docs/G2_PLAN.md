@@ -417,3 +417,19 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   only, so the kernel rebuilds it with its own seeding and the file holds only results
   (`scripts/g2_mean_vectors.py` -> `engine-rs/tests/mean_vectors.json`, test `numpy_mean.rs`; a pytest ties the
   file to the installed numpy, so an upgrade that changed the summation fails there). No step, loader or ABI change.
+- **ADR-0012 piece 3, procedural terrain** (2026-11-11, Windows 11): `terrain::generate_terrain` ports
+  `generate_terrain` line for line: the terrain stream `random.Random("worldsim-terrain-{seed}")` (piece 1), the
+  ridge profile with libm `sin`, numpy's pairwise mean (piece 2), `np.rint` as `round_ties_even`, rock below
+  `H - height`, then `vent_count` vents with `randrange(W)` on top of the seabed and the plumes summed in vent order.
+  `vent_plume` is public and shared with the `add_vent` intervention, so **ADR-0013 piece 1 lands here too**. The
+  plume depends only on `dx*dx + dy*dy`, so the kernel tabulates it once per `(|dy|, dx)` (about `H*W/2` calls to
+  `exp`, whatever the vent count), as Python does per distinct distance; the values are the same. Verdict: **met**
+  at the first run: SHA-256 of rock, chem, sun and organic equal on 44 terrains (flat default and with organic;
+  rock only; vents on a flat floor, `vy = H-1`; vents without strength; the volcanic form with seeds 42, 1, 2;
+  `rock_fraction` 0.9 with 100 vents; `vent_radius` 1e-6; widths 2, 7, 8, 9, 127, 128, 129, 257 and 10 000 at
+  height 100, three seeds each, one of them 2^64-1) and on 27 plumes (vents at `(0, 0)`, `(W-1, H-1)` and the
+  centre, widths 2, 7 and 128, radius 4, 1e-6 (`exp` underflows away from the vent) and the volcanic values).
+  Creation time of the largest case (10 000 x 100, 100 vents): **71 ms** in Rust (release, Windows); Python takes
+  a few seconds. libm makes the digests platform-dependent, so `g2_golden.py --all ROOT` also writes
+  `ROOT/terrain.json` (`scripts/g2_terrain_vectors.py`): the committed copy is the Windows reference and CI tests
+  against the one it regenerates on Linux, with no workflow change. No step, loader or ABI change.

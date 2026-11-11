@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 /// The golden sets checked by every test.
+#[allow(dead_code)] // the terrain vectors test uses only the root
 pub const GOLDEN_SETS: [&str; 18] = [
     "default",
     "volcanic",
