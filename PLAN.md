@@ -53,3 +53,10 @@ conflict. Closest: `spec_exp` 3, `pred_eff` 0.25, `pred_upkeep` 1.0 -> median li
 default), population 1268-1398, no extinction, predators 0.5-1.8% (fails only the >= 2% criterion). Other
 long-life settings are unstable across runs (e.g. 4/0.35/1.0: median life 9-130, predators 0-3.1%).
 Next step needs the owner: relaxing the predator criterion would be a change made after seeing the data.
+
+## Check of the chosen setting (owner decision 2026-11-11; criteria fixed before running)
+Setting: `spec_exp=3`, `pred_eff=0.25`, `pred_upkeep=1.0`. **The predator criterion is relaxed after seeing the sweep
+data** (from >= 2% of cells to "predators present"); this is recorded as a post-hoc change. 30k steps, the 20 P1 pairs
+(seeds 1, 3, ..., 19 x both planets; independent of the selection seeds 41 and 43), second half.
+Accepted as the "long-life world" if, in >= 16/20 pairs: median age at death of descendants >= 20; mean population
+>= 300; no extinction; mean predator share > 0. Default-world rows on the same pairs are run alongside for reference.
