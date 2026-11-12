@@ -2,7 +2,8 @@
 // instead of hand-edited.
 //   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
 //   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.ConfigureRenderPipeline
-//   Unity -batchmode -quit -projectPath unity -buildTarget Android -executeMethod WorldSim.EditorTools.WorldSimSetup.BuildAndroid
+//   Unity -batchmode -quit -projectPath unity -buildTarget Android -executeMethod WorldSim.EditorTools.WorldSimSetup.BuildAndroid [-appVersion X.Y.Z]
+//   (the APK is Builds/Android/worldsim-<version>.apk; -appVersion first sets the version, see SetVersion)
 //   (BuildAndroidCheck: the G3 P3 device check, normally run by scripts/android_check.py)
 using UnityEditor;
 using UnityEditor.Build;
@@ -29,7 +30,7 @@ namespace WorldSim.EditorTools
         // Provisional: the store name and its trademark check are still open (G3_PLAN "Design reference").
         public const string AndroidId = "com.kydodev.worldsim";
         public const string AndroidCheckId = "com.kydodev.worldsim.check";
-        public const string AndroidApk = "Builds/Android/worldsim.apk";
+        public const string AndroidApkFolder = "Builds/Android";
         public const string AndroidCheckApk = "Builds/Android/worldsim-check.apk";
 
         [MenuItem("WorldSim/Create front-end scene")]
@@ -163,8 +164,50 @@ namespace WorldSim.EditorTools
             {
                 throw new BuildFailedException("Assets/StreamingAssets/golden exists: delete it before a viewer build");
             }
+            string[] args = System.Environment.GetCommandLineArgs();
+            int at = System.Array.IndexOf(args, "-appVersion");
+            if (at >= 0)
+            {
+                SetVersion(at + 1 < args.Length ? args[at + 1] : "");
+            }
             ConfigureAndroid();
-            Build(new[] { ScenePath }, AndroidApk, AndroidId, PlayerSettings.productName);
+            string apk = $"{AndroidApkFolder}/worldsim-{PlayerSettings.bundleVersion}.apk";
+            Build(new[] { ScenePath }, apk, AndroidId, PlayerSettings.productName);
+        }
+
+        // The app's version, one source for the Unity player (Application.version, shown in the HUD) and the APK:
+        // MAJOR.MINOR.PATCH (owner's rule, 2026-11-12): PATCH goes up with every APK delivered to the phone, MINOR
+        // only with the owner's approval for a substantial change, 1.0.0 at the first release. The Android version
+        // code follows it (MAJOR * 10000 + MINOR * 100 + PATCH), so an install always sees a newer build; a version
+        // older than the current one is refused.
+        public static void SetVersion(string version)
+        {
+            int code = VersionCode(version);
+            if (code < VersionCode(PlayerSettings.bundleVersion, lenient: true))
+            {
+                throw new BuildFailedException($"version {version} is older than {PlayerSettings.bundleVersion}");
+            }
+            PlayerSettings.bundleVersion = version;
+            PlayerSettings.Android.bundleVersionCode = code;
+            AssetDatabase.SaveAssets();
+            Debug.Log($"WorldSim: version {version} (Android version code {code})");
+        }
+
+        private static int VersionCode(string version, bool lenient = false)
+        {
+            string[] parts = version.Split('.');
+            if (parts.Length == 3
+                && int.TryParse(parts[0], out int major) && int.TryParse(parts[1], out int minor)
+                && int.TryParse(parts[2], out int patch)
+                && major >= 0 && major < 2000 && minor >= 0 && minor < 100 && patch >= 0 && patch < 100)
+            {
+                return major * 10000 + minor * 100 + patch;
+            }
+            if (lenient)
+            {
+                return 0;    // a version from before this scheme (Unity's default "1.0")
+            }
+            throw new BuildFailedException($"-appVersion '{version}': expected MAJOR.MINOR.PATCH, MINOR and PATCH < 100");
         }
 
         public static void BuildAndroidCheck()

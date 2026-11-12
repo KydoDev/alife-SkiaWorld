@@ -1,6 +1,7 @@
-// G3 P2 camera over the world, kept apart from the UI so EditMode tests can check it. Units: device pixels in the
+// G3 camera over the world, kept apart from the UI so EditMode tests can check it. Units: device pixels in the
 // view (origin top-left, y down) and tiles (row 0 = the surface). The scale is a whole number of device pixels per
-// tile, so every tile has the same size on screen. x wraps (the world is toroidal), y is clamped.
+// tile, so every tile has the same size on screen. The world is drawn once (P2b, owner's rule): the simulation is
+// toroidal in x, but the view never repeats it; both axes are clamped, and an axis shorter than the view is centred.
 using UnityEngine;
 
 namespace WorldSim
@@ -14,17 +15,23 @@ namespace WorldSim
         /// <summary>Device pixels per tile, from <see cref="MinScale"/> to <see cref="MaxScale"/>.</summary>
         public int Scale { get; private set; }
 
-        /// <summary>The smallest scale: the whole depth fits the view (rounded down, at least 1).</summary>
+        /// <summary>The smallest scale: the whole world, width and depth, fits the view (rounded down, at least 1).
+        /// </summary>
         public int MinScale { get; private set; } = 1;
 
-        /// <summary>Tile coordinate at the view's left edge, in [0, Width).</summary>
+        /// <summary>Tile coordinate at the view's left edge; negative when the world is narrower than the view (it
+        /// is then centred).</summary>
         public double OffsetX { get; private set; }
 
-        /// <summary>Tile coordinate at the view's top edge; negative when the world is shorter than the view
-        /// (it is then centred).</summary>
+        /// <summary>Tile coordinate at the view's top edge; negative when the world is shorter than the view.</summary>
         public double OffsetY { get; private set; }
 
         public Vector2 ViewSize { get; private set; }
+
+        /// <summary>Set by <see cref="FitWorld"/>, cleared when the player zooms or pans: while set, every new view
+        /// size refits, so a fit taken on a stale or still-changing layout (a screen turn, the safe-area padding)
+        /// corrects itself on the next size.</summary>
+        public bool FollowFit { get; private set; }
 
         public WorldCamera(int width, int height, int maxScale)
         {
@@ -38,21 +45,24 @@ namespace WorldSim
         public void SetView(Vector2 viewSize)
         {
             ViewSize = viewSize;
-            MinScale = Mathf.Clamp(Mathf.FloorToInt(viewSize.y / Height), 1, MaxScale);
-            Scale = Mathf.Clamp(Scale, MinScale, MaxScale);
-            ClampY();
+            int fit = Mathf.FloorToInt(Mathf.Min(viewSize.x / Width, viewSize.y / Height));
+            MinScale = Mathf.Clamp(fit, 1, MaxScale);
+            Scale = FollowFit ? MinScale : Mathf.Clamp(Scale, MinScale, MaxScale);
+            Clamp();
         }
 
-        /// <summary>The first-run view: the smallest scale (the whole depth), x at tile 0.</summary>
-        public void FitHeight()
+        /// <summary>The first view: the smallest scale, so the whole world is on screen, centred.</summary>
+        public void FitWorld()
         {
             Scale = MinScale;
             OffsetX = 0;
             OffsetY = 0;
-            ClampY();
+            FollowFit = true;
+            Clamp();
         }
 
-        /// <summary>Change the scale so the tile under <paramref name="point"/> stays under it.</summary>
+        /// <summary>Change the scale so the tile under <paramref name="point"/> stays under it (as far as the
+        /// clamp allows).</summary>
         public void ZoomAt(int scale, Vector2 point)
         {
             scale = Mathf.Clamp(scale, MinScale, MaxScale);
@@ -63,9 +73,10 @@ namespace WorldSim
             double tileX = OffsetX + point.x / Scale;
             double tileY = OffsetY + point.y / Scale;
             Scale = scale;
-            OffsetX = Wrap(tileX - point.x / scale);
+            FollowFit = false;
+            OffsetX = tileX - point.x / scale;
             OffsetY = tileY - point.y / scale;
-            ClampY();
+            Clamp();
         }
 
         /// <summary>The next scale up or down (about a quarter at a time, at least one step).</summary>
@@ -79,59 +90,43 @@ namespace WorldSim
         /// on the left).</summary>
         public void Pan(Vector2 delta)
         {
-            OffsetX = Wrap(OffsetX - delta.x / Scale);
+            double x = OffsetX, y = OffsetY;
+            OffsetX -= delta.x / Scale;
             OffsetY -= delta.y / Scale;
-            ClampY();
+            Clamp();
+            if (OffsetX != x || OffsetY != y)
+            {
+                FollowFit = false;    // a pan that moved the world; one that the clamp undid keeps the fit
+            }
         }
 
-        /// <summary>The tile under <paramref name="point"/>; false above or below the world.</summary>
-        public bool TileAt(Vector2 point, out int x, out int y)
-        {
-            x = (int)Wrap(System.Math.Floor(OffsetX + point.x / Scale));
-            y = (int)System.Math.Floor(OffsetY + point.y / Scale);
-            return y >= 0 && y < Height && point.x >= 0 && point.x < ViewSize.x;
-        }
-
-        /// <summary>Where copy 0 of the world starts, in whole device pixels (in (-Width * Scale, 0]); further
-        /// copies follow every Width * Scale pixels until the view is covered.</summary>
-        public int FirstCopyLeft()
-        {
-            int left = -(int)System.Math.Round(OffsetX * Scale);
-            int period = Width * Scale;
-            return left <= -period ? left + period : left;
-        }
+        /// <summary>The world's left edge, in whole device pixels.</summary>
+        public int Left() => -(int)System.Math.Round(OffsetX * Scale);
 
         /// <summary>The world's top edge, in whole device pixels.</summary>
         public int Top() => -(int)System.Math.Round(OffsetY * Scale);
 
-        /// <summary>How many side-by-side copies cover the view.</summary>
-        public int CopiesNeeded()
+        /// <summary>The tile under <paramref name="point"/>, measured from the drawn edges, so the tile a tap
+        /// names is the tile drawn there; false in the margins around the world and outside the view.</summary>
+        public bool TileAt(Vector2 point, out int x, out int y)
         {
-            int period = Width * Scale;
-            return Mathf.Max(1, Mathf.CeilToInt((ViewSize.x - FirstCopyLeft()) / period));
+            x = (int)System.Math.Floor((point.x - Left()) / Scale);
+            y = (int)System.Math.Floor((point.y - Top()) / Scale);
+            return x >= 0 && x < Width && y >= 0 && y < Height
+                   && point.x >= 0 && point.x < ViewSize.x && point.y >= 0 && point.y < ViewSize.y;
         }
 
-        private double Wrap(double x)
+        private void Clamp()
         {
-            double r = x % Width;
-            if (r < 0)
-            {
-                r += Width;
-            }
-            return r >= Width ? 0 : r;   // -1e-17 + Width rounds to Width
+            OffsetX = ClampAxis(OffsetX, ViewSize.x / Scale, Width);
+            OffsetY = ClampAxis(OffsetY, ViewSize.y / Scale, Height);
         }
 
-        private void ClampY()
+        private static double ClampAxis(double offset, double visible, int size)
         {
-            double visible = ViewSize.y / Scale;
-            if (visible >= Height)
-            {
-                OffsetY = -(visible - Height) / 2;     // shorter than the view: centred
-            }
-            else
-            {
-                OffsetY = System.Math.Clamp(OffsetY, 0, Height - visible);
-            }
+            return visible >= size
+                ? -(visible - size) / 2                          // shorter than the view: centred
+                : System.Math.Clamp(offset, 0, size - visible);
         }
     }
 }

@@ -108,14 +108,15 @@
     border-radius: 0;
 }
 
+/* No padding or border here: WorldCamera takes taps in element-local units against the content size. */
 .ws-world {
     flex-grow: 1;
     background-color: #000000;
     overflow: hidden;
 }
 
-/* One copy of the world texture; WorldSimView places the copies side by side (the x wrap). */
-.ws-world-copy {
+/* The world texture, drawn once; WorldSimView places it (centred, or panned and clamped). */
+.ws-world-image {
     position: absolute;
 }
 

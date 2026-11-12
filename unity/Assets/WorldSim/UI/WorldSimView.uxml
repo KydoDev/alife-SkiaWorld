@@ -14,6 +14,7 @@
             <ui:Button name="faster" text="+" class="ws-btn ws-btn--square" />
             <ui:TextField name="seed" label="seed" max-length="20" class="ws-seed" />
             <ui:Button name="new-world" text="New world" class="ws-btn" />
+            <ui:Button name="orientation" text="Portrait" class="ws-btn" />
         </ui:VisualElement>
         <ui:VisualElement name="world" class="ws-world">
             <ui:Label name="error" class="ws-error" />

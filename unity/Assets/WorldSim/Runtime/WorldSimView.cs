@@ -2,8 +2,10 @@
 // step / speed, (ADR-0012) "New world" from an exported config and a typed seed, and (ADR-0013) the five G1
 // sandbox tools applied with a click, with the parameters Python's GameRules() exports. No budget or milestones
 // yet (G3 P7). The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette). G3 P2: the world is seen through
-// a WorldCamera (pinch or wheel zoom in whole device pixels per tile, drag to pan, wrapping in x); a tap applies the
-// selected tool or, with none, names the tile. Input comes from the Input System package.
+// a WorldCamera (pinch or wheel zoom in whole device pixels per tile, drag to pan); a tap applies the selected tool
+// or, with none, names the tile. Input comes from the Input System package. G3 P2b: the whole world is on screen at
+// the first view and drawn once (no x wrap in the view); the player picks portrait or landscape, which locks a phone's
+// screen and shapes New world (wide or deep).
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -33,6 +35,9 @@ namespace WorldSim
         [Tooltip("Config object in StreamingAssets for New world, exported by scripts/unity_sync.py")]
         public string configFile = "world_config.json";
 
+        [Tooltip("The same planet, deep instead of wide: New world in portrait (G3 P2b), exported by unity_sync.py")]
+        public string portraitConfigFile = "world_config_portrait.json";
+
         [Tooltip("G1 tool parameters in StreamingAssets, exported from GameRules() by scripts/unity_sync.py")]
         public string toolsFile = "game_tools.json";
 
@@ -55,23 +60,27 @@ namespace WorldSim
 
         private NativeWorld _world;
         private WorldCamera _camera;
-        private bool _fitPending;            // a new camera fits the height once the view has a size
+        private bool _fitPending;            // every world opened starts whole on screen, once the view has a size
         private Vector2Int _fittedScreen;    // the screen size FitView last used (device pixels per point follow it)
         private WorldInfo _info;
         private Texture2D _texture;
         private byte[] _rgb;
         private byte[] _flipped;
         private double _pending;
-        private StreamingRead _config;       // read once at Start, used by every New world
+        private StreamingRead _config;       // read once at Start, used by every New world in landscape
+        private StreamingRead _portraitConfig;    // ... and in portrait
         private bool _ready;                 // Start has opened the bundled world: New world may replace it
         private Button _newWorld;
+        private Button _orientation;
+        private bool _portrait;              // the player's choice (PlayerPrefs); landscape until one is made
+        private const string OrientationKey = "worldsim.orientation";
         private ToolSpec[] _tools = Array.Empty<ToolSpec>();
         private int _tool = -1;              // index into _tools; -1: no tool (clicks do nothing)
 
         // UI Toolkit elements (WorldSimView.uxml)
         private VisualElement _root;
         private VisualElement _worldView;
-        private readonly List<Image> _copies = new List<Image>();   // side-by-side copies: the x wrap
+        private Image _image;                // the world, drawn once (no copies: P2b)
         private Label _stats, _speed, _error, _toolStatus;
 
         // gestures on the world: the pointers down (panel units, world-local), a tap candidate, a pinch
@@ -108,10 +117,13 @@ namespace WorldSim
         private IEnumerator Start()
         {
             BindUi();
+            _portrait = PlayerPrefs.GetInt(OrientationKey, 0) == 1;
+            ApplyOrientation();
             var tools = new StreamingRead(toolsFile, MaxToolsBytes);
             _config = new StreamingRead(configFile, MaxConfigBytes);
+            _portraitConfig = new StreamingRead(portraitConfigFile, MaxConfigBytes);
             var save = new StreamingRead(saveFile, MaxSaveBytes);
-            foreach (StreamingRead read in new[] { tools, _config, save })
+            foreach (StreamingRead read in new[] { tools, _config, _portraitConfig, save })
             {
                 if (!read.Done)
                 {
@@ -141,6 +153,11 @@ namespace WorldSim
             VisualElement doc = GetComponent<UIDocument>().rootVisualElement;
             _root = doc.Q("root");
             _stats = doc.Q<Label>("stats");
+            Label title = doc.Q<Label>("title");
+            if (title != null)
+            {
+                title.text += $" v{Application.version}";    // which build is installed, at a glance
+            }
             _speed = doc.Q<Label>("speed");
             _error = doc.Q<Label>("error");
             _toolStatus = doc.Q<Label>("tool-status");
@@ -156,6 +173,13 @@ namespace WorldSim
             Bind(doc, "faster", () => speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1));
             _newWorld = Bind(doc, "new-world", NewWorld);
             _newWorld?.SetEnabled(false);    // until Start has read the files (see _ready)
+            _orientation = Bind(doc, "orientation", () =>
+            {
+                _portrait = !_portrait;
+                PlayerPrefs.SetInt(OrientationKey, _portrait ? 1 : 0);
+                PlayerPrefs.Save();
+                ApplyOrientation();
+            });
             _seed = doc.Q<TextField>("seed");
             _seed.value = seedText;
             _seed.RegisterValueChangedCallback(e => seedText = e.newValue);
@@ -192,6 +216,26 @@ namespace WorldSim
                 RefreshHud();
             };
             return button;
+        }
+
+        /// <summary>The player's orientation: on a phone the screen is locked to it (no autorotation); everywhere it
+        /// picks the shape of the next New world. The button names the other orientation, the one it switches to.
+        /// </summary>
+        private void ApplyOrientation()
+        {
+            if (Application.isMobilePlatform)
+            {
+                // both sides of the chosen orientation, so the phone may be held either way up
+                Screen.autorotateToPortrait = _portrait;
+                Screen.autorotateToPortraitUpsideDown = _portrait;
+                Screen.autorotateToLandscapeLeft = !_portrait;
+                Screen.autorotateToLandscapeRight = !_portrait;
+                Screen.orientation = ScreenOrientation.AutoRotation;
+            }
+            if (_orientation != null)
+            {
+                _orientation.text = _portrait ? "Landscape" : "Portrait";
+            }
         }
 
         /// <summary>Portrait or landscape classes, and padding for the screen's safe area (notches, bars).</summary>
@@ -290,7 +334,7 @@ namespace WorldSim
             return _camera != null && _camera.TileAt(local * PixelsPerPoint(), out x, out y);
         }
 
-        /// <summary>Give the camera the view's size; a new camera then fits the height.</summary>
+        /// <summary>Give the camera the view's size; a pending fit then shows the whole world.</summary>
         private void FitView()
         {
             if (_camera == null)
@@ -302,17 +346,25 @@ namespace WorldSim
             {
                 return;
             }
+            var screen = new Vector2Int(Screen.width, Screen.height);
+            if (_fittedScreen != Vector2Int.zero && (screen.x > screen.y) != (_fittedScreen.x > _fittedScreen.y))
+            {
+                _fitPending = true;    // the screen turned: show the whole world again, whatever the zoom was
+            }
             _camera.SetView(size);
-            _fittedScreen = new Vector2Int(Screen.width, Screen.height);
+            _fittedScreen = screen;
             if (_fitPending)
             {
-                _camera.FitHeight();
+                _camera.FitWorld();
                 _fitPending = false;
             }
             LayoutWorld();
         }
 
-        /// <summary>Place the world's copies (whole device pixels, so every tile is the same size).</summary>
+        /// <summary>The world's image element (null before the first world); tests read its layout.</summary>
+        public Image WorldImage => _image;
+
+        /// <summary>Place the world's image (whole device pixels, so every tile is the same size).</summary>
         public void LayoutWorld()
         {
             if (_camera == null || _texture == null)
@@ -320,27 +372,17 @@ namespace WorldSim
                 return;
             }
             float k = PixelsPerPoint();
-            int count = _camera.CopiesNeeded();
-            while (_copies.Count < count)
+            if (_image == null)
             {
-                var copy = new Image { image = _texture, scaleMode = ScaleMode.StretchToFill,
-                                       pickingMode = PickingMode.Ignore };
-                copy.AddToClassList("ws-world-copy");
-                _worldView.Insert(_copies.Count, copy);   // in copy order, under the error label
-                _copies.Add(copy);
+                _image = new Image { scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore };
+                _image.AddToClassList("ws-world-image");
+                _worldView.Insert(0, _image);    // under the error label
             }
-            int period = _camera.Width * _camera.Scale;
-            int left = _camera.FirstCopyLeft();
-            for (int i = 0; i < _copies.Count; i++)
-            {
-                Image copy = _copies[i];
-                copy.style.display = i < count ? DisplayStyle.Flex : DisplayStyle.None;
-                copy.image = _texture;
-                copy.style.left = (left + i * period) / k;
-                copy.style.top = _camera.Top() / k;
-                copy.style.width = period / k;
-                copy.style.height = _camera.Height * _camera.Scale / k;
-            }
+            _image.image = _texture;
+            _image.style.left = _camera.Left() / k;
+            _image.style.top = _camera.Top() / k;
+            _image.style.width = _camera.Width * _camera.Scale / k;
+            _image.style.height = _camera.Height * _camera.Scale / k;
         }
 
         private void OnWorldPointerDown(PointerDownEvent e)
@@ -558,12 +600,13 @@ namespace WorldSim
                 ShowError("still loading the bundled files");
                 return;
             }
-            if (_config.Data == null)
+            StreamingRead config = _portrait ? _portraitConfig : _config;    // wide in landscape, deep in portrait
+            if (config.Data == null)
             {
-                ShowError($"{_config.Error}\n(run scripts/unity_sync.py)");
+                ShowError($"{config.Error}\n(run scripts/unity_sync.py)");
                 return;
             }
-            Open(() => NativeWorld.Create(_config.Data, seed), $"config: {_config.Location}, seed {seed}");
+            Open(() => NativeWorld.Create(config.Data, seed), $"config: {config.Location}, seed {seed}");
             RefreshHud();
         }
 
@@ -602,10 +645,9 @@ namespace WorldSim
                         wrapMode = TextureWrapMode.Clamp,
                         name = "WorldSim",
                     };
-                    // a new size: a new camera, fitted to the height once the view has a size
                     _camera = new WorldCamera((int)_info.Width, (int)_info.Height, maxScale);
-                    _fitPending = true;
                 }
+                _fitPending = true;    // every world opened starts whole on screen, once the view has a size
                 FitView();
                 _pending = 0;
                 ShowError(null);
@@ -712,10 +754,7 @@ namespace WorldSim
             }
             _texture.SetPixelData(_flipped, 0);
             _texture.Apply(false);
-            foreach (Image copy in _copies)
-            {
-                copy.MarkDirtyRepaint();   // the panel repaints only when something in it is dirty
-            }
+            _image?.MarkDirtyRepaint();    // the panel repaints only when something in it is dirty
         }
 
         private void OnDestroy()

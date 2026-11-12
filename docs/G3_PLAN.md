@@ -11,7 +11,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 2. [?] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
 3. [?] P2 Touch camera: pinch zoom (integer steps), pan wrapping in x, tap = tool or tile (inspector in P6)
 4. [?] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
-12. [ ] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
+12. [?] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
 5. [ ] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [ ] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [ ] P6 Inspector bottom sheet and population screen from the ABI 4 views
@@ -85,6 +85,25 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   never repeated, and panning clamps in x as in y (the simulation stays toroidal; only the view stops wrapping); the player picks portrait or landscape (the screen is then locked to it); New world
   makes a world shaped for that orientation (wide for landscape, deep for portrait). Sizes per orientation are the
   owner's call before the code.
+  *Result (2026-11-12)*: sizes as proposed to the owner before the code (answer: "procedi"): landscape 160×64, the
+  planet form's own size; portrait 64×160, the same config with its sides swapped (`unity_sync.py` `shaped()`,
+  validated, written as `world_config_portrait.json`). `WorldCamera.FitWorld` takes the largest whole scale at which
+  width and depth fit; the world is one `Image`, clamped and centred on both axes; `TileAt` measures from the drawn
+  edges and refuses the margins. Every world opened and every screen turn refits. The orientation button stores the
+  choice in PlayerPrefs (landscape by default, so the bundled 160×64 save fills the first screen) and locks a phone's
+  screen. A headless 64×160 run (`run.py --planet examples/volcanic.json --set width=64 --set height=160 --steps
+  3000 --seed 1`) stays alive: 535 cells at step 3000 (min 122), photo 75 / sapro 114 / pred 96 / chemo 250, against
+  757 cells and photo 32 / sapro 24 / pred 54 / chemo 647 for 160×64; the light (`light_depth` 30) reaches about the
+  top fifth of the deep world, so it is a darker world with more decomposers and predators. Not retuned.
+  The bundled save stays 160×64, so in portrait it shows as a band until New world. Security review: the fit
+  first ran once, so a fit measured on a stale layout (a screen turn, the safe-area padding arriving later) could
+  leave the world partly off screen; now the camera follows the fit (`FollowFit`) until the player zooms or pans.
+  The phone autorotates within the chosen orientation (both landscape sides, or both portrait sides). Known and
+  kept: the simulation is still toroidal, so a tool used at one x edge also reaches the opposite edge, which the
+  unwrapped view shows at the far side of the screen. The portrait world is not dynamically equivalent to the
+  landscape one (its lower ~100 rows get under 4% light): the owner asked for different worlds by shape.
+  Owner's check on the phone (2026-11-12): "funziona", the whole world on screen. Open: the owner dislikes the black
+  margins around the fitted world; how to fill them is decided with the pixel-art design (P5), not now.
 - **P4 Kernel views (ABI 4, needs an ADR)** — read-only entry points, no RNG, no state change, state hash
   untouched, each wrapped in `catch_unwind` like the others:
   - `ws_world_tiles(handle, out, len)`: one `u32` per tile, packed: kind (empty / photo / chemo / sapro /
@@ -101,7 +120,8 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   per cell; below that, flat diet colour (today's look). Glow: the URP renderer has no post-processing
   (null `postProcessData`, see DEVELOPER_GUIDE), so the night halo is baked into the atlas (a ring of
   translucent pixels), not bloom. Pass: frame time on the P3 phone ≤ 16 ms at the default world, all
-  zoom levels; a screenshot test of a golden save matches a reference image.
+  zoom levels; a screenshot test of a golden save matches a reference image. Also decide here how to fill the margins
+  around the fitted world (P2b leaves them black; the owner wants them filled with the final design).
 - **P6 Inspector and population** — from P4 views. Pass: the inspector's values for a golden cell equal
   the Python export.
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the

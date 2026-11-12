@@ -6,7 +6,9 @@ Builds `engine-rs` in release mode and copies:
   in the name, which an Android build would unpack);
 - the config of a planet form (default: examples/volcanic.json), `Config.to_dict()` as a save stores it, to
   `unity/Assets/StreamingAssets/world_config.json`: the input of "New world", which the kernel creates with the
-  seed typed in the front-end (ADR-0012; forms and images themselves stay in Python);
+  seed typed in the front-end (ADR-0012; forms and images themselves stay in Python); and
+  `world_config_portrait.json`, the same planet with its sides swapped (G3 P2b: New world is wide in landscape,
+  deep in portrait);
 - the G1 tool parameters of `GameRules()` (kind, radius, amount per tool) to
   `unity/Assets/StreamingAssets/game_tools.json`: the viewer's sandbox tools (ADR-0013 piece 5), so the game
   rules keep one home, in Python.
@@ -21,6 +23,7 @@ re-running this script after a kernel change.
     python scripts/unity_sync.py --android
 """
 import argparse
+import dataclasses
 import json
 import os
 import re
@@ -72,7 +75,8 @@ def main(argv=None) -> None:
     copy(args.save, UNITY / "Assets/StreamingAssets/world.save")
     for stale in ("world.json.gz", "world.json.gz.meta"):   # the name before G3 P3: an APK would carry it
         (UNITY / "Assets/StreamingAssets" / stale).unlink(missing_ok=True)
-    write_config(args.planet, UNITY / "Assets/StreamingAssets/world_config.json")
+    write_config(args.planet, UNITY / "Assets/StreamingAssets/world_config.json",
+                 UNITY / "Assets/StreamingAssets/world_config_portrait.json")
     write_tools(UNITY / "Assets/StreamingAssets/game_tools.json")
 
 
@@ -144,9 +148,17 @@ def write_tools(dst: Path) -> None:
     print(f"GameRules() tools -> {dst.relative_to(ROOT)}")
 
 
-def write_config(planet: Path, dst: Path) -> None:
-    """The planet form's config as a save stores it (forms only: an image's terrain is not procedural). The form
-    is read by worldgen (size cap, validation), as `run.py --planet` reads it."""
+def shaped(cfg, portrait: bool):
+    """The config with its longer side across (landscape) or down (portrait), validated like any other."""
+    long, short = max(cfg.width, cfg.height), min(cfg.width, cfg.height)
+    width, height = (short, long) if portrait else (long, short)
+    return dataclasses.replace(cfg, width=width, height=height).validate()
+
+
+def write_config(planet: Path, dst: Path, dst_portrait: Path) -> None:
+    """The planet form's config as a save stores it (forms only: an image's terrain is not procedural), once wide
+    for landscape (`dst`) and once deep for portrait (`dst_portrait`). The form is read by worldgen (size cap,
+    validation), as `run.py --planet` reads it."""
     from worldsim.worldgen import PlanetError, planet_from_form
     if planet.suffix.lower() != ".json":
         raise SystemExit(f"{planet}: New world needs a planet form (.json), not an image")
@@ -154,9 +166,15 @@ def write_config(planet: Path, dst: Path) -> None:
         cfg, _, seed = planet_from_form(planet)
     except (OSError, PlanetError, RecursionError) as e:
         raise SystemExit(f"cannot export the config of {planet}: {e}") from e
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps(cfg.to_dict(), separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"{planet.name} config -> {dst.relative_to(ROOT)} (seed {seed} gives the planet of run.py --planet)")
+    for path, portrait in ((dst, False), (dst_portrait, True)):
+        try:
+            shape = shaped(cfg, portrait)
+        except ValueError as e:   # e.g. a sensing radius too wide for the shorter side
+            raise SystemExit(f"{planet}: no valid {'portrait' if portrait else 'landscape'} shape: {e}") from e
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(shape.to_dict(), separators=(",", ":")) + "\n", encoding="utf-8")
+        print(f"{planet.name} config {shape.width}x{shape.height} -> {path.relative_to(ROOT)}")
+    print(f"(seed {seed} gives the planet of run.py --planet)")
 
 
 if __name__ == "__main__":

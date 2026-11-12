@@ -114,9 +114,13 @@ python scripts/android_check.py             # device check APK: golden sets and 
 - **UI (G3 P1)**: UI Toolkit. `Assets/WorldSim/UI/WorldSimView.uxml` is the layout (HUD, control bar, world, tool
   dock), `WorldSimView.uss` the Neon Abyss style, `WorldSimTheme.tss` the theme and `WorldSimPanel.asset` the panel
   settings (scale with screen size from 1280x720, created by `CreateScene`). The world is shown through a
-  `WorldCamera` (G3 P2): a whole number of device pixels per tile, from "the whole depth fits" (the first view) up to
-  `maxScale`; x wraps, y is clamped. The point-filtered texture is drawn as side-by-side `Image` copies in a clipped
-  `#world`, so the seam needs no texture repeat. The root gets `ws-portrait` or
+  `WorldCamera` (G3 P2, P2b): a whole number of device pixels per tile, from "the whole world fits" (the first view,
+  refitted for every world opened and every screen turn) up to `maxScale`. The world is drawn once, as one `Image`
+  in a clipped `#world`: both axes are clamped and an axis shorter than the view is centred (the simulation is
+  toroidal in x, the view is not: owner's rule). A tap in the margins names no tile. The **orientation** button
+  switches portrait / landscape: the choice is kept in PlayerPrefs (`worldsim.orientation`, landscape by default),
+  locks a phone's screen (`Screen.orientation`) and picks the config of New world: `world_config.json` (wide) or
+  `world_config_portrait.json` (the same planet, deep), both written by `unity_sync.py`. The root gets `ws-portrait` or
   `ws-landscape` and padding from `Screen.safeArea`. Font: Pixelify Sans (`UI/Fonts`, SIL OFL, `OFL.txt` beside
   it). **Input: the Input System package only** (`activeInputHandler: 1`); UI Toolkit reads it through the package's
   `InputSystemProvider`, so the scene needs no EventSystem. On the world: drag pans, pinch (two fingers) or the
@@ -124,7 +128,12 @@ python scripts/android_check.py             # device check APK: golden sets and 
   by a second finger) applies the selected tool or, with none, names the tile in the dock. Keys (Space, N, +/-) come
   from `Keyboard.current` (none on a phone) and are ignored while the seed field has the focus.
 - **Android (G3 P3)**: IL2CPP, ARM64 only, min API 26, provisional id `com.kydodev.worldsim` (the device check is
-  `com.kydodev.worldsim.check`); APKs go to `unity/Builds/Android/`. The two kernel libraries sit in the git-ignored
+  `com.kydodev.worldsim.check`); APKs go to `unity/Builds/Android/`. **Version** (owner's rule, 2026-11-12):
+  `MAJOR.MINOR.PATCH` in `PlayerSettings.bundleVersion`, the one source for `Application.version` (shown after the
+  HUD title) and the viewer APK's name, `worldsim-<version>.apk`. PATCH goes up with every APK delivered to the
+  phone (`BuildAndroid -appVersion 0.0.2`); MINOR only with the owner's approval, for a substantial change; 1.0.0
+  at the first release. `SetVersion` refuses an older version and sets the Android version code to
+  `MAJOR * 10000 + MINOR * 100 + PATCH`. The device-check APK keeps its fixed name. The two kernel libraries sit in the git-ignored
   Plugins folder, so `WorldSimSetup.ConfigureAndroid` sets their import settings from code (.so: Android ARM64; .dll:
   Editor and Windows). On Android StreamingAssets stay inside the APK: `StreamingRead` reads them through
   `UnityWebRequest` (the desktop reads the file directly), and the build gunzips any `*.gz` there, so the bundled save

@@ -1,6 +1,6 @@
-// PlayMode tests of the G3 P2 camera in the real view (UI Toolkit panel, Input System): the tile drawn at a screen
-// point is the tile a tap there selects, at three zoom levels and across the x seam; and a virtual mouse reaches the
-// panel (the Input System is the only input backend).
+// PlayMode tests of the G3 P2/P2b camera in the real view (UI Toolkit panel, Input System): the first view shows the
+// whole world; the tile drawn at a screen point is the tile a tap there selects, at three zoom levels and at both x
+// edges (the view never wraps); and a virtual mouse reaches the panel (the Input System is the only input backend).
 //   Unity -projectPath unity -runTests -testPlatform PlayMode -testResults <file>
 // Without -batchmode: the Editor opens a window, and only then do runtime panels receive input (the mouse test
 // is skipped in batchmode).
@@ -76,14 +76,10 @@ namespace WorldSim.PlayTests
             }
         }
 
-        private static Image Copy(WorldSimView view, int index) =>
-            view.WorldElement.Query<Image>(className: "ws-world-copy").AtIndex(index);
-
-        /// <summary>The centre of tile (x, y) as drawn by copy <paramref name="copy"/>, in world-local panel units.
-        /// </summary>
-        private static Vector2 DrawnCentre(WorldSimView view, int copy, int x, int y)
+        /// <summary>The centre of tile (x, y) as drawn by the world image, in world-local panel units.</summary>
+        private static Vector2 DrawnCentre(WorldSimView view, int x, int y)
         {
-            Rect r = Copy(view, copy).layout;
+            Rect r = view.WorldImage.layout;
             WorldCamera camera = view.Camera;
             return new Vector2(r.x + (x + 0.5f) * r.width / camera.Width,
                                r.y + (y + 0.5f) * r.height / camera.Height);
@@ -93,32 +89,48 @@ namespace WorldSim.PlayTests
         {
             WorldCamera c = view.Camera;
             return $"screen {Screen.width}x{Screen.height}, k {view.PixelsPerPoint()}, world {view.WorldElement.contentRect}, "
-                   + $"view {c.ViewSize}, offset ({c.OffsetX}, {c.OffsetY}), copy0 {Copy(view, 0).layout}";
+                   + $"view {c.ViewSize}, offset ({c.OffsetX}, {c.OffsetY}), image {view.WorldImage.layout}";
         }
 
         [UnityTest]
-        public IEnumerator DrawnTileIsTheTappedTileAtThreeZoomsAndAcrossTheSeam()
+        public IEnumerator FirstViewShowsTheWholeWorld()
+        {
+            yield return OpenView();
+            yield return null;                    // the panel lays the image out
+            WorldCamera camera = _view.Camera;
+            Assert.AreEqual(camera.MinScale, camera.Scale, "the first view is the fit");
+            Rect image = _view.WorldImage.layout;
+            Rect view = _view.WorldElement.contentRect;
+            const float slack = 0.5f;             // a device pixel rounded to panel units
+            Assert.IsTrue(image.xMin >= -slack && image.xMax <= view.width + slack
+                          && image.yMin >= -slack && image.yMax <= view.height + slack,
+                          $"the world is not wholly inside the view; {State(_view)}");
+            Assert.AreEqual(1, _view.WorldElement.Query<Image>().ToList().Count, "the world is drawn once");
+        }
+
+        [UnityTest]
+        public IEnumerator DrawnTileIsTheTappedTileAtThreeZoomsAndBothEdges()
         {
             yield return OpenView();
             WorldCamera camera = _view.Camera;
             Assert.AreEqual(160, camera.Width);
-            Assert.AreEqual(camera.MinScale, camera.Scale, "the first view fits the height");
             int[] scales = { camera.MinScale, camera.MinScale + 3, camera.MaxScale };
             foreach (int scale in scales)
             {
                 camera.ZoomAt(scale, Vector2.zero);
-                camera.Pan(new Vector2((float)((camera.OffsetX + 2) * camera.Scale), 0));   // tile 158 at the left
-                _view.LayoutWorld();
-                yield return null;                // the panel lays the copies out
-                Assert.AreEqual(158.0, camera.OffsetX, 1e-6, $"scale {scale}");
-                int row = Mathf.Clamp((int)camera.OffsetY + 1, 0, camera.Height - 1);
-                // copy 0 draws tiles 158 and 159 at the left edge; copy 1 draws tile 0 just after the seam
-                foreach ((int copy, int x) in new[] { (0, 158), (0, 159), (1, 0), (1, 1) })
+                foreach ((float drag, int[] xs) in new[] { (1e5f, new[] { 0, 1 }), (-1e5f, new[] { 158, 159 }) })
                 {
-                    Vector2 centre = DrawnCentre(_view, copy, x, row);
-                    Assert.IsTrue(_view.TileAtLocal(centre, out int tx, out int ty),
-                                  $"scale {scale}, tile {x}, centre {centre}; {State(_view)}");
-                    Assert.AreEqual((x, row), (tx, ty), $"scale {scale}, copy {copy}, centre {centre}");
+                    camera.Pan(new Vector2(drag, 0));    // to the west edge, then to the east edge: no seam
+                    _view.LayoutWorld();
+                    yield return null;                  // the panel lays the image out
+                    int row = Mathf.Clamp((int)System.Math.Max(camera.OffsetY, 0) + 1, 0, camera.Height - 1);
+                    foreach (int x in xs)
+                    {
+                        Vector2 centre = DrawnCentre(_view, x, row);
+                        Assert.IsTrue(_view.TileAtLocal(centre, out int tx, out int ty),
+                                      $"scale {scale}, tile {x}, centre {centre}; {State(_view)}");
+                        Assert.AreEqual((x, row), (tx, ty), $"scale {scale}, centre {centre}");
+                    }
                 }
             }
         }
@@ -159,7 +171,7 @@ namespace WorldSim.PlayTests
 
             // a click on the world names the tile under it
             WorldCamera camera = _view.Camera;
-            Vector2 local = DrawnCentre(_view, 0, 3, Mathf.Clamp((int)camera.OffsetY + 2, 0, camera.Height - 1));
+            Vector2 local = DrawnCentre(_view, 3, Mathf.Clamp((int)System.Math.Max(camera.OffsetY, 0) + 2, 0, camera.Height - 1));
             Assert.IsTrue(_view.TileAtLocal(local, out int x, out int y));
             Vector2 panel = _view.WorldElement.LocalToWorld(local);
             yield return Click(mouse, new Vector2(panel.x * k, Screen.height - panel.y * k));

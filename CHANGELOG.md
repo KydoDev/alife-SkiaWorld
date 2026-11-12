@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **G3 P2b, the whole world on screen** (owner's review on the phone): the first view fits width and depth, and every
+  new world or screen turn fits again; the world is drawn once, never repeated, and panning is clamped in x as in y
+  (the simulation stays toroidal). An orientation button lets the player pick portrait or landscape: the phone's
+  screen is locked to it and New world is wide (160x64) in landscape, deep (64x160, the same planet with its sides
+  swapped) in portrait. `unity_sync.py` writes `world_config_portrait.json`. A headless 64x160 run (volcanic, seed
+  1, 3000 steps) lives on with more decomposers and predators than the wide world.
+- **App version**: the Unity player and the viewer APK carry a `MAJOR.MINOR.PATCH` version, starting at 0.0.1, shown
+  after the HUD title and in the APK's name (`worldsim-0.0.1.apk`); `BuildAndroid -appVersion X.Y.Z` sets it.
 - **G3 P3, Android spike**: `unity_sync.py --android` cross-builds the kernel for arm64 Android with the Unity
   Editor's own NDK (16 KB pages); `WorldSimSetup.BuildAndroid` builds an IL2CPP ARM64 APK; `android_check.py`
   builds a device-check APK that steps the golden sets on a phone and logs the result. On the owner's POCO F2 Pro the

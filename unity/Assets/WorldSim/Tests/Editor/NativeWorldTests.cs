@@ -112,6 +112,21 @@ namespace WorldSim.Tests
         }
 
         [Test]
+        public void TheKernelCreatesTheDeepPortraitShape()
+        {
+            // G3 P2b: New world in portrait is the same planet with its sides swapped (unity_sync.py shaped()); no
+            // golden vectors exist for it, so this checks the kernel accepts the shape and the world lives on
+            string config = File.ReadAllText(Path.Combine(GoldenDir("create_default"), "config.json"));
+            Assert.IsTrue(config.StartsWith("{\"width\":160,\"height\":64,"), "the golden config's layout changed");
+            config = "{\"width\":64,\"height\":160," + config.Substring("{\"width\":160,\"height\":64,".Length);
+            using NativeWorld world = NativeWorld.Create(System.Text.Encoding.UTF8.GetBytes(config), 1);
+            Assert.AreEqual((64u, 160u), (world.Info.Width, world.Info.Height));
+            world.Step(300);
+            Assert.Greater(world.Info.Population, 0UL);
+            Assert.AreEqual(64 * 160 * 3, world.RgbLength);
+        }
+
+        [Test]
         public void EditsFollowTheInterventionsVectors()
         {
             string path = Path.Combine(GoldenDir(""), "interventions.json");
