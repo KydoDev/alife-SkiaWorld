@@ -107,7 +107,15 @@ namespace WorldSim.PlayTests
                           $"the world is not wholly inside the view; {State(_view)}");
             var images = _view.WorldElement.Query<Image>().ToList();
             Assert.AreEqual(1, images.FindAll(i => i.image == _view.WorldImage.image).Count, "the world is drawn once");
-            Assert.LessOrEqual(images.Count, 2, "the world and at most one sprite layer over it");
+            Assert.LessOrEqual(images.Count, 3, "the backdrop, the world and at most one sprite layer");
+            // P5d: the backdrop fills the view (no black bands) and lies under the world
+            Image backdrop = images[0];
+            Assert.AreNotSame(_view.WorldImage, backdrop, "the backdrop is drawn first");
+            float tile = _view.Camera.Scale / _view.PixelsPerPoint();
+            Assert.IsTrue(backdrop.layout.xMin <= slack && backdrop.layout.yMin <= slack
+                          && backdrop.layout.xMax >= view.width - slack && backdrop.layout.yMax >= view.height - slack
+                          && backdrop.layout.width <= view.width + 2 * tile + slack,
+                          $"backdrop {backdrop.layout} does not cover the view {view}; {State(_view)}");
         }
 
         [UnityTest]

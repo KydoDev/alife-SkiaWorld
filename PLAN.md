@@ -30,8 +30,8 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 23. [x] G3 P5a: sprite atlas and neon palette built from the design table; EditMode test against the table
 24. [x] G3 P5b: sprite layer (tile texture + blit shader), LOD at >= 5 px/cell, idle frames, frame-time readout
 25. [x] G3 P5c: night/day palette rows driven by `WorldInfo.LightFactor`
-26. [~] G3 P5d: margins as the abyss continuing (owner's choice 2026-11-12): dimmed water and seabed, edge line
-27. [ ] G3 P5 check: APK 0.0.2 on the owner's phone; frame time <= 16 ms at every zoom; owner's look check
+26. [x] G3 P5d: margins as the abyss continuing (owner's choice 2026-11-12): dimmed water and seabed, edge line
+27. [~] G3 P5 check: APK 0.0.2 on the owner's phone; frame time <= 16 ms at every zoom; owner's look check
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

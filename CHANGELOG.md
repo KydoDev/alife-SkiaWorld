@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P5d, the abyss continues in the margins** (owner's choice): the bands around the fitted world are no longer
+  black. Beside the world each row carries on as its own water, or as rock where the world's edge tile is rock;
+  above the surface the top water, below the floor the deepest rock. The colours are the means of the world's own
+  render, dimmed, so they follow day and night; a faint line marks the playable edge. `Backdrop.cs`, EditMode
+  `BackdropTests`, and a PlayMode check that the backdrop covers the view under the world.
 - **G3 P5c, night and day sprites**: the sprite palette moves from the neon night colours to the day colours as the
   world's light factor rises above its mean (`SpriteArt.Daylight`, fully day at twice the mean); a world without
   day or season cycles keeps the neon look.

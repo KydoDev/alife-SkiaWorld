@@ -148,7 +148,9 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   `SpriteArt.Daylight(light_factor) = clamp01(light_factor - 1)`: the neon night look is the base (a world without
   cycles stays neon), and light above the mean fades the day palette in, fully at twice the mean; the RGB
   background already dims with the light field. **Margins**: the abyss continues (owner's choice, 2026-11-12): the water
-  gradient and the seabed carry on into the bands, dimmed, with a subtle line at the world's edge.
+  gradient and the seabed carry on into the bands, dimmed, with a subtle line at the world's edge. Built (P5d) from
+  the world's own render rather than the design's water bands, so the margins match the RGB world they continue
+  (the design palette applies to the sprites only, until the background itself becomes pixel art).
 - **P6 Inspector and population** — from P4 views. Pass: the inspector's values for a golden cell equal
   the Python export.
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the

@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-12 - G3 P5c (night and day sprites; PlayMode from the P5b run), `main`, working tree before the commit; pytest and cargo from the
+Last run: 2026-11-12 - G3 P5d (margins), `main`, working tree before the commit; pytest and cargo from the
 save-loader run (no Python or Rust change since)
 
 > Archive protocol: before overwriting this file, append its current content to
@@ -12,11 +12,14 @@ save-loader run (no Python or Rust change since)
 | pytest (418 tests) | 418 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 34 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 36 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (4 tests) | 4 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P5c/P5d: `DaylightIsNeonUpToTheMeanLightAndDayFromTwiceIt`, `BackdropTests` (2), and the PlayMode first-view
+  test now checks that the backdrop covers the view under the world. The sprite PlayMode test caught the sprite
+  layer being inserted under the world once the backdrop existed; fixed before the commit.
 - New in P5b: `SpriteLayerTests` (every pixel of the GPU sprite layer equals a CPU version of the rules on the
   default, plasticity and volcanic golden saves, both frames, night and day palettes; 10-13 starving and 147-352
   bonded cells per world, so those branches are exercised) and PlayMode `SpritesAppearFromFivePixelsPerTileOverTheWorld`.

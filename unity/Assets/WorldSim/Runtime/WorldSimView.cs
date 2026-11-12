@@ -70,6 +70,9 @@ namespace WorldSim
         private float _frameClock;
         private float _frameMs;              // smoothed frame time, shown in the HUD (P5 pass: <= 16 ms on the phone)
         private const float IdleFrameSeconds = 0.5f;
+        private byte[] _tileWords;           // ABI 4 tile words of the shown step (rock bits for the backdrop)
+        private Texture2D _backdropTexture;  // P5d: the abyss continuing in the margins, one texel per tile
+        private static readonly Color EdgeLine = new Color(1f, 1f, 1f, 0.18f);
         private byte[] _rgb;
         private byte[] _flipped;
         private double _pending;
@@ -88,6 +91,8 @@ namespace WorldSim
         private VisualElement _worldView;
         private Image _image;                // the world, drawn once (no copies: P2b)
         private Image _spriteImage;          // the sprites over it, shown at >= SpriteArt.Size device px per tile
+        private Image _backdrop;             // under the world: the margins (P5d)
+        private VisualElement _edge;         // a faint line just outside the world's edge
         private Label _stats, _speed, _error, _toolStatus;
 
         // gestures on the world: the pointers down (panel units, world-local), a tap candidate, a pinch
@@ -395,6 +400,7 @@ namespace WorldSim
             }
             _image.image = _texture;
             Place(_image, k);
+            PlaceBackdrop(k);
             if (_sprites == null)
             {
                 return;
@@ -403,12 +409,69 @@ namespace WorldSim
             {
                 _spriteImage = new Image { scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore };
                 _spriteImage.AddToClassList("ws-world-image");
-                _worldView.Insert(1, _spriteImage);    // over the world, under the error label
+                _worldView.Insert(_worldView.IndexOf(_image) + 1, _spriteImage);    // over the world, under the error label
             }
             _spriteImage.image = _sprites.Texture;
             Place(_spriteImage, k);
             _spriteImage.style.display = SpritesShown ? DisplayStyle.Flex : DisplayStyle.None;
             RefreshSprites();
+        }
+
+        /// <summary>The backdrop covers the view in whole tiles aligned with the world's grid; the edge line sits
+        /// one device pixel outside the world, so it never covers a tile.</summary>
+        private void PlaceBackdrop(float k)
+        {
+            if (_tileWords == null)
+            {
+                return;
+            }
+            if (_backdrop == null)
+            {
+                _backdrop = new Image { scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore };
+                _backdrop.AddToClassList("ws-world-image");
+                _edge = new VisualElement { pickingMode = PickingMode.Ignore };
+                _edge.AddToClassList("ws-world-image");
+                _worldView.Insert(0, _edge);        // under the world image
+                _worldView.Insert(0, _backdrop);    // under everything
+            }
+            int s = _camera.Scale;
+            int x0 = (int)Math.Floor(_camera.OffsetX), y0 = (int)Math.Floor(_camera.OffsetY);
+            int w = (int)Math.Ceiling(_camera.OffsetX + _camera.ViewSize.x / s) - x0;
+            int h = (int)Math.Ceiling(_camera.OffsetY + _camera.ViewSize.y / s) - y0;
+            w = Math.Max(1, w);
+            h = Math.Max(1, h);
+            if (_backdropTexture == null || _backdropTexture.width != w || _backdropTexture.height != h)
+            {
+                if (_backdropTexture != null)
+                {
+                    Destroy(_backdropTexture);
+                }
+                _backdropTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Point,
+                    wrapMode = TextureWrapMode.Clamp,
+                    name = "WorldSimBackdrop",
+                };
+            }
+            _backdropTexture.SetPixels32(Backdrop.Compute(_rgb, _tileWords, (int)_info.Width, (int)_info.Height, x0, y0,
+                                                          w, h));
+            _backdropTexture.Apply(false);
+            _backdrop.image = _backdropTexture;
+            _backdrop.style.left = (_camera.Left() + x0 * s) / k;
+            _backdrop.style.top = (_camera.Top() + y0 * s) / k;
+            _backdrop.style.width = w * s / k;
+            _backdrop.style.height = h * s / k;
+            _backdrop.MarkDirtyRepaint();
+
+            float line = 1f / k;
+            _edge.style.left = _camera.Left() / k - line;
+            _edge.style.top = _camera.Top() / k - line;
+            _edge.style.width = _camera.Width * s / k + 2 * line;
+            _edge.style.height = _camera.Height * s / k + 2 * line;
+            _edge.style.borderLeftWidth = _edge.style.borderRightWidth = line;
+            _edge.style.borderTopWidth = _edge.style.borderBottomWidth = line;
+            _edge.style.borderLeftColor = _edge.style.borderRightColor = EdgeLine;
+            _edge.style.borderTopColor = _edge.style.borderBottomColor = EdgeLine;
         }
 
         private void Place(Image image, float k)
@@ -680,6 +743,7 @@ namespace WorldSim
                 _world = world;
                 _info = info;
                 _rgb = new byte[rgbLength];
+                _tileWords = new byte[world.TilesLength];
                 _flipped = new byte[rgbLength];
                 if (_texture == null || _texture.width != (int)_info.Width || _texture.height != (int)_info.Height)
                 {
@@ -840,6 +904,11 @@ namespace WorldSim
             _texture.SetPixelData(_flipped, 0);
             _texture.Apply(false);
             _image?.MarkDirtyRepaint();    // the panel repaints only when something in it is dirty
+            _world.Tiles(_tileWords);
+            if (_image != null)
+            {
+                PlaceBackdrop(PixelsPerPoint());    // the margins follow the world's light and its terrain edits
+            }
             _spritesStale = true;
             RefreshSprites();
         }
@@ -851,6 +920,10 @@ namespace WorldSim
             if (_texture != null)
             {
                 Destroy(_texture);
+            }
+            if (_backdropTexture != null)
+            {
+                Destroy(_backdropTexture);
             }
         }
     }
