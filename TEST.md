@@ -1,6 +1,7 @@
 # Test Report
 
-Last run: 2026-11-12 - save loader integer bounds (after G3 P4), `main`, working tree before the commit
+Last run: 2026-11-12 - G3 P5a (sprite art), `main`, working tree before the commit; pytest and cargo from the
+save-loader run (no Python or Rust change since)
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -11,11 +12,13 @@ Last run: 2026-11-12 - save loader integer bounds (after G3 P4), `main`, working
 | pytest (418 tests) | 418 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (G3 P4 run, unchanged since; batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 26 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 30 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (G3 P4 run, 3 tests) | 3 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P5a: `SpriteArtTests` (sprites and palette equal the design table in `docs/G3_PLAN.md`, atlas roles and
+  palette texels where the shader reads them). PlayMode not rerun: P5a adds no runtime behaviour yet.
 - New: `test_load_bounds_ids_ages_lineages_and_counters_like_the_kernel` (30 cases: id, age, lineage, step_count,
   next_id and a counter at 2^62 + 1, -1, 1.5, True and "7"), the largest values accepted, and a `next_id` below a
   cell id refused. Written first; 27 of them failed before the fix. After the security review: `next_id` equal to

@@ -27,6 +27,11 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 20. [?] G3 P3: Android spike (arm64 kernel, IL2CPP APK, device check); runs on the owner's POCO F2 Pro
 21. [?] G3 P2b (owner, 2026-11-12): whole world on screen, never repeated; player picks orientation; shape per orientation
 22. [?] G3 P4: ADR-0016, ABI 4 views (tile words, cell record, light factor), byte-equal to Python's worldsim/views.py
+23. [x] G3 P5a: sprite atlas and neon palette built from the design table; EditMode test against the table
+24. [~] G3 P5b: sprite layer (tile texture + blit shader), LOD at >= 5 px/cell, idle frames, frame-time readout
+25. [ ] G3 P5c: night/day palette rows driven by `WorldInfo.LightFactor`
+26. [ ] G3 P5d: margins as the abyss continuing (owner's choice 2026-11-12): dimmed water and seabed, edge line
+27. [ ] G3 P5 check: APK 0.0.2 on the owner's phone; frame time <= 16 ms at every zoom; owner's look check
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

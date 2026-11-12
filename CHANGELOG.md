@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **G3 P5a, sprite art** (`unity/Assets/WorldSim/Runtime/SpriteArt.cs`): the 5x5 cell sprites (photo, sapro, pred,
+  chemo; two idle frames each) and the neon night/day palette of the design reference, built into a role atlas
+  (one colour role per pixel) and a palette texture for the P5b sprite shader. EditMode tests read the design table
+  in `docs/G3_PLAN.md` and fail if the code and the doc disagree. The plan records what ABI 4 cannot draw (organic,
+  true dying, bond direction, vent sources) and the owner's choice for the margins (the abyss continues).
+
 ### Fixed
 - **Save loader bounds the integers like the kernel**: `persistence.py` now refuses a cell `id`, `age` or `lineage`,
   the `step_count`, `next_id` or an event counter that is not an integer in `0..=2^62`, and a `next_id` below a

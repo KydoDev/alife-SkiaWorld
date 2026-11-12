@@ -13,7 +13,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 4. [?] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
 12. [?] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
 5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
-6. [ ] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
+6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [ ] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [ ] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
 9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
@@ -130,6 +130,22 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   translucent pixels), not bloom. Pass: frame time on the P3 phone ≤ 16 ms at the default world, all
   zoom levels; a screenshot test of a golden save matches a reference image. Also decide here how to fill the margins
   around the fitted world (P2b leaves them black; the owner wants them filled with the final design).
+- **P5, what ABI 4 can draw** (decided before the renderer, 2026-11-12): the tile word has no organic level, no
+  dying flag, no bond direction and no vent source, so four rows of the sprite table are approximate or deferred.
+  *Organic*: no sprite; the `render_rgb` background under the sprite layer already shows it. *Dying*: drawn as
+  *starving* (energy level 0), which the word carries; a true dying look needs a snapshot diff (later, if wanted).
+  *Bonded edge*: the light edge is drawn towards a bonded neighbour tile, which is right unless two colonies touch
+  (no bond list per tile in the word; ABI 5 only if the owner sees it wrong). *Vent*: chem level 3 is the plume,
+  not the source (212 tiles for 6 vents in the `volcanic` golden save), so the vent sprite is deferred until the
+  kernel exposes vent positions (static terrain, a one-time view); the plume keeps its `render_rgb` tint.
+  **Approach**: the RGB image stays as the background and as the LOD below 5 px/cell (P2b tests unchanged); a
+  second `Image` on top shows a `RenderTexture` filled by `Graphics.Blit` with one unlit material from the tile
+  texture (RGBA32, linear, point, clamp, no mips; read by texel), so UI Toolkit needs no custom material. Idle
+  frames come from a time uniform, at most 2 frame swaps a second. The project is in gamma space, so the palette
+  hex values come out as written. The camera scale is a whole number of device pixels per tile but not a multiple
+  of 5, so sprite pixels can differ by one device pixel; the owner judges it on the phone (snap the fit to
+  multiples of 5 only if it shows). **Margins**: the abyss continues (owner's choice, 2026-11-12): the water
+  gradient and the seabed carry on into the bands, dimmed, with a subtle line at the world's edge.
 - **P6 Inspector and population** — from P4 views. Pass: the inspector's values for a golden cell equal
   the Python export.
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the
