@@ -108,6 +108,20 @@ Original scope:
 - **The 10k-step verdict "phototaxis likely selected" weakens to a lean.** The direction is the same in both seed sets (`w_light` above the off arm in 29 of 40 pairs, a plain sum) and holds on the flat planet (18/20), but neither set alone reaches a confirmed verdict. The old evidence came from immigration arms, where hundreds of lineages move; with immigration 0 almost no cell moves, so sensing has very little to act on.
 - Same reason as the F5d probe: median life 6–8 steps and 0.4–2.5 sensed moves per life. Any behaviour that sensing or learning could select is weak in this world until movement matters more (more motile cells, longer lives).
 
+**Evolvable perception radius** (ADR-0014, 2026-11-12; `python scripts/sense_range_experiment.py --steps 30000`, [sense_range_experiment.csv](sense_range_experiment.csv), and with `--defence`, [sense_range_defence.csv](sense_range_defence.csv); rules fixed in PLAN before the runs). `--set sensing=1 --set sense_range=1`: an evolvable `sense_r` widens what a sensing cell sees, up to radius `sense_radius_max` (3); cost `sense_range_upkeep` 0.05 per extra tile of radius. Arms off / on / neutral (the trait is paid for, the radius stays 1) / control (neutral, cost 0.5); P1 standard, 20 pairs.
+
+| Rule (ADR-0014, PLAN item 15; >= 16/20) | Base | With F5e armour (`--defence`) |
+|---|---|---|
+| Positive control: `sense_r` control < neutral | 16/20, at the threshold | **19/20**, fires |
+| Selection: `sense_r` on > neutral | 11/20 (lower in 9) | 8/20 (lower in 12) |
+| Fleeing: `w_danger` on < neutral | 9/20 | 10/20 |
+| Hunting: mobile share of attacks on > neutral | 11/20 | 10/20 |
+| Mean radius of descendants, on (median, range) | 1.04 (1.01-1.44) | 1.24 (1.02-2.50) |
+| Extinctions (reseeded) per arm, off / on / neutral / control | 0 / 0 / 3 / 3 | 0 / 6 / 0 / 2 |
+
+- **Null result.** The measurement can see selection on `sense_r` (the cost control fires), but a wider view is neither selected nor selected against, and no hunting or fleeing appears, with or without armour. In the base world the radius of the `on` arm stays near 1 (median 1.04): the cost alone keeps it down. As ADR-0014 decided, `sense_range` is **not** ported to the Rust kernel; the kernel keeps refusing it.
+- Likely reason, not tested: as for F3 and F5d, few cells move (mobile predators make 1-16% of attacks), so what a cell sees rarely changes what it does.
+
 Original scope:
 - The cell perceives its 8 neighboring tiles: light, organic matter, presence of cells, kinship.
 - **Directed** movement (towards food/light, away from predators) instead of random.

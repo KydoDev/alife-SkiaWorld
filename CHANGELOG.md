@@ -19,6 +19,9 @@ All notable changes to this project are documented here. Format based on
   follows the four trait means.
 
 ### Added
+- **ADR-0014 commit 3, `sense_r` experiment** (`scripts/sense_range_experiment.py`): P1, 20 pairs, with and without
+  F5e armour. The cost control fires, but a wider perception radius is not selected and brings no hunting or fleeing
+  (null result, ROADMAP F3); `sense_range` is not ported to the kernel.
 - **ADR-0014 commit 2, evolvable perception radius** (`--set sensing=1 --set sense_range=1`): cells carry
   `sense_r`, which widens what sensing sees from radius 1 up to `sense_radius_max` (the move stays one tile), at a
   cost of `sense_range_upkeep` per extra tile of radius; `sense_range_neutral` is the control arm. Off by default

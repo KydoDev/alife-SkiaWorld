@@ -14,12 +14,12 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 7. [x] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
 8. [x] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first
 9. [?] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
-10. [~] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
+10. [x] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
 11. [ ] Owner's idea (2026-11-11, after 10): obstacles and scattered resources that make exploration pay (see below)
 12. [x] ADR-0014: trait table first, then `sense_r`; the kernel refuses `sense_range` until validated
 13. [x] Item 10, commit 1: trait table refactor (Python); every golden file byte-identical, steps/s measured
 14. [x] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
-15. [ ] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
+15. [x] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side
@@ -111,6 +111,28 @@ as F3 and F5d; also try it where F5e lengthens life (`defence=1`) or on the flat
   - security review: no blockers (its fuzz against a naive tile-enumerating reference matched 14,470 moves, R 2-5,
     heights 2-12, minimal widths); its nits applied (docstrings, a draw-counting test, a v8-row test in Rust, the
     upkeep deviation noted in `docs/ARCHITECTURE.md`).
+
+## Item 15: `sense_r` experiment (rules fixed 2026-11-12, before any run)
+`python scripts/sense_range_experiment.py --steps 30000` and the same with `--defence` (F5e armour on in every arm,
+longer lives; ADR-0014: part of the plan, not a rescue). Arms, all with `sensing=1` and immigration 0: off, on,
+neutral, control (neutral with `sense_range_upkeep` 0.5). P1 standard: 30k steps, second half, descendants only,
+flat world with day/night + seasons and `volcanic.json`, seeds 1 3 ... 19 = 20 pairs.
+1. Positive control: `sense_r` control < neutral in >= 16/20, else rule 2 is not claimed.
+2. Selection: `sense_r` on > neutral in >= 16/20 -> selected; on < neutral in >= 16/20 -> selected against.
+3. Behaviour, on vs neutral at >= 16/20: fleeing = mean `w_danger` of descendants lower; hunting = share of
+   predation attempts by mobile unbonded predators (`move` > 0.3) higher. On vs off reported too.
+4. Exactly 16/20 is "at the threshold, not confirmed on new seeds". A null result is reported as null.
+
+**Result (2026-11-12): null.** Script `scripts/sense_range_experiment.py`; data in `docs/sense_range_experiment.csv`
+and `docs/sense_range_defence.csv`; the full table is in ROADMAP F3.
+- The positive control fires: 16/20, at the threshold, in the base run; 19/20 with armour.
+- Selection on vs neutral: 11/20 and 8/20, so no detectable selection.
+- Fleeing (9/20, 10/20) and hunting (11/20, 10/20): no consistent sign.
+
+Consequences:
+- `sense_range` stays Python-only, and the kernel keeps refusing it (ADR-0014).
+- The science half of item 11 loses its premise. It said "only makes sense if item 10 shows that a wider perception
+  radius is selected". Item 11 is to be rescoped by the owner: game-only, or with a new hypothesis.
 
 ## Item 11: obstacles and scattered resources that make exploration pay (owner's idea, 2026-11-11)
 **Idea.** Use the terrain together with `sense_r` (item 10): obstacles placed at random by the world generator, or
