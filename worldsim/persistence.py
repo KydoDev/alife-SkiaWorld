@@ -1,12 +1,12 @@
 """Save and load a complete world state (ADR-0002).
 
-Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 8, ...}`.
+Format: gzip-compressed JSON, `{"format": "worldsim-save", "version": 9, ...}`.
 Version 2 (F2, ADR-0004) added the static terrain maps and the 10th gene, version 3
 (F3, ADR-0005) the 16-gene genome, version 4 (F4, ADR-0006) the per-cell rule genes,
 version 5 (F5a, ADR-0007) the mating propensity and a sexual-births counter,
 version 6 (F5b, ADR-0009) the acclimation rate and the acclimated diet, version 7 (F5c, ADR-0010)
 the gene-transfer propensity and two transfer counters, version 8 (F5e, ADR-0011) the armour
-and a repelled-attacks counter.
+and a repelled-attacks counter, version 9 (ADR-0014) the perception trait sense_r.
 Older saves are rejected (their genomes cannot continue under the new rules).
 JSON is used instead of pickle so a save file shared by someone else can never
 execute code when loaded. Python's float repr round-trips exactly through JSON,
@@ -28,8 +28,8 @@ from .terrain import Terrain
 from .world import N_GENES, RULE_LEN, TRAITS, Cell, World
 
 FORMAT = "worldsim-save"
-VERSION = 8
-CELL_ROW_LEN = 15
+VERSION = 9
+CELL_ROW_LEN = 16
 MAX_SAVE_BYTES = 512 * 1024 * 1024     # decompressed size cap: guards against gzip bombs
 COUNTERS = ("births", "deaths", "kills", "extinctions", "sex_births", "hgt_events", "hgt_foreign", "defended")
 
@@ -52,10 +52,10 @@ def world_to_dict(world: World) -> dict:
         "organic": world.organic.tolist(),
         "terrain": _terrain_to_dict(world.terrain),
         # [id, x, y, energy, age, genes, lineage, species, [bond ids in insertion order], rules, sex_p, plast_p, diet,
-        #  hgt_p, armor_p]
+        #  hgt_p, armor_p, sense_r]
         "cells": [[c.id, c.x, c.y, c.energy, c.age, c.genes, c.lineage, c.species,
                    [b.id for b in c.bonds], [list(r) for r in c.rules], c.sex_p,
-                   c.plast_p, list(c.diet), c.hgt_p, c.armor_p] for c in world.cells],
+                   c.plast_p, list(c.diet), c.hgt_p, c.armor_p, c.sense_r] for c in world.cells],
         "tracker": world.tracker.to_dict() if world.tracker is not None else None,
     }
 
@@ -134,7 +134,8 @@ def _world_from_dict(d: dict) -> World:
     by_id: dict[int, Cell] = {}
     if any(not isinstance(row, list) or len(row) != CELL_ROW_LEN for row in d["cells"]):
         raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
-    for cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet, hgt_p, armor_p in d["cells"]:
+    for (cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet, hgt_p, armor_p,
+         sense_r) in d["cells"]:
         if not (0 <= x < world.W and 0 <= y < world.H):
             raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
@@ -145,7 +146,7 @@ def _world_from_dict(d: dict) -> World:
             raise SaveFormatError(f"invalid cell #{cid}")
         if not _valid_rules(rules, cfg):
             raise SaveFormatError(f"cell #{cid} has invalid rule genes")
-        traits = (sex_p, plast_p, hgt_p, armor_p)               # TRAITS order (the row keeps v8's layout)
+        traits = (sex_p, plast_p, hgt_p, armor_p, sense_r)      # TRAITS order (diet sits between, as in v8)
         for t, v in zip(TRAITS, traits, strict=True):
             if not (_finite(v) and 0.0 <= v <= 1.0) or (v and not getattr(cfg, t.flag)):
                 raise SaveFormatError(f"cell #{cid} has an invalid {t.name}")

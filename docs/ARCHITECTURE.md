@@ -104,7 +104,9 @@ activity and the novelty counter. Never touches the RNG; the dynamics never read
 
 ### `worldsim/persistence.py`
 `save_world` / `load_world`: gzip JSON, versioned, validated on load (ADR-0002;
-v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007; v6 the diet plasticity, ADR-0009; v7 the gene-transfer propensity and counters, ADR-0010; v8 the armour and the `defended` counter, ADR-0011). Resume is bit-exact.
+v2 adds the terrain maps, ADR-0004; v3 the 16-gene genome, ADR-0005; v4 the rule genes, ADR-0006; v5 the mating propensity, ADR-0007; v6 the diet plasticity, ADR-0009; v7 the gene-transfer propensity and counters, ADR-0010; v8 the armour and the `defended` counter, ADR-0011; v9 the perception trait `sense_r`, ADR-0014). Resume is bit-exact. Note for a port of `sense_range`: unlike
+the ADR text, `sense_r`'s table entry has no linear upkeep; it costs `sense_range_upkeep x (R - 1)` from the genetic
+radius (neutral arm included), and `Config.validate` requires `sensing` and `width >= 2 x sense_radius_max + 1`.
 
 ### `worldsim/render.py`
 Maps the world to an RGB array: cell color mixes green/purple/red/cyan by

@@ -279,6 +279,10 @@ fn bad_configs_return_null_with_a_message() {
         "sex must be bool",
     );
     refused(
+        |m| drop(m.insert("sense_range".into(), true.into())),
+        "sense_range is not supported",
+    );
+    refused(
         |m| {
             m.insert("width".into(), 10_000.into());
             m.insert("height".into(), 10_000.into());

@@ -21,7 +21,9 @@
 //!   would truncate larger ones); `rng.gauss_next` must be a finite number or None; duplicate
 //!   keys in the save object and in its config are refused (Python keeps the last one);
 //! - every optional flag is ported (M5): `defence`, `hgt`, `plasticity`, `sex`, `sensing` and
-//!   `open_genome` (rule genes: at most `max_rules`, at most 64 read, each 4 values in [0, 1]);
+//!   `open_genome` (rule genes: at most `max_rules`, at most 64 read, each 4 values in [0, 1]),
+//!   **except** `sense_range` (ADR-0014): a config with it on is refused, and so is a cell whose
+//!   `sense_r` is not zero (the save v9 field is read only to be checked);
 //! - **one known hash mismatch**: a JSON integer `-0` in a float slot (genes, propensities, diet) becomes
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not);
 //!   the same holds for rule values;
@@ -51,7 +53,7 @@ pub const FORMAT: &str = "worldsim-save";
 pub const MAX_SAVE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// `persistence.CELL_ROW_LEN`: fields per cell row.
-pub const CELL_ROW_LEN: usize = 15;
+pub const CELL_ROW_LEN: usize = 16;
 
 /// Largest step, id, age, lineage or event counter accepted from a save: far above anything a
 /// run reaches, and far enough below `u64::MAX` that no later increment can overflow.
@@ -178,7 +180,8 @@ struct RawTerrain {
     sun: Capped<f64, MAX_SIDE>,
 }
 
-/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p, armor_p]`.
+/// `[id, x, y, energy, age, genes, lineage, species, bonds, rules, sex_p, plast_p, diet, hgt_p, armor_p,
+/// sense_r]`.
 /// Rules (at most 64, the `max_rules` bound) and the diet are checked below.
 #[derive(Deserialize)]
 struct RawCell(
@@ -195,6 +198,7 @@ struct RawCell(
     f64,
     f64,
     Capped<f64, 3>,
+    f64,
     f64,
     f64,
 );
@@ -561,6 +565,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             diet,
             hgt_p,
             armor_p,
+            sense_r,
         ) = row;
         if !(x < w as u64 && y < h as u64) {
             return Err(err(format!("cell #{id} outside the grid at ({x}, {y})")));
@@ -623,6 +628,11 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             && (world.cfg.defence || armor_p == 0.0);
         if !armor_ok {
             return Err(err(format!("cell #{id} has an invalid armor_p")));
+        }
+        // `persistence.py` accepts it in [0, 1] with `sense_range` on, which the config refuses here
+        // (ADR-0014): so it must be zero (or -0.0). NaN is not zero.
+        if sense_r != 0.0 {
+            return Err(err(format!("cell #{id} has an invalid sense_r")));
         }
         // `_valid_rules`: at most max_rules (none with open_genome off), each 4 values in [0, 1]
         let rules = rules.0;

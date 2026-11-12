@@ -125,6 +125,11 @@ config_fields! {
     defence_neutral: bool,
     defence_strength: f64 [0, 0.95],
     defence_upkeep: f64 [0, 10],
+    // perception radius (ADR-0014): parsed and bounded, but `sense_range` on is refused (not ported)
+    sense_range: bool,
+    sense_range_neutral: bool,
+    sense_radius_max: i64 [1, 5],
+    sense_range_upkeep: f64 [0, 10],
     // reproduction
     body_cost: f64,
     div_min: f64,
@@ -162,6 +167,13 @@ impl Config {
         if self.div_min > self.div_max || self.mut_min > self.mut_max {
             return Err(SaveError::new(
                 "invalid config: div_min/mut_min must not exceed div_max/mut_max",
+            ));
+        }
+        // ADR-0014: the evolvable perception radius is an experiment, ported only if it is validated.
+        // Refused here, so neither a save nor `ws_world_create` can run a world the kernel would get wrong.
+        if self.sense_range {
+            return Err(SaveError::new(
+                "invalid config: sense_range is not supported by the kernel yet (ADR-0014)",
             ));
         }
         Ok(())

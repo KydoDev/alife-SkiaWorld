@@ -104,6 +104,10 @@ runs (same seed, before/after), not only by unit tests.
   a transfer changes the genome for life and re-runs `express()`; species stay as assigned at birth (ADR-0010).
 - **Prey defence (F5e)**: `Cell.armor_p` exists only when `cfg.defence` is on; the failed-attack draw happens only
   when on and not `defence_neutral` (no RNG otherwise); a repelled attack moves no energy (ADR-0011).
+- **Trait table and perception radius (ADR-0014)**: the per-cell values outside the genome are the
+  `TRAITS` table in `world.py` (draw order = table order: append, never insert). `Cell.sense_r` widens
+  `sensed_move` only when `cfg.sense_range` is on (needs `sensing`; no RNG when off; R = 1 keeps F3's code).
+  The Rust kernel refuses `sense_range` until the experiment validates it.
 - **Untrusted input**: planet files and saves may come from others. `Config.validate()`
   bounds every field; loaders cap sizes and raise `PlanetError` / `SaveFormatError`.
 - **Interventions (G1)** edit the world only between steps, use no RNG and only touch

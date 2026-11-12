@@ -42,7 +42,8 @@ TRAITS = (
     Trait("plast_p", "plasticity", "plastic_upkeep"),  # F5b rate of diet acclimation
     Trait("hgt_p", "hgt", "hgt_upkeep"),               # F5c propensity to copy a neighbour's gene
     Trait("armor_p", "defence", "defence_upkeep"),     # F5e share of attacks it can repel
-)
+    Trait("sense_r", "sense_range", None),             # item 10 perception radius; its upkeep is per extra
+)                                                      # tile of radius, in express()
 TRAIT_NAMES = tuple(t.name for t in TRAITS)
 NO_TRAITS = (0.0,) * len(TRAITS)
 _UPKEEP_TRAITS = tuple((t.flag, t.upkeep, t.name) for t in TRAITS if t.upkeep is not None)   # express() hot path
@@ -54,6 +55,11 @@ def make_traits(**values):
     if unknown:
         raise ValueError(f"unknown traits {sorted(unknown)}; known: {TRAIT_NAMES}")
     return tuple(float(values.get(name, 0.0)) for name in TRAIT_NAMES)
+
+
+def sense_radius(sense_r, radius_max):
+    """ADR-0014: the perception radius a sense_r gives, from 1 (sense_r < 1 / radius_max) to radius_max."""
+    return min(radius_max, 1 + int(sense_r * radius_max))
 
 
 def _view(top, bottom):
@@ -97,6 +103,7 @@ class Cell:
         "photo", "sapro", "pred", "chemo", "photo_k", "sapro_k", "pred_k", "chemo_k",
         "move", "div_thr", "child_frac", "attach", "share", "mut_sigma", "upkeep",
         "sense", "species", "rules", "rule_fx", "sex_p", "plast_p", "diet", "hgt_p", "armor_p",
+        "sense_r", "sense_rad",
     )
 
     def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), traits=NO_TRAITS):
@@ -108,7 +115,7 @@ class Cell:
         self.genes = genes
         self.rules = rules        # F4 rule genes (list of 4-value lists); empty unless open_genome is on
         # the TRAITS values, in table order; each is 0.0 unless its flag is on
-        self.sex_p, self.plast_p, self.hgt_p, self.armor_p = traits
+        self.sex_p, self.plast_p, self.hgt_p, self.armor_p, self.sense_r = traits
         self.diet = ()            # F5b acclimated (photo, sapro, chemo) split; empty unless plasticity is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
@@ -156,6 +163,12 @@ class Cell:
         for flag, cost, name in _UPKEEP_TRAITS:   # in table order: the float sum is part of the state
             if getattr(cfg, flag):
                 self.upkeep += getattr(cfg, cost) * getattr(self, name)
+        self.sense_rad = 1                    # radius sensed_move uses (derived, never saved)
+        if cfg.sense_range:                   # upkeep from the genetic radius, so the neutral arm pays it too
+            radius = sense_radius(self.sense_r, cfg.sense_radius_max)
+            self.upkeep += cfg.sense_range_upkeep * (radius - 1)
+            if not cfg.sense_range_neutral:
+                self.sense_rad = radius
         if cfg.plasticity:
             self.diet = genetic_diet(self.photo, self.sapro, self.chemo)
             self.apply_diet(cfg)
@@ -392,7 +405,10 @@ class World:
         chemical energy) and the cells among the mover's neighbours that touch it (kin = same
         lineage, strangers, danger = predator share of all of them, kin included, since kin predators
         eat kin too), as densities in [0, 1] over the neighbour tiles inside the grid.
-        Score = sum(weight x input) + noise; the noise breaks ties, so zero weights = random walk."""
+        Score = sum(weight x input) + noise; the noise breaks ties, so zero weights = random walk.
+        A cell with a wider radius (ADR-0014) goes to `sensed_move_wide`; this radius-1 code stays as F3 wrote it."""
+        if c.sense_rad > 1:
+            return self.sensed_move_wide(c, c.sense if sense is None else sense, c.sense_rad)
         cfg, grid, W, H = self.cfg, self.grid, self.W, self.H
         x, y = c.x, c.y
         blocked = self.blocked if self.has_rock else None
@@ -434,6 +450,79 @@ class World:
                             strangers += 1.0
                         danger += pred
                 s += (wk * kin + ws * strangers + wd * danger) / view[(dx, dy)]
+            s += noise * rand()
+            if s > best_score:
+                best, best_score = (dx, dy, tx, ty), s
+        return None if best[0] == 0 and best[1] == 0 else (best[2], best[3])
+
+    def sensed_move_wide(self, c, sense, R):
+        """ADR-0014: `sensed_move` with perception radius R > 1. The move is still one tile; for each candidate
+        tile t the environment inputs are means over the in-grid tiles within R - 1 of t, the social inputs count
+        the cells within R of both the mover and t, normalised by the in-grid tiles within R of both (the mover's
+        and t's own tiles excluded). At R = 1 these are F3's inputs. Sums are scalar float operations in a fixed
+        order, no numpy reductions (a later Rust port stays bit-exact); `Config.validate` keeps width >= 2R + 1, so
+        no tile is seen twice. Longer than ~50 lines on purpose: like `step()`, a per-move hot path kept inline."""
+        cfg, grid, W, H = self.cfg, self.grid, self.W, self.H
+        x, y = c.x, c.y
+        blocked = self.blocked if self.has_rock else None
+        cands = [(0, 0, x, y)]
+        for dx, dy in NEIGH8:
+            ny = y + dy
+            if 0 <= ny < H:
+                nx = (x + dx) % W
+                if grid[ny * W + nx] is None and (blocked is None or not blocked[ny * W + nx]):
+                    cands.append((dx, dy, nx, ny))
+        if len(cands) == 1:
+            return None
+        wl, wo, wc, wk, ws, wd = sense
+        light, org = self.light, self.organic
+        chem = self.chem if self.has_chem else None
+        inv_l = 1.0 / cfg.light_max if cfg.light_max > 0 else 0.0
+        top, bottom = max(-R, -y), min(R, H - 1 - y)          # in-grid row offsets around the mover
+        # inputs of every tile within R of the mover, row by row: env[oy][ox + R] = (light, organic, chem)
+        env = {}
+        social = []                                           # (ox, oy, is_kin, predator share)
+        for oy in range(top, bottom + 1):
+            ty = y + oy
+            row = []
+            for ox in range(-R, R + 1):
+                tx = (x + ox) % W
+                o = org[ty, tx]
+                ch = chem[ty, tx] if chem is not None else 0.0
+                row.append((light[ty, tx] * inv_l, o / (o + 1.0), ch / (ch + 1.0)))
+                other = grid[ty * W + tx]
+                if other is not None and (ox or oy):
+                    social.append((ox, oy, other.lineage == c.lineage, other.pred))
+            env[oy] = row
+        noise, rand = cfg.sense_noise, self.rng.random
+        reach = R - 1
+        best, best_score = cands[0], -math.inf
+        for dx, dy, tx, ty in cands:
+            sl = so = sc = 0.0
+            n = 0
+            for ey in range(max(dy - reach, top), min(dy + reach, bottom) + 1):
+                row = env[ey]
+                for ex in range(dx - reach + R, dx + reach + R + 1):
+                    vl, vo, vc = row[ex]
+                    sl += vl
+                    so += vo
+                    sc += vc
+                    n += 1
+            s = wl * (sl / n) + wo * (so / n)
+            if chem is not None:
+                s += wc * (sc / n)
+            if social:
+                kin = strangers = danger = 0.0
+                for sx, sy, is_kin, pred in social:
+                    if -R <= sx - dx <= R and -R <= sy - dy <= R and (sx != dx or sy != dy):
+                        if is_kin:
+                            kin += 1.0
+                        else:
+                            strangers += 1.0
+                        danger += pred
+                rows = min(R, dy + R, bottom) - max(-R, dy - R, top) + 1
+                view = rows * (2 * R + 1 - abs(dx)) - (1 if dx == 0 and dy == 0 else 2)
+                s += (wk * kin + ws * strangers + wd * danger) / max(1, view)
             s += noise * rand()
             if s > best_score:
                 best, best_score = (dx, dy, tx, ty), s

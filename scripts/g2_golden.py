@@ -122,6 +122,8 @@ def state_hash(world: World) -> str:
             h.update(f64(c.hgt_p))
         if defence:
             h.update(f64(c.armor_p))
+        if world.cfg.sense_range:            # ADR-0014: the kernel refuses this flag until it is ported
+            h.update(f64(c.sense_r))
         if open_genome:
             h.update(u64(len(c.rules)))
             for r in c.rules:

@@ -44,7 +44,7 @@ fn start_save_is_gzip_and_rng_vectors_exist() {
     for dir in golden_dirs() {
         check_save_and_rng(&dir);
     }
-    assert_eq!(worldsim_core::SAVE_VERSION, 8);
+    assert_eq!(worldsim_core::SAVE_VERSION, 9);
 }
 
 fn check_save_and_rng(golden: &std::path::Path) {

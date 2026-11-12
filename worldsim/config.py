@@ -24,6 +24,7 @@ _BOUNDS = {
     "plastic_rate": (0, 1), "plastic_upkeep": (0, 10),
     "hgt_rate": (0, 1), "hgt_upkeep": (0, 10),
     "defence_strength": (0, 0.95), "defence_upkeep": (0, 10),
+    "sense_radius_max": (1, 5), "sense_range_upkeep": (0, 10),
 }
 
 
@@ -112,6 +113,12 @@ class Config:
     defence_strength: float = 0.8    # chance an attack fails at armor_p = 1 (capped below 1: nobody is immune)
     defence_upkeep: float = 0.2      # cost per step x armor_p (paid in the neutral arm too)
 
+    # --- perception radius (ADR-0014, item 10). Off by default: a sensing cell sees radius 1 ---
+    sense_range: bool = False        # cells carry an evolvable sense_r that widens what sensing sees (needs sensing)
+    sense_range_neutral: bool = False  # control arm: sense_r is inherited, mutates and costs, but the radius stays 1
+    sense_radius_max: int = 3        # radius at sense_r = 1: R = min(max, 1 + int(sense_r x max))
+    sense_range_upkeep: float = 0.05  # cost per step x (R - 1) (paid in the neutral arm too)
+
     # --- reproduction ---
     body_cost: float = 5.0           # energy to build a body (returned at death)
     div_min: float = 10.0
@@ -173,4 +180,8 @@ class Config:
             raise ValueError("initial_cells exceeds the number of tiles")
         if self.div_min > self.div_max or self.mut_min > self.mut_max:
             raise ValueError("div_min/mut_min must not exceed div_max/mut_max")
+        if self.sense_range and not self.sensing:
+            raise ValueError("sense_range needs sensing on (the radius widens what sensing sees)")
+        if self.sense_range and self.width < 2 * self.sense_radius_max + 1:
+            raise ValueError("sense_range needs width >= 2 x sense_radius_max + 1 (no tile seen twice across x)")
         return self

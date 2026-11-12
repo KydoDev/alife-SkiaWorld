@@ -18,7 +18,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 11. [ ] Owner's idea (2026-11-11, after 10): obstacles and scattered resources that make exploration pay (see below)
 12. [x] ADR-0014: trait table first, then `sense_r`; the kernel refuses `sense_range` until validated
 13. [x] Item 10, commit 1: trait table refactor (Python); every golden file byte-identical, steps/s measured
-14. [ ] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
+14. [x] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
 15. [ ] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
 
 ## Rules for every piece
@@ -82,6 +82,35 @@ as F3 and F5d; also try it where F5e lengthens life (`defence=1`) or on the flat
   - steps/s with every flag off (CPU time, five interleaved runs each): before 387 / 483 / 471 / 490 / 510, after
     465 / 467 / 506 / 487 / 516, within the machine's noise. A first wall-clock pass read 3-4% slower; the
     interleaved run did not reproduce it.
+- **Commit 2, `sense_r` and save v9 (2026-11-12).** `Config.sense_range` / `sense_range_neutral` /
+  `sense_radius_max` (3, bounded 1..5) / `sense_range_upkeep` (0.05); `sense_r` is the table's fifth trait;
+  `World.sensed_move_wide` handles R > 1 and F3's code still runs at R = 1. Deviations from the ADR text, decided
+  while implementing:
+  - the table entry has upkeep `None`: the cost is `sense_range_upkeep x (R - 1)` from the *genetic* radius,
+    added in `express()` after the table loop (a linear table upkeep would have charged twice). The neutral arm
+    pays it and senses at radius 1;
+  - `Config.validate` refuses `sense_range` without `sensing` (the trait would cost and do nothing) and with
+    `width < 2 x sense_radius_max + 1`, so no tile is seen twice across the x wrap. This replaces the `seen` set:
+    the windows and the view counts need no dedupe, and the normalisation has a closed form;
+  - environment inputs are means of the per-tile F3 inputs (`light / light_max`, `o / (o + 1)`, `ch / (ch + 1)`)
+    over the window. At R = 1 the general function makes the same choices with the same draws as F3's code
+    (pytest, 6 seeds with rock, vents and edge rows); its scores may differ in the last bit (product order), which
+    is why R = 1 keeps F3's code.
+
+  Verdict:
+  - every committed `hashes.csv` and render is byte-identical after a full `--all` into a fresh root. Only the
+    start saves (v9: `sense_r` as the 16th field, 0.0), `rng.json` (`save_version` 9), `create.json` and the two
+    creation `config.json` files changed, and only by the four new config keys and the version (checked by
+    decoding them);
+  - the kernel reads v9 and refuses `sense_range` on (in `Config::check_relations`, so saves and
+    `ws_world_create` alike) and a non-zero `sense_r`; `cargo test`, `fmt` and `clippy` pass;
+  - pytest 366 passed (99.36%), with the new `tests/test_sense_range.py`;
+  - steps/s, CPU time, interleaved: flags off before 646 / 646 / 640 / 646, after 653 / 634 / 627 / 667 (noise);
+    `sensing=1` before 441 / 432 / 427 / 435 / 430 / 444, after 424 / 427 / 372 / 441 / 424 / 432 (median about
+    2% lower, ranges overlap); `sense_range` on, about 720 cells, `sense_radius_max` 3: 368-421, 5: 512-516.
+  - security review: no blockers (its fuzz against a naive tile-enumerating reference matched 14,470 moves, R 2-5,
+    heights 2-12, minimal widths); its nits applied (docstrings, a draw-counting test, a v8-row test in Rust, the
+    upkeep deviation noted in `docs/ARCHITECTURE.md`).
 
 ## Item 11: obstacles and scattered resources that make exploration pay (owner's idea, 2026-11-11)
 **Idea.** Use the terrain together with `sense_r` (item 10): obstacles placed at random by the world generator, or

@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **Save format v9 (ADR-0014)**: each cell row gains `sense_r` (16 fields); v8 saves are refused. The Rust kernel
+  reads v9 and refuses `sense_range` on until the experiment validates it.
 - **ADR-0014 commit 1, trait table**: the per-cell traits outside the genome (`sex_p`, `plast_p`, `hgt_p`,
   `armor_p`) are driven by one table, `worldsim.world.TRAITS`, for draws, inheritance, upkeep, stats, save checks
   and the inspector. `Cell` takes `traits=` (`make_traits(...)`) and `World.offspring_traits` replaces the four
@@ -13,6 +15,10 @@ All notable changes to this project are documented here. Format based on
   follows the four trait means.
 
 ### Added
+- **ADR-0014 commit 2, evolvable perception radius** (`--set sensing=1 --set sense_range=1`): cells carry
+  `sense_r`, which widens what sensing sees from radius 1 up to `sense_radius_max` (the move stays one tile), at a
+  cost of `sense_range_upkeep` per extra tile of radius; `sense_range_neutral` is the control arm. Off by default
+  and then bit-identical (every golden hash and render unchanged).
 - **ADR-0014, trait table and evolvable perception radius**: the trait refactor first, then `sense_r` with save v9;
   the Rust kernel reads v9 but refuses `sense_range` until the experiment validates it.
 - **ADR-0013 piece 5, Unity sandbox tools**: the viewer gets the five G1 tools (pick one, click the world), with

@@ -84,6 +84,10 @@ fn malformed_saves_are_refused() {
             "unsupported save version 5",
         ),
         (
+            with(|s| s["version"] = json!(8)),
+            "unsupported save version 8",
+        ),
+        (
             with(|s| s["config"]["warp_drive"] = json!(1)),
             "unknown key \"warp_drive\"",
         ),
@@ -181,6 +185,11 @@ fn malformed_saves_are_refused() {
             with(|s| s["cells"][0].as_array_mut().unwrap().push(json!(0))),
             BAD,
         ),
+        (
+            // a v8-layout row (15 fields) inside a v9 save
+            with(|s| drop(s["cells"][0].as_array_mut().unwrap().pop())),
+            BAD,
+        ),
         (with(|s| s["cells"][0][1] = json!(160)), "outside the grid"),
         (with(|s| s["cells"][0][2] = json!(-1)), BAD),
         (with(|s| s["cells"][0][1] = json!(1.0)), BAD),
@@ -211,6 +220,19 @@ fn malformed_saves_are_refused() {
         (with(|s| s["cells"][0][11] = json!(0.5)), "plast_p"),
         (with(|s| s["cells"][0][13] = json!(0.5)), "hgt_p"),
         (with(|s| s["cells"][0][14] = json!(0.5)), "armor_p"),
+        (with(|s| s["cells"][0][15] = json!(0.5)), "sense_r"),
+        (with(|s| s["cells"][0][15] = json!(1.5)), "sense_r"),
+        (
+            with(|s| {
+                s["config"]["sensing"] = json!(true);
+                s["config"]["sense_range"] = json!(true);
+            }),
+            "sense_range is not supported",
+        ),
+        (
+            with(|s| s["config"]["sense_radius_max"] = json!(6)),
+            "sense_radius_max = 6 is outside",
+        ),
         (
             with(|s| s["counters"]["hgt_foreign"] = json!(1)),
             "hgt_foreign exceeds hgt_events",

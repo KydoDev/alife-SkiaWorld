@@ -7,7 +7,7 @@ from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
 from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, TRAIT_NAMES, Cell, make_traits
 
-ARMOR_COL = 14                                                   # armor_p in a v8 cell row
+ARMOR_COL = 14                                                   # armor_p in a cell row (v8 on)
 
 
 def world(seed=1, **kw):
