@@ -2,7 +2,9 @@
     "name": "WorldSim.Editor",
     "rootNamespace": "WorldSim.EditorTools",
     "references": [
-        "WorldSim.Runtime"
+        "WorldSim.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [
         "Editor"

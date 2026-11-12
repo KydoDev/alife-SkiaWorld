@@ -98,8 +98,15 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
 ```
 - The editor locks a loaded native library: close it before re-running `unity_sync.py` after a
   kernel change (the script says so when the copy fails).
+- **Render pipeline: URP 17.5** (the Built-in pipeline is deprecated in Unity 6). `Assets/Settings/WorldSim_URP.asset`
+  (+ `_Renderer`, no post-processing, MSAA off) is assigned in Graphics and in every Quality level;
+  `WorldSimSetup.ConfigureRenderPipeline` (menu *WorldSim > Configure render pipeline*) recreates and reassigns it.
+  The scene camera only clears to black and carries `UniversalAdditionalCameraData` (post-processing off); the world
+  is drawn by IMGUI on top. The project has no materials, lights or custom shaders, so nothing else depends on the
+  pipeline. Packages are kept minimal: URP, Test Framework and the IMGUI and JSON modules (used by the viewer)
+  plus UI Toolkit (editor and Test Runner windows); URP pulls in its own dependencies.
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
-  `WorldSimView.cs` (texture, controls), `Editor/WorldSimSetup.cs` (scene), `Tests/Editor/`.
+  `WorldSimView.cs` (texture, controls), `Editor/WorldSimSetup.cs` (scene, URP settings), `Tests/Editor/`.
 - **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
   form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms
   and images themselves stay in Python; a kernel-made world cannot be saved yet.

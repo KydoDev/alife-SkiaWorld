@@ -1,14 +1,20 @@
-// Builds the front-end scene from code, so the scene file can be regenerated instead of hand-edited.
+// Builds the front-end scene and the render pipeline settings from code, so they can be regenerated
+// instead of hand-edited.
 //   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
+//   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.ConfigureRenderPipeline
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace WorldSim.EditorTools
 {
     public static class WorldSimSetup
     {
         public const string ScenePath = "Assets/Scenes/WorldSim.unity";
+        public const string PipelineAssetPath = "Assets/Settings/WorldSim_URP.asset";
+        public const string RendererAssetPath = "Assets/Settings/WorldSim_URP_Renderer.asset";
 
         [MenuItem("WorldSim/Create front-end scene")]
         public static void CreateScene()
@@ -19,11 +25,46 @@ namespace WorldSim.EditorTools
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Color.black;
             camera.orthographic = true;
+            // The world is drawn by IMGUI on top of the camera's clear, so URP needs no post-processing,
+            // anti-aliasing or depth texture here.
+            var cameraData = camera.gameObject.AddComponent<UniversalAdditionalCameraData>();
+            cameraData.renderPostProcessing = false;
+            cameraData.antialiasing = AntialiasingMode.None;
             new GameObject("WorldSim").AddComponent<WorldSimView>();
             System.IO.Directory.CreateDirectory("Assets/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             Debug.Log($"WorldSim: scene written to {ScenePath}");
+        }
+
+        // Creates (or reuses) the URP asset and its renderer, then assigns it in Graphics settings and in
+        // every Quality level. Idempotent: running it again changes nothing.
+        [MenuItem("WorldSim/Configure render pipeline (URP)")]
+        public static void ConfigureRenderPipeline()
+        {
+            var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelineAssetPath);
+            if (pipeline == null)
+            {
+                System.IO.Directory.CreateDirectory("Assets/Settings");
+                // No PostProcessData: the viewer draws a texture with IMGUI and uses no post-processing.
+                var renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
+                AssetDatabase.CreateAsset(renderer, RendererAssetPath);
+                pipeline = UniversalRenderPipelineAsset.Create(renderer);
+                pipeline.msaaSampleCount = 1;
+                AssetDatabase.CreateAsset(pipeline, PipelineAssetPath);
+            }
+
+            GraphicsSettings.defaultRenderPipeline = pipeline;
+            int current = QualitySettings.GetQualityLevel();
+            for (int level = 0; level < QualitySettings.names.Length; level++)
+            {
+                QualitySettings.SetQualityLevel(level, false);
+                QualitySettings.renderPipeline = pipeline;
+            }
+            QualitySettings.SetQualityLevel(current, false);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"WorldSim: URP asset {PipelineAssetPath} assigned to Graphics and "
+                      + $"{QualitySettings.names.Length} Quality levels");
         }
     }
 }
