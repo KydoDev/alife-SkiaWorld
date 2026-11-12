@@ -64,6 +64,12 @@ namespace WorldSim
         private Vector2Int _fittedScreen;    // the screen size FitView last used (device pixels per point follow it)
         private WorldInfo _info;
         private Texture2D _texture;
+        private SpriteLayer _sprites;        // P5b: null where the sprite shader is unsupported (RGB only)
+        private bool _spritesStale;          // the world changed since the sprite layer was last drawn
+        private int _spriteFrame;            // idle frame, swapped every IdleFrameSeconds
+        private float _frameClock;
+        private float _frameMs;              // smoothed frame time, shown in the HUD (P5 pass: <= 16 ms on the phone)
+        private const float IdleFrameSeconds = 0.5f;
         private byte[] _rgb;
         private byte[] _flipped;
         private double _pending;
@@ -81,6 +87,7 @@ namespace WorldSim
         private VisualElement _root;
         private VisualElement _worldView;
         private Image _image;                // the world, drawn once (no copies: P2b)
+        private Image _spriteImage;          // the sprites over it, shown at >= SpriteArt.Size device px per tile
         private Label _stats, _speed, _error, _toolStatus;
 
         // gestures on the world: the pointers down (panel units, world-local), a tap candidate, a pinch
@@ -271,7 +278,7 @@ namespace WorldSim
                 return;
             }
             _stats.text = _world == null ? "no world" : $"step {_info.StepCount}   cells {_info.Population}";
-            _speed.text = $"{StepsPerSecond}/s";
+            _speed.text = $"{StepsPerSecond}/s  {_frameMs:0.0} ms";
             _play.text = running ? "Pause" : "Play";
             _step.SetEnabled(!running && _world != null);
         }
@@ -364,6 +371,14 @@ namespace WorldSim
         /// <summary>The world's image element (null before the first world); tests read its layout.</summary>
         public Image WorldImage => _image;
 
+        /// <summary>The sprite image (null before the first world or without sprite support); tests read it.
+        /// </summary>
+        public Image SpriteImage => _spriteImage;
+
+        /// <summary>Sprites are drawn when a tile is at least <see cref="SpriteArt.Size"/> device pixels wide;
+        /// below that the flat RGB world is the level of detail.</summary>
+        public bool SpritesShown => _sprites != null && _camera != null && _camera.Scale >= SpriteArt.Size;
+
         /// <summary>Place the world's image (whole device pixels, so every tile is the same size).</summary>
         public void LayoutWorld()
         {
@@ -379,10 +394,43 @@ namespace WorldSim
                 _worldView.Insert(0, _image);    // under the error label
             }
             _image.image = _texture;
-            _image.style.left = _camera.Left() / k;
-            _image.style.top = _camera.Top() / k;
-            _image.style.width = _camera.Width * _camera.Scale / k;
-            _image.style.height = _camera.Height * _camera.Scale / k;
+            Place(_image, k);
+            if (_sprites == null)
+            {
+                return;
+            }
+            if (_spriteImage == null)
+            {
+                _spriteImage = new Image { scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore };
+                _spriteImage.AddToClassList("ws-world-image");
+                _worldView.Insert(1, _spriteImage);    // over the world, under the error label
+            }
+            _spriteImage.image = _sprites.Texture;
+            Place(_spriteImage, k);
+            _spriteImage.style.display = SpritesShown ? DisplayStyle.Flex : DisplayStyle.None;
+            RefreshSprites();
+        }
+
+        private void Place(Image image, float k)
+        {
+            image.style.left = _camera.Left() / k;
+            image.style.top = _camera.Top() / k;
+            image.style.width = _camera.Width * _camera.Scale / k;
+            image.style.height = _camera.Height * _camera.Scale / k;
+        }
+
+        /// <summary>Draw the sprite layer if it is shown and out of date; hidden, it waits (no GPU work at the
+        /// flat LOD).</summary>
+        private void RefreshSprites()
+        {
+            if (!SpritesShown || !_spritesStale)
+            {
+                return;
+            }
+            _sprites.Upload(_world);
+            _sprites.Render(_spriteFrame, 0f);    // night palette until P5c drives it from the light factor
+            _spritesStale = false;
+            _spriteImage?.MarkDirtyRepaint();
         }
 
         private void OnWorldPointerDown(PointerDownEvent e)
@@ -646,6 +694,8 @@ namespace WorldSim
                         name = "WorldSim",
                     };
                     _camera = new WorldCamera((int)_info.Width, (int)_info.Height, maxScale);
+                    _sprites?.Dispose();
+                    _sprites = MakeSprites((int)_info.Width, (int)_info.Height);
                 }
                 _fitPending = true;    // every world opened starts whole on screen, once the view has a size
                 FitView();
@@ -663,6 +713,37 @@ namespace WorldSim
             }
         }
 
+        private static SpriteLayer MakeSprites(int width, int height)
+        {
+            try
+            {
+                return new SpriteLayer(width, height);
+            }
+            catch (InvalidOperationException e)
+            {
+                Debug.LogWarning($"{e.Message}: the world is drawn without sprites");
+                return null;
+            }
+        }
+
+        /// <summary>Idle frames and the frame-time readout: the sprites swap frame every
+        /// <see cref="IdleFrameSeconds"/>, also while paused, and the HUD's frame time is refreshed with them.
+        /// </summary>
+        private void Tick()
+        {
+            _frameMs += (Time.unscaledDeltaTime * 1000f - _frameMs) * 0.1f;
+            _frameClock += Time.unscaledDeltaTime;
+            if (_frameClock < IdleFrameSeconds)
+            {
+                return;
+            }
+            _frameClock = 0f;
+            _spriteFrame ^= 1;
+            _spritesStale = true;
+            RefreshSprites();
+            RefreshHud();
+        }
+
         private void Update()
         {
             // a resize that keeps the aspect ratio changes no layout in panel units, so no geometry event comes,
@@ -672,6 +753,10 @@ namespace WorldSim
                 FitView();
             }
             HandleKeys();
+            if (_world != null)
+            {
+                Tick();
+            }
             if (_world == null || !running)
             {
                 return;
@@ -755,10 +840,13 @@ namespace WorldSim
             _texture.SetPixelData(_flipped, 0);
             _texture.Apply(false);
             _image?.MarkDirtyRepaint();    // the panel repaints only when something in it is dirty
+            _spritesStale = true;
+            RefreshSprites();
         }
 
         private void OnDestroy()
         {
+            _sprites?.Dispose();
             _world?.Dispose();
             if (_texture != null)
             {

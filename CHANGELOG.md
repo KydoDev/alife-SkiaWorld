@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P5b, sprite layer** (`SpriteLayer.cs`, `Resources/WorldSimSprites.shader`): the ABI 4 tile words are uploaded as
+  a data texture and one unlit shader blits a 5x5 sprite per occupied tile into a render texture, shown over the RGB
+  world from 5 device pixels per tile (below that the flat RGB world is the level of detail). Idle frames swap every
+  half second (each species offset by its key); starving cells (energy level 0) are desaturated and dithered;
+  a bonded cell lights the edge it shares with a bonded neighbour. The HUD shows the smoothed frame time. EditMode
+  tests compare every GPU pixel of three golden worlds with a CPU version of the rules.
 - **G3 P5a, sprite art** (`unity/Assets/WorldSim/Runtime/SpriteArt.cs`): the 5x5 cell sprites (photo, sapro, pred,
   chemo; two idle frames each) and the neon night/day palette of the design reference, built into a role atlas
   (one colour role per pixel) and a palette texture for the P5b sprite shader. EditMode tests read the design table

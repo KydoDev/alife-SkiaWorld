@@ -105,7 +105,34 @@ namespace WorldSim.PlayTests
             Assert.IsTrue(image.xMin >= -slack && image.xMax <= view.width + slack
                           && image.yMin >= -slack && image.yMax <= view.height + slack,
                           $"the world is not wholly inside the view; {State(_view)}");
-            Assert.AreEqual(1, _view.WorldElement.Query<Image>().ToList().Count, "the world is drawn once");
+            var images = _view.WorldElement.Query<Image>().ToList();
+            Assert.AreEqual(1, images.FindAll(i => i.image == _view.WorldImage.image).Count, "the world is drawn once");
+            Assert.LessOrEqual(images.Count, 2, "the world and at most one sprite layer over it");
+        }
+
+        [UnityTest]
+        public IEnumerator SpritesAppearFromFivePixelsPerTileOverTheWorld()
+        {
+            yield return OpenView();
+            WorldCamera camera = _view.Camera;
+            Assume.That(_view.SpriteImage, Is.Not.Null, "the sprite shader is supported on this GPU");
+            camera.ZoomAt(SpriteArt.Size - 1, Vector2.zero);
+            _view.LayoutWorld();
+            yield return null;
+            Assert.AreEqual(camera.Scale >= SpriteArt.Size, _view.SpritesShown, State(_view));
+            if (camera.MinScale < SpriteArt.Size)
+            {
+                Assert.AreEqual(DisplayStyle.None, _view.SpriteImage.resolvedStyle.display, "flat LOD below 5 px");
+            }
+            camera.ZoomAt(SpriteArt.Size, Vector2.zero);
+            _view.LayoutWorld();
+            yield return null;
+            Assert.IsTrue(_view.SpritesShown);
+            Assert.AreEqual(DisplayStyle.Flex, _view.SpriteImage.resolvedStyle.display);
+            Assert.AreEqual(_view.WorldImage.layout, _view.SpriteImage.layout, "the sprites sit on their tiles");
+            Assert.AreSame(_view.WorldImage.parent, _view.SpriteImage.parent);
+            Assert.Greater(_view.SpriteImage.parent.IndexOf(_view.SpriteImage),
+                           _view.WorldImage.parent.IndexOf(_view.WorldImage), "the sprites are drawn over the world");
         }
 
         [UnityTest]
