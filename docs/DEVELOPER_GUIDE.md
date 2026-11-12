@@ -95,6 +95,8 @@ python scripts/unity_sync.py --planet examples/red_dwarf.json   # config for New
 Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
 # EditMode tests: golden hashes and renders through P/Invoke
 Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResults unity-tests.xml
+# PlayMode tests (G3 P2): without -batchmode, so the Editor has a window and the UI gets input
+Unity -projectPath unity -runTests -testPlatform PlayMode -testResults unity-play.xml
 ```
 - The editor locks a loaded native library: close it before re-running `unity_sync.py` after a
   kernel change (the script says so when the copy fails).
@@ -103,17 +105,25 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
   `WorldSimSetup.ConfigureRenderPipeline` (menu *WorldSim > Configure render pipeline*) recreates and reassigns it.
   The scene camera only clears to black and carries `UniversalAdditionalCameraData` (post-processing off); the world
   is a UI Toolkit panel on top. The project has no materials, lights or custom shaders, so nothing else depends on
-  the pipeline. Packages are kept minimal: URP, Test Framework, UI Toolkit (the viewer) and the IMGUI and JSON
-  modules; URP pulls in its own dependencies.
+  the pipeline. Packages are kept minimal: URP, Test Framework, Input System 1.20 (bundled with the Editor), UI
+  Toolkit (the viewer) and the IMGUI and JSON modules; URP pulls in its own dependencies.
 - **UI (G3 P1)**: UI Toolkit. `Assets/WorldSim/UI/WorldSimView.uxml` is the layout (HUD, control bar, world, tool
   dock), `WorldSimView.uss` the Neon Abyss style, `WorldSimTheme.tss` the theme and `WorldSimPanel.asset` the panel
-  settings (scale with screen size from 1280x720, created by `CreateScene`). The world is an `Image` showing the
-  point-filtered texture scale-to-fit; `ViewMath` maps a click to a tile. The root gets `ws-portrait` or
+  settings (scale with screen size from 1280x720, created by `CreateScene`). The world is shown through a
+  `WorldCamera` (G3 P2): a whole number of device pixels per tile, from "the whole depth fits" (the first view) up to
+  `maxScale`; x wraps, y is clamped. The point-filtered texture is drawn as side-by-side `Image` copies in a clipped
+  `#world`, so the seam needs no texture repeat. The root gets `ws-portrait` or
   `ws-landscape` and padding from `Screen.safeArea`. Font: Pixelify Sans (`UI/Fonts`, SIL OFL, `OFL.txt` beside
-  it). Keys (Space, N, +/-) are read with the legacy Input Manager and ignored while the seed field has the focus.
+  it). **Input: the Input System package only** (`activeInputHandler: 1`); UI Toolkit reads it through the package's
+  `InputSystemProvider`, so the scene needs no EventSystem. On the world: drag pans, pinch (two fingers) or the
+  wheel zooms about the fingers or the cursor, and a tap (a press that moves less than `tapSlop` and is never joined
+  by a second finger) applies the selected tool or, with none, names the tile in the dock. Keys (Space, N, +/-) come
+  from `Keyboard.current` (none on a phone) and are ignored while the seed field has the focus.
+- **Batchmode gives the UI no input**: with no window, UI Toolkit drops runtime input (the device gets its events,
+  the panel none), so `VirtualMouseReachesThePanel` skips itself in batchmode; run PlayMode without `-batchmode`.
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
-  `WorldSimView.cs` (texture, controls), `ViewMath.cs` (fit and click mapping), `Editor/WorldSimSetup.cs` (scene,
-  panel, URP settings), `Tests/Editor/`.
+  `WorldSimView.cs` (texture, controls), `WorldCamera.cs` (zoom, pan, screen point to tile), `Editor/WorldSimSetup.cs` (scene,
+  panel, URP settings), `Tests/Editor/` (EditMode), `Tests/Play/` (PlayMode).
 - **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
   form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms
   and images themselves stay in Python; a kernel-made world cannot be saved yet.

@@ -1,7 +1,9 @@
 {
     "name": "WorldSim.Runtime",
     "rootNamespace": "WorldSim",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

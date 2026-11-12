@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **G3 P2, camera over the world in the Unity viewer**: drag to pan (wrapping in x, clamped in y), pinch or mouse
+  wheel to zoom in whole device pixels per tile; the first view fits the whole depth. A tap applies the selected tool
+  or, with none, names the tile (the cell inspector comes with P6). Input moves to the Input System package (1.20,
+  bundled with the Editor; the legacy Input Manager is off). `WorldCamera` replaces P1's `ViewMath`, with EditMode
+  tests; new PlayMode tests (`Tests/Play`) check the drawn-vs-tapped tile at three zooms and across the seam, and a
+  virtual mouse click through the real UI (windowed Editor only: batchmode gives the UI no input).
 - **G3 P1, UI Toolkit shell for the Unity viewer**: the IMGUI view is replaced by UXML + USS in the Neon Abyss
   palette with the Pixelify Sans font (SIL OFL): HUD, control bar (play/pause, step, speed, seed, New world), the
   world scale-to-fit, and a tool dock. Layout classes follow portrait or landscape and padding follows the screen's

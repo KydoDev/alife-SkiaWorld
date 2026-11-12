@@ -1,13 +1,15 @@
 // G3 P1 front-end shell (docs/G3_PLAN.md): a kernel world shown as a point-filtered texture, with play / pause /
 // step / speed, (ADR-0012) "New world" from an exported config and a typed seed, and (ADR-0013) the five G1
 // sandbox tools applied with a click, with the parameters Python's GameRules() exports. No budget or milestones
-// yet (G3 P7). The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette); keys come from the legacy
-// Input Manager (no input package until P2).
+// yet (G3 P7). The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette). G3 P2: the world is seen through
+// a WorldCamera (pinch or wheel zoom in whole device pixels per tile, drag to pan, wrapping in x); a tap applies the
+// selected tool or, with none, names the tile. Input comes from the Input System package.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace WorldSim
@@ -40,9 +42,17 @@ namespace WorldSim
         [Tooltip("Upper bound of steps per frame, so a slow frame never blocks for long")]
         public int maxStepsPerFrame = 20;
 
+        [Tooltip("Largest zoom, in device pixels per tile")]
+        public int maxScale = 48;
+
+        [Tooltip("A press that moves less than this (panel units) and is never joined by a second finger is a tap")]
+        public float tapSlop = 8f;
+
         public bool running = true;
 
         private NativeWorld _world;
+        private WorldCamera _camera;
+        private bool _fitPending;            // a new camera fits the height once the view has a size
         private WorldInfo _info;
         private Texture2D _texture;
         private byte[] _rgb;
@@ -53,8 +63,17 @@ namespace WorldSim
 
         // UI Toolkit elements (WorldSimView.uxml)
         private VisualElement _root;
-        private Image _image;
+        private VisualElement _worldView;
+        private readonly List<Image> _copies = new List<Image>();   // side-by-side copies: the x wrap
         private Label _stats, _speed, _error, _toolStatus;
+
+        // gestures on the world: the pointers down (panel units, world-local), a tap candidate, a pinch
+        private readonly Dictionary<int, Vector2> _pointers = new Dictionary<int, Vector2>();
+        private int _tapId = -1;
+        private Vector2 _tapStart;
+        private bool _dragging;
+        private float _pinchStartDistance;
+        private int _pinchStartScale;
         private Button _play, _step;
         private TextField _seed;
         private readonly List<Button> _toolButtons = new List<Button>();
@@ -120,10 +139,14 @@ namespace WorldSim
                     e.StopPropagation();
                 }
             }, TrickleDown.TrickleDown);
-            _image = new Image { scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Position };
-            _image.AddToClassList("ws-world-image");
-            doc.Q("world").Insert(0, _image);
-            _image.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
+            _worldView = doc.Q("world");
+            _worldView.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
+            _worldView.RegisterCallback<PointerMoveEvent>(OnWorldPointerMove);
+            _worldView.RegisterCallback<PointerUpEvent>(e => EndPointer(e.pointerId, e.localPosition, e.button));
+            _worldView.RegisterCallback<PointerCancelEvent>(e => EndPointer(e.pointerId, e.localPosition, -1));
+            _worldView.RegisterCallback<PointerCaptureOutEvent>(e => DropPointer(e.pointerId));
+            _worldView.RegisterCallback<WheelEvent>(OnWorldWheel);
+            _worldView.RegisterCallback<GeometryChangedEvent>(_ => FitView());
             _root.RegisterCallback<GeometryChangedEvent>(_ => ApplyLayout());
         }
 
@@ -215,19 +238,228 @@ namespace WorldSim
             }
         }
 
-        /// <summary>A left click (or a touch) on the world applies the selected tool to the tile under it.</summary>
-        private void OnWorldPointerDown(PointerDownEvent e)
+        // ------------------------------------------------------------------ camera and gestures
+
+        /// <summary>The camera over the shown world (null without a world); tests read it.</summary>
+        public WorldCamera Camera => _camera;
+
+        /// <summary>The world element (the camera's view); tests read its layout.</summary>
+        public VisualElement WorldElement => _worldView;
+
+        /// <summary>Device pixels per panel unit (the panel scales with the screen).</summary>
+        public float PixelsPerPoint()
         {
-            if (e.button != 0 || _tool < 0 || _world == null || _texture == null)
+            float width = _root?.panel?.visualTree.layout.width ?? 0f;
+            return width > 0 && Screen.width > 0 ? Screen.width / width : 1f;
+        }
+
+        /// <summary>The tile under a point of the world element (panel units, element-local).</summary>
+        public bool TileAtLocal(Vector2 local, out int x, out int y)
+        {
+            x = y = 0;
+            return _camera != null && _camera.TileAt(local * PixelsPerPoint(), out x, out y);
+        }
+
+        /// <summary>Give the camera the view's size; a new camera then fits the height.</summary>
+        private void FitView()
+        {
+            if (_camera == null)
             {
                 return;
             }
-            Rect drawn = ViewMath.FittedRect(_image.contentRect, _texture.width, _texture.height);
-            if (ViewMath.TileAt(e.localPosition, drawn, (int)_info.Width, (int)_info.Height, out int x, out int y))
+            Vector2 size = _worldView.contentRect.size * PixelsPerPoint();
+            if (size.x <= 0 || size.y <= 0)
+            {
+                return;
+            }
+            _camera.SetView(size);
+            if (_fitPending)
+            {
+                _camera.FitHeight();
+                _fitPending = false;
+            }
+            LayoutWorld();
+        }
+
+        /// <summary>Place the world's copies (whole device pixels, so every tile is the same size).</summary>
+        public void LayoutWorld()
+        {
+            if (_camera == null || _texture == null)
+            {
+                return;
+            }
+            float k = PixelsPerPoint();
+            int count = _camera.CopiesNeeded();
+            while (_copies.Count < count)
+            {
+                var copy = new Image { image = _texture, scaleMode = ScaleMode.StretchToFill,
+                                       pickingMode = PickingMode.Ignore };
+                copy.AddToClassList("ws-world-copy");
+                _worldView.Insert(_copies.Count, copy);   // in copy order, under the error label
+                _copies.Add(copy);
+            }
+            int period = _camera.Width * _camera.Scale;
+            int left = _camera.FirstCopyLeft();
+            for (int i = 0; i < _copies.Count; i++)
+            {
+                Image copy = _copies[i];
+                copy.style.display = i < count ? DisplayStyle.Flex : DisplayStyle.None;
+                copy.image = _texture;
+                copy.style.left = (left + i * period) / k;
+                copy.style.top = _camera.Top() / k;
+                copy.style.width = period / k;
+                copy.style.height = _camera.Height * _camera.Scale / k;
+            }
+        }
+
+        private void OnWorldPointerDown(PointerDownEvent e)
+        {
+            _pointers[e.pointerId] = e.localPosition;
+            _worldView.CapturePointer(e.pointerId);
+            if (_pointers.Count == 1)
+            {
+                _tapId = e.pointerId;
+                _tapStart = e.localPosition;
+                _dragging = false;
+            }
+            else
+            {
+                _tapId = -1;          // a second finger: this gesture is a pinch, never a tap
+                StartPinch();
+            }
+            e.StopPropagation();
+        }
+
+        private void OnWorldPointerMove(PointerMoveEvent e)
+        {
+            if (!_pointers.TryGetValue(e.pointerId, out Vector2 last) || _camera == null)
+            {
+                return;
+            }
+            Vector2 now = e.localPosition;
+            float k = PixelsPerPoint();
+            if (_pointers.Count == 1)
+            {
+                if (!_dragging && (now - _tapStart).magnitude > tapSlop)
+                {
+                    _dragging = true;     // past the slop: a drag, and the pan catches up from the press
+                    _tapId = -1;
+                    last = _tapStart;
+                }
+                if (_dragging)
+                {
+                    _camera.Pan((now - last) * k);
+                }
+            }
+            else
+            {
+                Vector2 midBefore = Midpoint();
+                _pointers[e.pointerId] = now;
+                Vector2 mid = Midpoint();
+                _camera.Pan((mid - midBefore) * k);
+                float distance = PinchDistance();
+                if (_pinchStartDistance > 0 && distance > 0)
+                {
+                    int target = Mathf.RoundToInt(_pinchStartScale * distance / _pinchStartDistance);
+                    _camera.ZoomAt(target, mid * k);
+                }
+            }
+            _pointers[e.pointerId] = now;
+            LayoutWorld();
+            e.StopPropagation();
+        }
+
+        private void EndPointer(int pointerId, Vector2 local, int button)
+        {
+            if (pointerId == _tapId && !_dragging && button == 0 && _pointers.Count == 1)
+            {
+                Tap(local);
+            }
+            DropPointer(pointerId);
+            if (_worldView.HasPointerCapture(pointerId))
+            {
+                _worldView.ReleasePointer(pointerId);
+            }
+        }
+
+        private void DropPointer(int pointerId)
+        {
+            if (!_pointers.Remove(pointerId))
+            {
+                return;
+            }
+            if (pointerId == _tapId)
+            {
+                _tapId = -1;
+            }
+            if (_pointers.Count >= 2)
+            {
+                StartPinch();         // three fingers down to two: restart from the two left
+            }
+            else
+            {
+                _dragging = _pointers.Count == 1;   // one finger left after a pinch pans, it never taps
+            }
+        }
+
+        private void StartPinch()
+        {
+            _pinchStartDistance = PinchDistance();
+            _pinchStartScale = _camera?.Scale ?? 1;
+        }
+
+        private void OnWorldWheel(WheelEvent e)
+        {
+            if (_camera == null || e.delta.y == 0)
+            {
+                return;
+            }
+            _camera.ZoomAt(_camera.NextScale(e.delta.y < 0 ? 1 : -1), e.localMousePosition * PixelsPerPoint());
+            LayoutWorld();
+            e.StopPropagation();
+        }
+
+        /// <summary>A tap applies the selected tool to the tile under it, or names the tile.</summary>
+        private void Tap(Vector2 local)
+        {
+            if (_world == null || !TileAtLocal(local, out int x, out int y))
+            {
+                return;
+            }
+            if (_tool >= 0)
             {
                 ApplyTool((uint)x, (uint)y);
             }
-            e.StopPropagation();
+            else
+            {
+                _toolStatus.text = $"tile ({x}, {y})";
+            }
+        }
+
+        // the first two pointers down (a pinch uses two fingers; a third is ignored)
+        private (Vector2, Vector2) FirstTwo()
+        {
+            using var it = _pointers.Values.GetEnumerator();
+            it.MoveNext();
+            Vector2 a = it.Current;
+            it.MoveNext();
+            return (a, it.Current);
+        }
+
+        private Vector2 Midpoint()
+        {
+            (Vector2 a, Vector2 b) = FirstTwo();
+            return (a + b) / 2;
+        }
+
+        private float PinchDistance()
+        {
+            if (_pointers.Count < 2)
+            {
+                return 0f;
+            }
+            (Vector2 a, Vector2 b) = FirstTwo();
+            return (a - b).magnitude;
         }
 
         // ------------------------------------------------------------------ world
@@ -333,8 +565,11 @@ namespace WorldSim
                         wrapMode = TextureWrapMode.Clamp,
                         name = "WorldSim",
                     };
-                    _image.image = _texture;
+                    // a new size: a new camera, fitted to the height once the view has a size
+                    _camera = new WorldCamera((int)_info.Width, (int)_info.Height, maxScale);
+                    _fitPending = true;
                 }
+                FitView();
                 _pending = 0;
                 ShowError(null);
                 Redraw();
@@ -373,21 +608,25 @@ namespace WorldSim
             {
                 return;
             }
+            Keyboard keys = Keyboard.current;
+            if (keys == null)
+            {
+                return;               // phones and tablets: no keyboard
+            }
             bool changed = true;
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (keys.spaceKey.wasPressedThisFrame)
             {
                 running = !running;
             }
-            else if (Input.GetKeyDown(KeyCode.N) && !running && _world != null)
+            else if (keys.nKey.wasPressedThisFrame && !running && _world != null)
             {
                 Advance(1);
             }
-            else if (Input.GetKeyDown(KeyCode.Plus) || Input.GetKeyDown(KeyCode.Equals)
-                     || Input.GetKeyDown(KeyCode.KeypadPlus))
+            else if (keys.equalsKey.wasPressedThisFrame || keys.numpadPlusKey.wasPressedThisFrame)
             {
                 speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1);
             }
-            else if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
+            else if (keys.minusKey.wasPressedThisFrame || keys.numpadMinusKey.wasPressedThisFrame)
             {
                 speedIndex = Math.Max(0, speedIndex - 1);
             }
@@ -430,7 +669,10 @@ namespace WorldSim
             }
             _texture.SetPixelData(_flipped, 0);
             _texture.Apply(false);
-            _image.MarkDirtyRepaint();   // the panel repaints only when something in it is dirty
+            foreach (Image copy in _copies)
+            {
+                copy.MarkDirtyRepaint();   // the panel repaints only when something in it is dirty
+            }
         }
 
         private void OnDestroy()

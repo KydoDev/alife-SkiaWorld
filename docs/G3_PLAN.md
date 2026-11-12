@@ -9,7 +9,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 ## Checklist
 1. [x] P0 Owner checks the URP viewer in Play mode (texture visible, row 0 on top, tool click hits the right cell)
 2. [?] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
-3. [ ] P2 Touch camera: pinch zoom (integer steps), two-finger pan wrapping in x, tap = inspect cell
+3. [?] P2 Touch camera: pinch zoom (integer steps), pan wrapping in x, tap = tool or tile (inspector in P6)
 4. [ ] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
 5. [ ] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [ ] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
@@ -50,6 +50,12 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
 - **P2 Touch camera** — Input System package (comes back into the manifest). Pinch zoom in integer
   scale steps; pan wraps in x (the world is toroidal), clamps in y; tap maps screen → cell. Pass: a
   PlayMode test maps known screen points to known cells at three zoom levels and across the x seam.
+  *Result (2026-11-12)*: `WorldCamera` (whole device pixels per tile, first view fits the depth), drag to pan
+  (one finger or the mouse), pinch or wheel to zoom, x wraps by drawing side-by-side copies. Until the inspector
+  (P6, needs ABI 4) a tap with no tool only names the tile. EditMode 19/19 (`WorldCameraTests`); PlayMode 2/2 in a
+  windowed Editor: the tile drawn at a point is the tile mapped there at three zooms and across the seam, and a
+  virtual mouse clicks Play and taps the world through the Input System. Batchmode gives the UI no input, so
+  that test skips there. Pending: the owner's check with a mouse in the Editor (touch waits for P3's device).
 - **P3 Android spike** — `cargo ndk -t arm64-v8a` builds `libworldsim_core.so` into
   `Assets/Plugins/Android/arm64-v8a/`; IL2CPP, ARM64, min API to be set. Check whether the player needs the
   `androidjni` module back. Run the golden checks on a device: ARM's maths library may differ from Windows,

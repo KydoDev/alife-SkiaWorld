@@ -111,14 +111,12 @@
 .ws-world {
     flex-grow: 1;
     background-color: #000000;
+    overflow: hidden;
 }
 
-.ws-world-image {
+/* One copy of the world texture; WorldSimView places the copies side by side (the x wrap). */
+.ws-world-copy {
     position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
 }
 
 .ws-error {
