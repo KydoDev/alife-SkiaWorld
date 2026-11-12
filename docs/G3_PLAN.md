@@ -10,7 +10,8 @@ like [G2_PLAN.md](G2_PLAN.md).
 1. [x] P0 Owner checks the URP viewer in Play mode (texture visible, row 0 on top, tool click hits the right cell)
 2. [?] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
 3. [?] P2 Touch camera: pinch zoom (integer steps), pan wrapping in x, tap = tool or tile (inspector in P6)
-4. [ ] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
+4. [?] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
+12. [ ] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
 5. [ ] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [ ] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [ ] P6 Inspector bottom sheet and population screen from the ABI 4 views
@@ -62,6 +63,28 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   so per [G2_PLAN.md](G2_PLAN.md) ("Golden sets per platform") the device is compared with Python on a
   matching platform or the check is reported as not comparable — never with a tolerance. Pass: the APK
   starts, loads the bundled save, steps at ≥ 30 steps/s on the default 160×64 world on a mid-range phone.
+  *Result (2026-11-12)*: no cargo-ndk: `unity_sync.py --android` links with the Unity Editor's own NDK (r27c, API 26 =
+  the project's min SDK, 16 KB pages); `androidjni` not needed (the APK reads StreamingAssets through the
+  `unitywebrequest` module); Gradle fetched nothing (no repository lines in the build log). An Android build gunzips
+  `*.gz` StreamingAssets, so the bundled save is now `world.save`. Device: POCO F2 Pro (Snapdragon 865, Android 12):
+  a 2020 flagship, **not** a mid-range phone, so the speed pass holds only with that caveat. `android_check.py`
+  (check APK, release IL2CPP): kernel only, 1000 golden steps, default 7991 steps/s, volcanic 5574 steps/s; the
+  viewer APK runs at its 30 steps/s setting with HUD, world and dock drawn. Golden: **not comparable** on ARM:
+  default diverges from the Windows/Python hashes at step 246, volcanic at step 201 (its first step); no tolerance
+  applied, not investigated further (a reference from an arm64 Linux Python is the way to compare). Security review
+  (no blocker), fixed: New world is disabled until the bundled save has opened (it could be replaced by it); the
+  `INTERNET` permission that `UnityWebRequest` pulls in is removed from the manifest (`DropInternetPermission`; the
+  APK requests nothing); only `jar:` paths are fetched; a viewer build refuses a leftover `StreamingAssets/golden`;
+  the device check reports any exception instead of dying silently. Open for the owner: the viewer APK ships the
+  default golden start save as its world. Pending: the owner's touch check (pinch, pan, tap) on the phone.
+- **P2b Whole world on screen (owner's review on the phone, 2026-11-12)** — on the phone the first view fitted only
+  the depth: in portrait the 160-wide world needs horizontal scrolling, in landscape the right side shows a repeated
+  copy. The owner's rule: the whole world is always visible at the first view; scrolling to see it is unacceptable.
+  The owner also rejects the wrapped view (the world repeating while panning): it reads as wrong. So: the first
+  zoom fits both width and depth (still whole device pixels per tile; zoom in from there); the world is drawn once,
+  never repeated, and panning clamps in x as in y (the simulation stays toroidal; only the view stops wrapping); the player picks portrait or landscape (the screen is then locked to it); New world
+  makes a world shaped for that orientation (wide for landscape, deep for portrait). Sizes per orientation are the
+  owner's call before the code.
 - **P4 Kernel views (ABI 4, needs an ADR)** — read-only entry points, no RNG, no state change, state hash
   untouched, each wrapped in `catch_unwind` like the others:
   - `ws_world_tiles(handle, out, len)`: one `u32` per tile, packed: kind (empty / photo / chemo / sapro /

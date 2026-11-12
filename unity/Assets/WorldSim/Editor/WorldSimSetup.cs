@@ -2,7 +2,11 @@
 // instead of hand-edited.
 //   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
 //   Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.ConfigureRenderPipeline
+//   Unity -batchmode -quit -projectPath unity -buildTarget Android -executeMethod WorldSim.EditorTools.WorldSimSetup.BuildAndroid
+//   (BuildAndroidCheck: the G3 P3 device check, normally run by scripts/android_check.py)
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -19,6 +23,14 @@ namespace WorldSim.EditorTools
         public const string LayoutPath = "Assets/WorldSim/UI/WorldSimView.uxml";
         public const string ThemePath = "Assets/WorldSim/UI/WorldSimTheme.tss";
         public const string PanelSettingsPath = "Assets/WorldSim/UI/WorldSimPanel.asset";
+        public const string CheckScenePath = "Assets/Scenes/DeviceCheck.unity";
+        public const string AndroidLibPath = "Assets/Plugins/Android/arm64-v8a/libworldsim_core.so";
+        public const string WindowsLibPath = "Assets/Plugins/x86_64/worldsim_core.dll";
+        // Provisional: the store name and its trademark check are still open (G3_PLAN "Design reference").
+        public const string AndroidId = "com.kydodev.worldsim";
+        public const string AndroidCheckId = "com.kydodev.worldsim.check";
+        public const string AndroidApk = "Builds/Android/worldsim.apk";
+        public const string AndroidCheckApk = "Builds/Android/worldsim-check.apk";
 
         [MenuItem("WorldSim/Create front-end scene")]
         public static void CreateScene()
@@ -95,6 +107,105 @@ namespace WorldSim.EditorTools
             AssetDatabase.SaveAssets();
             Debug.Log($"WorldSim: URP asset {PipelineAssetPath} assigned to Graphics and "
                       + $"{QualitySettings.names.Length} Quality levels");
+        }
+
+        // G3 P3: the scene of the device check, a camera and a DeviceCheck (no UI Toolkit, no input).
+        [MenuItem("WorldSim/Create device check scene")]
+        public static void CreateCheckScene()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var camera = new GameObject("Main Camera").AddComponent<Camera>();
+            camera.tag = "MainCamera";
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = Color.black;
+            var cameraData = camera.gameObject.AddComponent<UniversalAdditionalCameraData>();
+            cameraData.renderPostProcessing = false;
+            cameraData.antialiasing = AntialiasingMode.None;
+            new GameObject("DeviceCheck").AddComponent<DeviceCheck>();
+            System.IO.Directory.CreateDirectory("Assets/Scenes");
+            EditorSceneManager.SaveScene(scene, CheckScenePath);
+            Debug.Log($"WorldSim: scene written to {CheckScenePath}");
+        }
+
+        // Android player settings kept in the project (IL2CPP, ARM64 only, the provisional id), and the import
+        // settings of the two kernel libraries, which live in the git-ignored Plugins folder and so cannot carry
+        // their own .meta: the .so goes to Android ARM64 only, the .dll to the Editor and Windows only.
+        public static void ConfigureAndroid()
+        {
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, AndroidId);
+            var so = AssetImporter.GetAtPath(AndroidLibPath) as PluginImporter
+                     ?? throw new BuildFailedException($"{AndroidLibPath} missing: run scripts/unity_sync.py --android");
+            so.SetCompatibleWithAnyPlatform(false);
+            so.SetCompatibleWithEditor(false);
+            so.SetCompatibleWithPlatform(BuildTarget.Android, true);
+            so.SetPlatformData(BuildTarget.Android, "CPU", "ARM64");
+            so.SaveAndReimport();
+            if (AssetImporter.GetAtPath(WindowsLibPath) is PluginImporter dll)
+            {
+                dll.SetCompatibleWithAnyPlatform(false);
+                dll.SetCompatibleWithEditor(true);
+                dll.SetEditorData("CPU", "x86_64");
+                dll.SetEditorData("OS", "Windows");
+                dll.SetCompatibleWithPlatform(BuildTarget.StandaloneWindows64, true);
+                dll.SetCompatibleWithPlatform(BuildTarget.Android, false);
+                dll.SaveAndReimport();
+            }
+            AssetDatabase.SaveAssets();
+        }
+
+        [MenuItem("WorldSim/Build Android viewer")]
+        public static void BuildAndroid()
+        {
+            // left behind by an interrupted scripts/android_check.py: the viewer must not ship the golden sets
+            if (AssetDatabase.IsValidFolder("Assets/StreamingAssets/golden"))
+            {
+                throw new BuildFailedException("Assets/StreamingAssets/golden exists: delete it before a viewer build");
+            }
+            ConfigureAndroid();
+            Build(new[] { ScenePath }, AndroidApk, AndroidId, PlayerSettings.productName);
+        }
+
+        public static void BuildAndroidCheck()
+        {
+            ConfigureAndroid();
+            CreateCheckScene();
+            Build(new[] { CheckScenePath }, AndroidCheckApk, AndroidCheckId, PlayerSettings.productName + " check");
+        }
+
+        // A release (non-development) APK, so the timings are those of a player; the id and the name are swapped
+        // in for the build only, so the check installs beside the viewer.
+        private static void Build(string[] scenes, string apk, string id, string name)
+        {
+            string keptId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
+            string keptName = PlayerSettings.productName;
+            bool keptBundle = EditorUserBuildSettings.buildAppBundle;
+            try
+            {
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, id);
+                PlayerSettings.productName = name;
+                EditorUserBuildSettings.buildAppBundle = false;
+                BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = scenes,
+                    locationPathName = apk,
+                    target = BuildTarget.Android,
+                    options = BuildOptions.None,
+                });
+                if (report.summary.result != BuildResult.Succeeded)
+                {
+                    throw new BuildFailedException($"Android build {report.summary.result}: {apk}");
+                }
+                Debug.Log($"WorldSim: {apk} ({report.summary.totalSize} bytes)");
+            }
+            finally
+            {
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, keptId);
+                PlayerSettings.productName = keptName;
+                EditorUserBuildSettings.buildAppBundle = keptBundle;
+                AssetDatabase.SaveAssets();
+            }
         }
     }
 }

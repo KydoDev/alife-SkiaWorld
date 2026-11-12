@@ -5,6 +5,7 @@
 // a WorldCamera (pinch or wheel zoom in whole device pixels per tile, drag to pan, wrapping in x); a tap applies the
 // selected tool or, with none, names the tile. Input comes from the Input System package.
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -24,8 +25,10 @@ namespace WorldSim
         private const long MaxConfigBytes = 64 * 1024;
         private const long MaxToolsBytes = 16 * 1024;
 
-        [Tooltip("Save in StreamingAssets, copied by scripts/unity_sync.py")]
-        public string saveFile = "world.json.gz";
+        // A gzip save under a name without ".gz": an Android build unpacks *.gz files of StreamingAssets and drops
+        // the extension, and the kernel reads gzip only.
+        [Tooltip("Save (gzip JSON) in StreamingAssets, copied by scripts/unity_sync.py")]
+        public string saveFile = "world.save";
 
         [Tooltip("Config object in StreamingAssets for New world, exported by scripts/unity_sync.py")]
         public string configFile = "world_config.json";
@@ -59,6 +62,9 @@ namespace WorldSim
         private byte[] _rgb;
         private byte[] _flipped;
         private double _pending;
+        private StreamingRead _config;       // read once at Start, used by every New world
+        private bool _ready;                 // Start has opened the bundled world: New world may replace it
+        private Button _newWorld;
         private ToolSpec[] _tools = Array.Empty<ToolSpec>();
         private int _tool = -1;              // index into _tools; -1: no tool (clicks do nothing)
 
@@ -97,12 +103,34 @@ namespace WorldSim
 
         public int StepsPerSecond => Speeds[Mathf.Clamp(speedIndex, 0, Speeds.Length - 1)];
 
-        private void Start()
+        // On the desktop every read finishes in its constructor, so Start runs to the end in its first frame; on
+        // Android the files come out of the APK and Start waits for them (StreamingRead).
+        private IEnumerator Start()
         {
             BindUi();
-            LoadTools();
-            string path = Path.Combine(Application.streamingAssetsPath, saveFile);
-            Open(() => NativeWorld.Load(ReadCapped(path, MaxSaveBytes)), $"save: {path}");
+            var tools = new StreamingRead(toolsFile, MaxToolsBytes);
+            _config = new StreamingRead(configFile, MaxConfigBytes);
+            var save = new StreamingRead(saveFile, MaxSaveBytes);
+            foreach (StreamingRead read in new[] { tools, _config, save })
+            {
+                if (!read.Done)
+                {
+                    yield return read.Wait();
+                }
+            }
+            LoadTools(tools);
+            if (save.Data == null)
+            {
+                ShowError($"{save.Error}\n(run scripts/unity_sync.py)");
+                Debug.LogError(save.Error);
+            }
+            else
+            {
+                Open(() => NativeWorld.Load(save.Data), $"save: {save.Location}");
+            }
+            // Only now: a New world made while the save was still being read would be replaced by it.
+            _ready = true;
+            _newWorld?.SetEnabled(true);
             RefreshHud();
         }
 
@@ -126,7 +154,8 @@ namespace WorldSim
             });
             Bind(doc, "slower", () => speedIndex = Math.Max(0, speedIndex - 1));
             Bind(doc, "faster", () => speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1));
-            Bind(doc, "new-world", NewWorld);
+            _newWorld = Bind(doc, "new-world", NewWorld);
+            _newWorld?.SetEnabled(false);    // until Start has read the files (see _ready)
             _seed = doc.Q<TextField>("seed");
             _seed.value = seedText;
             _seed.RegisterValueChangedCallback(e => seedText = e.newValue);
@@ -467,20 +496,27 @@ namespace WorldSim
         // ------------------------------------------------------------------ world
 
         /// <summary>Read the tool parameters; without them the viewer works, with no tools.</summary>
-        private void LoadTools()
+        private void LoadTools(StreamingRead read)
         {
-            string path = Path.Combine(Application.streamingAssetsPath, toolsFile);
-            try
+            _tools = Array.Empty<ToolSpec>();
+            if (read.Data == null)
             {
-                string text = System.Text.Encoding.UTF8.GetString(ReadCapped(path, MaxToolsBytes));
-                ToolFile file = JsonUtility.FromJson<ToolFile>(text);
-                _tools = file?.tools ?? Array.Empty<ToolSpec>();
-                _toolStatus.text = _tools.Length == 0 ? $"no tools in {path}" : "pick a tool, then tap the world";
+                _toolStatus.text = "no tools: run scripts/unity_sync.py";
+                Debug.LogWarning(read.Error);
             }
-            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException)
+            else
             {
-                _tools = Array.Empty<ToolSpec>();
-                _toolStatus.text = $"no tools ({e.GetType().Name}): run scripts/unity_sync.py";
+                try
+                {
+                    ToolFile file = JsonUtility.FromJson<ToolFile>(System.Text.Encoding.UTF8.GetString(read.Data));
+                    _tools = file?.tools ?? Array.Empty<ToolSpec>();
+                    _toolStatus.text = _tools.Length == 0 ? $"no tools in {read.Location}"
+                                                          : "pick a tool, then tap the world";
+                }
+                catch (ArgumentException e)
+                {
+                    _toolStatus.text = $"no tools ({e.GetType().Name}): run scripts/unity_sync.py";
+                }
             }
             BuildToolDock();
         }
@@ -512,24 +548,23 @@ namespace WorldSim
         /// <summary>Replace the shown world by one the kernel creates from the exported config and the seed.</summary>
         private void NewWorld()
         {
-            string path = Path.Combine(Application.streamingAssetsPath, configFile);
             if (!ulong.TryParse(seedText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out ulong seed))
             {
                 ShowError($"seed must be an integer from 0 to {ulong.MaxValue}");
                 return;
             }
-            Open(() => NativeWorld.Create(ReadCapped(path, MaxConfigBytes), seed), $"config: {path}, seed {seed}");
-            RefreshHud();
-        }
-
-        private static byte[] ReadCapped(string path, long limit)
-        {
-            long length = new FileInfo(path).Length;
-            if (length > limit)
+            if (!_ready)
             {
-                throw new IOException($"{path} is {length} bytes, more than the {limit} the kernel accepts");
+                ShowError("still loading the bundled files");
+                return;
             }
-            return File.ReadAllBytes(path);
+            if (_config.Data == null)
+            {
+                ShowError($"{_config.Error}\n(run scripts/unity_sync.py)");
+                return;
+            }
+            Open(() => NativeWorld.Create(_config.Data, seed), $"config: {_config.Location}, seed {seed}");
+            RefreshHud();
         }
 
         /// <summary>Show the world <paramref name="make"/> returns; on failure keep the current one.</summary>

@@ -88,7 +88,7 @@ Unity 6 (6000.5.6f1) project that loads a save into the Rust kernel through P/In
 Not in CI (Unity needs a licence): run its tests locally after a change to `ffi.rs` or `unity/`.
 ```bash
 # build the kernel and copy the DLL + a save into the project (both git-ignored)
-python scripts/unity_sync.py                                  # default golden start save
+python scripts/unity_sync.py                                  # default golden start save (-> StreamingAssets/world.save)
 python scripts/unity_sync.py --save runs/a/world_final.json.gz  # or any v9 save, default flags
 python scripts/unity_sync.py --planet examples/red_dwarf.json   # config for New world (default: volcanic)
 # regenerate the scene from code (Assets/Scenes/WorldSim.unity)
@@ -97,6 +97,10 @@ Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.Wo
 Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResults unity-tests.xml
 # PlayMode tests (G3 P2): without -batchmode, so the Editor has a window and the UI gets input
 Unity -projectPath unity -runTests -testPlatform PlayMode -testResults unity-play.xml
+# Android (G3 P3): once, rustup target add aarch64-linux-android; the Editor needs its Android module
+python scripts/unity_sync.py --android      # + libworldsim_core.so for arm64, linked by the Editor's own NDK
+Unity -batchmode -quit -projectPath unity -buildTarget Android -executeMethod WorldSim.EditorTools.WorldSimSetup.BuildAndroid
+python scripts/android_check.py             # device check APK: golden sets and kernel speed on a phone over adb
 ```
 - The editor locks a loaded native library: close it before re-running `unity_sync.py` after a
   kernel change (the script says so when the copy fails).
@@ -106,7 +110,7 @@ Unity -projectPath unity -runTests -testPlatform PlayMode -testResults unity-pla
   The scene camera only clears to black and carries `UniversalAdditionalCameraData` (post-processing off); the world
   is a UI Toolkit panel on top. The project has no materials, lights or custom shaders, so nothing else depends on
   the pipeline. Packages are kept minimal: URP, Test Framework, Input System 1.20 (bundled with the Editor), UI
-  Toolkit (the viewer) and the IMGUI and JSON modules; URP pulls in its own dependencies.
+  Toolkit (the viewer), the IMGUI, JSON and UnityWebRequest modules; URP pulls in its own dependencies.
 - **UI (G3 P1)**: UI Toolkit. `Assets/WorldSim/UI/WorldSimView.uxml` is the layout (HUD, control bar, world, tool
   dock), `WorldSimView.uss` the Neon Abyss style, `WorldSimTheme.tss` the theme and `WorldSimPanel.asset` the panel
   settings (scale with screen size from 1280x720, created by `CreateScene`). The world is shown through a
@@ -119,10 +123,19 @@ Unity -projectPath unity -runTests -testPlatform PlayMode -testResults unity-pla
   wheel zooms about the fingers or the cursor, and a tap (a press that moves less than `tapSlop` and is never joined
   by a second finger) applies the selected tool or, with none, names the tile in the dock. Keys (Space, N, +/-) come
   from `Keyboard.current` (none on a phone) and are ignored while the seed field has the focus.
+- **Android (G3 P3)**: IL2CPP, ARM64 only, min API 26, provisional id `com.kydodev.worldsim` (the device check is
+  `com.kydodev.worldsim.check`); APKs go to `unity/Builds/Android/`. The two kernel libraries sit in the git-ignored
+  Plugins folder, so `WorldSimSetup.ConfigureAndroid` sets their import settings from code (.so: Android ARM64; .dll:
+  Editor and Windows). On Android StreamingAssets stay inside the APK: `StreamingRead` reads them through
+  `UnityWebRequest` (the desktop reads the file directly), and the build gunzips any `*.gz` there, so the bundled save
+  is `world.save` (gzip inside). The golden sets differ on ARM (G3_PLAN P3), so `android_check.py` reports
+  "equal" or "not-comparable" with the first diverging step. MIUI phones refuse `adb install` unless "Install via
+  USB" is on; otherwise copy the APK to the phone (`adb push ... /sdcard/Download/`) and install it by hand. A build
+  with `-buildTarget Android` leaves the project on Android: pass `-buildTarget StandaloneWindows64` to the next run.
 - **Batchmode gives the UI no input**: with no window, UI Toolkit drops runtime input (the device gets its events,
   the panel none), so `VirtualInputReachesTheView` skips itself in batchmode; run PlayMode without `-batchmode`.
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
-  `WorldSimView.cs` (texture, controls), `WorldCamera.cs` (zoom, pan, screen point to tile), `Editor/WorldSimSetup.cs` (scene,
+  `WorldSimView.cs` (texture, controls), `StreamingRead.cs` (StreamingAssets on desktop and Android), `DeviceCheck.cs` (P3 device check), `WorldCamera.cs` (zoom, pan, screen point to tile), `Editor/DropInternetPermission.cs` (no `INTERNET` in the APK manifest), `Editor/WorldSimSetup.cs` (scene,
   panel, URP settings), `Tests/Editor/` (EditMode), `Tests/Play/` (PlayMode).
 - **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
   form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms

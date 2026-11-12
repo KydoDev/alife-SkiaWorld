@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **G3 P3, Android spike**: `unity_sync.py --android` cross-builds the kernel for arm64 Android with the Unity
+  Editor's own NDK (16 KB pages); `WorldSimSetup.BuildAndroid` builds an IL2CPP ARM64 APK; `android_check.py`
+  builds a device-check APK that steps the golden sets on a phone and logs the result. On the owner's POCO F2 Pro the
+  viewer runs and the kernel does about 8000 steps/s on the default world; the golden hashes are not comparable on
+  ARM (first divergence at step 246 / 201). StreamingAssets are read through `StreamingRead` (UnityWebRequest inside
+  an APK); the bundled save is renamed `world.save` because an Android build unpacks `*.gz` files. After the security
+  review: the APK requests no permissions (Unity's automatic `INTERNET` is removed), New world waits for the bundled
+  save, and a viewer build refuses leftover golden data in StreamingAssets.
 - **G3 P2, camera over the world in the Unity viewer**: drag to pan (wrapping in x, clamped in y), pinch or mouse
   wheel to zoom in whole device pixels per tile; the first view fits the whole depth. A tap applies the selected tool
   or, with none, names the tile (the cell inspector comes with P6). Input moves to the Input System package (1.20,

@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f312f5ff01c68b646a0d821eec3b1287, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WorldSim.Runtime::WorldSim.WorldSimView
-  saveFile: world.json.gz
+  saveFile: world.save
   configFile: world_config.json
   toolsFile: game_tools.json
   seedText: 1
