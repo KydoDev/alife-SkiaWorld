@@ -15,5 +15,5 @@ before the commit
 | Golden regeneration (`g2_golden.py --all`, fresh root) | hashes and renders byte-identical | | | |
 
 ## Notes
-- Unity EditMode was not run here: the parallel Unity session owns `unity/` right now. Its NativeWorldTests read
-  the v9 golden root and need the DLL rebuilt (`scripts/unity_sync.py`) to pass.
+- Unity EditMode (batchmode, Unity 6000.5.6f1, after the URP migration 774a4c8 and `scripts/unity_sync.py` with the
+  v9 kernel DLL and save): 12 passed, 0 failed.

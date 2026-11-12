@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **Unity front-end on URP 17.5**: the deprecated Built-in Render Pipeline is replaced by a URP asset and renderer
+  (`unity/Assets/Settings`, no post-processing), assigned in Graphics and every Quality level by
+  `WorldSimSetup.ConfigureRenderPipeline`; the IMGUI view is unchanged. Packages trimmed to URP, Test Framework and
+  the IMGUI, JSON and UI Toolkit modules.
 - **Save format v9 (ADR-0014)**: each cell row gains `sense_r` (16 fields); v8 saves are refused. The Rust kernel
   reads v9 and refuses `sense_range` on until the experiment validates it.
 - **ADR-0014 commit 1, trait table**: the per-cell traits outside the genome (`sex_p`, `plast_p`, `hgt_p`,

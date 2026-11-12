@@ -89,7 +89,7 @@ Not in CI (Unity needs a licence): run its tests locally after a change to `ffi.
 ```bash
 # build the kernel and copy the DLL + a save into the project (both git-ignored)
 python scripts/unity_sync.py                                  # default golden start save
-python scripts/unity_sync.py --save runs/a/world_final.json.gz  # or any v8 save, default flags
+python scripts/unity_sync.py --save runs/a/world_final.json.gz  # or any v9 save, default flags
 python scripts/unity_sync.py --planet examples/red_dwarf.json   # config for New world (default: volcanic)
 # regenerate the scene from code (Assets/Scenes/WorldSim.unity)
 Unity -batchmode -quit -projectPath unity -executeMethod WorldSim.EditorTools.WorldSimSetup.CreateScene
