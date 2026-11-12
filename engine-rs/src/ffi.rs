@@ -2,7 +2,7 @@
 //!
 //! Only what `docs/G2_PLAN.md` allows across the boundary: loading a save, creating a world from a
 //! config and a seed (ADR-0012), stepping, the five validated G1 edits (ADR-0013), and read-only views
-//! (sizes, state hash, an RGB render). No raw field writes: an edit is a domain operation that the core
+//! (sizes and light factor, state hash, an RGB render, the tile snapshot and a cell's record: ADR-0016). No raw field writes: an edit is a domain operation that the core
 //! validates before changing anything.
 //!
 //! Contract for every function:
@@ -19,6 +19,7 @@
 use crate::hash::state_hash;
 use crate::render::{render_rgb, rgb_len};
 use crate::save::{config_from_json, world_from_gzip, MAX_SAVE_BYTES};
+use crate::views::{cell_record, tile_words, tiles_len, N_TRAITS};
 use crate::world::{
     Intervention, World, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK, KIND_VENT,
 };
@@ -32,8 +33,9 @@ compile_error!("the C ABI needs panic = unwind");
 
 /// One counter for the whole ABI, bumped once per commit that changes it (an added entry point
 /// included, ADR-0012); front-ends refuse a mismatch. 2: [`ws_world_create`]; 3:
-/// [`ws_world_intervene`] and [`WS_ERR_INVALID`] (ADR-0013).
-pub const WS_ABI_VERSION: u32 = 3;
+/// [`ws_world_intervene`] and [`WS_ERR_INVALID`] (ADR-0013); 4: [`ws_world_tiles`], [`ws_world_cell`] and
+/// [`WsInfo::light_factor`] (ADR-0016).
+pub const WS_ABI_VERSION: u32 = 4;
 
 pub const WS_OK: i32 = 0;
 /// A null pointer or a buffer of the wrong size.
@@ -71,7 +73,7 @@ pub struct WsWorld {
 
 /// Read-only sizes and counters of a world.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct WsInfo {
     pub width: u32,
     pub height: u32,
@@ -80,10 +82,37 @@ pub struct WsInfo {
     pub births: u64,
     pub deaths: u64,
     pub kills: u64,
+    /// `World.light_factor(step_count)`: the day/season factor of the light the world holds (ADR-0016).
+    pub light_factor: f64,
 }
 
-// The layout C# mirrors (`LayoutKind.Sequential`: two uint, five ulong); a change bumps the ABI.
-const _: () = assert!(std::mem::size_of::<WsInfo>() == 48 && std::mem::align_of::<WsInfo>() == 8);
+// The layout C# mirrors (`LayoutKind.Sequential`: two uint, five ulong, one double); a change bumps the ABI.
+const _: () = assert!(std::mem::size_of::<WsInfo>() == 56 && std::mem::align_of::<WsInfo>() == 8);
+
+/// One cell's inspector record (ADR-0016 Decision 2); all zero with `present` 0 on an empty tile.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct WsCell {
+    pub id: u64,
+    pub lineage: u64,
+    pub age: u64,
+    pub energy: f64,
+    /// The fixed genome, `GENE_NAMES` order.
+    pub genes: [f64; crate::N_GENES],
+    /// Feeding shares: photo, sapro, pred, chemo.
+    pub shares: [f64; 4],
+    /// `TRAITS` order: sex_p, plast_p, hgt_p, armor_p, sense_r.
+    pub traits: [f64; N_TRAITS],
+    pub present: u32,
+    pub bonds: u32,
+    /// Cells in its bonded component, itself included (1 when unbonded).
+    pub colony: u32,
+    /// Number of F4 rule genes.
+    pub rules: u32,
+}
+
+// The layout C# mirrors: three ulong, 1 + 16 + 4 + 5 doubles, four uint; a change bumps the ABI.
+const _: () = assert!(std::mem::size_of::<WsCell>() == 248 && std::mem::align_of::<WsCell>() == 8);
 
 thread_local! {
     static LAST_ERROR: RefCell<String> = const { RefCell::new(String::new()) };
@@ -317,6 +346,7 @@ pub unsafe extern "C" fn ws_world_info(handle: *const WsWorld, out: *mut WsInfo)
                 births: w.counters.births,
                 deaths: w.counters.deaths,
                 kills: w.counters.kills,
+                light_factor: w.light_factor(w.step_count),
             };
             WS_OK
         })
@@ -380,6 +410,81 @@ pub unsafe extern "C" fn ws_world_render_rgb(
     }
 }
 
+/// Write the tile snapshot (ADR-0016 Decision 1) into `out`, which must hold exactly
+/// `width * height * 4` bytes: one little-endian 32-bit word per tile, row 0 = the lit surface, so the
+/// buffer is an RGBA32 image. Read-only (the state hash is unchanged); O(width * height).
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out` is null or points to `len` writable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_tiles(handle: *const WsWorld, out: *mut u8, len: usize) -> i32 {
+    if out.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null tile buffer");
+    }
+    // SAFETY: forwarded caller guarantee; `out` checked non-null, its size checked below.
+    unsafe {
+        with_world(handle, |w| {
+            let need = tiles_len(w);
+            if len != need {
+                return fail(
+                    WS_ERR_ARGUMENT,
+                    format!("tile buffer must be {need} bytes, got {len}"),
+                );
+            }
+            tile_words(w, std::slice::from_raw_parts_mut(out, len));
+            WS_OK
+        })
+    }
+}
+
+/// Write the record of the cell on tile (`x`, `y`) into `*out` (ADR-0016 Decision 2): `present` 1, or 0
+/// with every field 0 on an empty tile (not an error). A tile outside the world is refused with
+/// [`WS_ERR_INVALID`], `*out` untouched; the handle stays usable. Read-only; the colony walk is
+/// O(colony size) plus one mark per cell slot.
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out` is null or points to a writable, 8-byte-aligned [`WsCell`].
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_cell(
+    handle: *const WsWorld,
+    x: u32,
+    y: u32,
+    out: *mut WsCell,
+) -> i32 {
+    if out.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null cell pointer");
+    }
+    // SAFETY: forwarded caller guarantee; `out` checked non-null.
+    unsafe {
+        with_world(handle, |w| {
+            let (x, y) = (x as usize, y as usize);
+            if x >= w.width || y >= w.height {
+                return fail(
+                    WS_ERR_INVALID,
+                    format!("tile ({x}, {y}) outside the {}x{} world", w.width, w.height),
+                );
+            }
+            *out = match cell_record(w, x, y) {
+                None => WsCell::default(),
+                Some(r) => WsCell {
+                    id: r.id,
+                    lineage: r.lineage,
+                    age: r.age,
+                    energy: r.energy,
+                    genes: r.genes,
+                    shares: r.shares,
+                    traits: r.traits,
+                    present: 1,
+                    bonds: r.bonds,
+                    colony: r.colony,
+                    rules: r.rules,
+                },
+            };
+            WS_OK
+        })
+    }
+}
+
 /// Copy the last error message of this thread (UTF-8, no terminator, at most
 /// `MAX_MESSAGE` + 3 bytes) into `out`, truncated to `len` bytes (a cut may split a UTF-8
 /// sequence). Returns the full message length, so a caller can retry with a larger buffer;
@@ -431,6 +536,10 @@ mod tests {
             );
             let mut rgb = vec![0u8; 3];
             assert_eq!(ws_world_render_rgb(h, rgb.as_mut_ptr(), 3), WS_ERR_POISONED);
+            let mut tiles = vec![0u8; 4];
+            assert_eq!(ws_world_tiles(h, tiles.as_mut_ptr(), 4), WS_ERR_POISONED);
+            let mut cell = WsCell::default();
+            assert_eq!(ws_world_cell(h, 0, 0, &mut cell), WS_ERR_POISONED);
             let mut changed = 7u64;
             assert_eq!(
                 ws_world_intervene(h, WS_EDIT_NUTRIENTS, 1, 1, 2, 15.0, &mut changed),

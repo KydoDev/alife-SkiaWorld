@@ -26,6 +26,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 19. [?] G3 P2: camera (pan, pinch/wheel zoom, x wrap), Input System; PlayMode tests; owner checks with a mouse
 20. [?] G3 P3: Android spike (arm64 kernel, IL2CPP APK, device check); runs on the owner's POCO F2 Pro
 21. [?] G3 P2b (owner, 2026-11-12): whole world on screen, never repeated; player picks orientation; shape per orientation
+22. [?] G3 P4: ADR-0016, ABI 4 views (tile words, cell record, light factor), byte-equal to Python's worldsim/views.py
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

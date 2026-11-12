@@ -67,7 +67,8 @@ python scripts/g2_golden.py --all engine-rs/tests/golden
 #  world-creation and interventions vectors; alone: python scripts/g2_terrain_vectors.py --out
 #  engine-rs/tests/golden/terrain.json, python scripts/g2_create_vectors.py --out engine-rs/tests/golden/create.json
 #  and python scripts/g2_intervention_vectors.py --root engine-rs/tests/golden
-#  --out engine-rs/tests/golden/interventions.json, which reads the sets' start saves)
+#  --out engine-rs/tests/golden/interventions.json, which reads the sets' start saves; and views.json, the G3 P4
+#  view vectors of ADR-0016: python scripts/g3_view_vectors.py, likewise from the start saves)
 # numpy mean vectors (ndarray.mean(), pairwise summation; tied to the installed numpy)
 python scripts/g2_mean_vectors.py --out engine-rs/tests/mean_vectors.json
 # seeding vectors (random.Random(seed) for int and str seeds; platform-independent)
@@ -79,7 +80,8 @@ python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --ou
 # after a change to render.py only: rewrite the two golden renders of a set, nothing else
 python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/golden/default
 
-# C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract)
+# C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract;
+# ABI 4 adds the read-only views of ADR-0016: ws_world_tiles, ws_world_cell, WsInfo.light_factor)
 cd engine-rs && cargo build --release
 ```
 

@@ -12,7 +12,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 3. [?] P2 Touch camera: pinch zoom (integer steps), pan wrapping in x, tap = tool or tile (inspector in P6)
 4. [?] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
 12. [?] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
-5. [ ] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
+5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [ ] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [ ] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [ ] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
@@ -114,6 +114,14 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   - `WsInfo` gains `light_factor` (the struct size changes, so the ABI number bumps).
   Golden: a Python script exports the same views from the golden saves; Rust and the Unity EditMode tests
   compare byte for byte. Pass: golden equal on Windows and on the Linux CI job.
+  *Result (2026-11-12)*: [ADR-0016](adr/0016-kernel-views-for-the-front-end.md) fixes the layout. Two corrections to
+  the list above: the kind order follows `Cell.strategy` (1 photo, 2 sapro, 3 pred, 4 chemo), and the word has a
+  4-level chem field instead of a vent bit (the save holds the vent field, not vent positions). The background
+  (water, organic, glow) stays `ws_world_render_rgb`. The cell record also carries the five `TRAITS` and the rule
+  count, so P6 needs no further ABI change. Reference `worldsim/views.py`; vectors `scripts/g3_view_vectors.py`
+  (`views.json`, sets default / volcanic / plasticity / combined at the start save and 37 steps later, written by
+  `g2_golden.py --all` too, so CI regenerates them on Linux). Windows: Rust `golden_views` equal (views between
+  every step leave the hashes golden), Unity EditMode `ViewTests` equal through P/Invoke. Pending: the Linux CI job.
 - **P5 Sprite renderer** — the tile array is uploaded once per frame as a `width × height` data texture;
   one unlit shader draws each tile from a sprite atlas (6 kinds × 2 idle frames, 5×5 px each) and a
   palette LUT (night/day rows, species tints). **Level of detail**: sprites only at ≥ 5 device pixels

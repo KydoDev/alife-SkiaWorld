@@ -2,6 +2,8 @@
 name = "worldsim-core"
 version = "0.1.0"
 edition = "2021"
+# `as_chunks_mut` (views.rs) is stable from 1.88
+rust-version = "1.88"
 description = "Rust reference kernel of the WorldSim engine (G2 port, ADR-0008)"
 publish = false
 

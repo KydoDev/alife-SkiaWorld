@@ -54,6 +54,13 @@ All notable changes to this project are documented here. Format based on
   follows the four trait means.
 
 ### Added
+- **G3 P4, kernel views (ABI 4, ADR-0016)**: `ws_world_tiles` writes one 32-bit word per tile (diet kind, bonded,
+  rock, vent level, energy level, lineage key; an RGBA32 texture for the P5 sprites), `ws_world_cell` the inspector
+  record of one cell (genes, energy, age, lineage, feeding shares, traits, bonds, colony size, rule count), and
+  `WsInfo` gains the day/season `light_factor`. Read-only. Python's `worldsim/views.py` is the reference;
+  `scripts/g3_view_vectors.py` writes `views.json`, which the Rust and the Unity EditMode tests match byte for byte.
+  The Unity wrapper gains `Tiles`, `Cell`, `Tile` and `CellRecord`. A cell with `div_thr` 0 gets the IEEE-754 level in both
+  languages instead of a Python `ZeroDivisionError`. `engine-rs` declares `rust-version = "1.88"` (`as_chunks_mut`).
 - **G3 plan** (`docs/G3_PLAN.md`): the game front-end in the Neon Abyss design, mobile first (phones and tablets,
   portrait and landscape), built on the Unity viewer and the Rust kernel; P0 is the owner's Play-mode check of the
   URP viewer.

@@ -1,4 +1,4 @@
-// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 3).
+// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 4).
 // No UnityEngine dependency: this file is plain C# and is exercised by the EditMode tests.
 using System;
 using System.Runtime.InteropServices;
@@ -6,7 +6,7 @@ using System.Text;
 
 namespace WorldSim
 {
-    /// <summary>Sizes and counters of a world (`WsInfo`, 48 bytes, sequential layout).</summary>
+    /// <summary>Sizes and counters of a world (`WsInfo`, 56 bytes, sequential layout).</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct WorldInfo
     {
@@ -17,6 +17,68 @@ namespace WorldSim
         public ulong Births;
         public ulong Deaths;
         public ulong Kills;
+        /// <summary>Day/season factor of the light the world holds (ADR-0016).</summary>
+        public double LightFactor;
+    }
+
+    /// <summary>The kind field of a tile word (ADR-0016): 1 + the cell's dominant diet.</summary>
+    public enum TileKind : byte
+    {
+        Empty = 0,
+        Photo = 1,
+        Sapro = 2,
+        Pred = 3,
+        Chemo = 4,
+    }
+
+    /// <summary>One tile word of <see cref="NativeWorld.Tiles"/>, unpacked (layout: ADR-0016 Decision 1).</summary>
+    public readonly struct Tile
+    {
+        public readonly uint Word;
+
+        public Tile(uint word)
+        {
+            Word = word;
+        }
+
+        public TileKind Kind => (TileKind)(Word & 0x7);
+        public bool Bonded => (Word & 0x8) != 0;
+        public bool Rock => (Word & 0x10) != 0;
+        /// <summary>Vent field level, 0..3.</summary>
+        public int Chem => (int)((Word >> 5) & 0x3);
+        /// <summary>Energy level 0..15 (15: about to divide).</summary>
+        public int Energy => (int)((Word >> 8) & 0xF);
+        /// <summary>Species key: the lineage mod 65536 (until P8).</summary>
+        public int Key => (int)(Word >> 16);
+
+        /// <summary>The word of tile <paramref name="index"/> in a snapshot (little-endian).</summary>
+        public static Tile At(byte[] tiles, int index)
+        {
+            int i = index * 4;
+            return new Tile((uint)(tiles[i] | tiles[i + 1] << 8 | tiles[i + 2] << 16 | tiles[i + 3] << 24));
+        }
+    }
+
+    /// <summary>One cell's inspector record (`WsCell`, 248 bytes; ADR-0016 Decision 2).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CellRecord
+    {
+        public ulong Id;
+        public ulong Lineage;
+        public ulong Age;
+        public double Energy;
+        /// <summary>The fixed genome, GENE_NAMES order.</summary>
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)] public double[] Genes;
+        /// <summary>Feeding shares: photo, sapro, pred, chemo.</summary>
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)] public double[] Shares;
+        /// <summary>TRAITS order: sex_p, plast_p, hgt_p, armor_p, sense_r.</summary>
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)] public double[] Traits;
+        /// <summary>1 if a cell stands on the tile; 0 and all fields zero otherwise.</summary>
+        public uint Present;
+        public uint Bonds;
+        /// <summary>Cells in its bonded component, itself included (1 when unbonded).</summary>
+        public uint Colony;
+        public uint Rules;
     }
 
     /// <summary>The five G1 edits of `ws_world_intervene` (`WS_EDIT_*`; ADR-0013).</summary>
@@ -97,6 +159,12 @@ namespace WorldSim
         internal static extern int ws_world_render_rgb(WorldHandle handle, [Out] byte[] buffer, UIntPtr len);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_tiles(WorldHandle handle, [Out] byte[] buffer, UIntPtr len);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_cell(WorldHandle handle, uint x, uint y, out CellRecord cell);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UIntPtr ws_last_error([Out] byte[] buffer, UIntPtr len);
     }
 
@@ -106,7 +174,7 @@ namespace WorldSim
     public sealed class NativeWorld : IDisposable
     {
         /// <summary>The ABI this wrapper was written for (`WS_ABI_VERSION`).</summary>
-        public const uint AbiVersion = 3;
+        public const uint AbiVersion = 4;
 
         private const int HashLength = 64;
         private readonly WorldHandle _handle;
@@ -219,6 +287,36 @@ namespace WorldSim
                 throw new ArgumentNullException(nameof(rgb));
             }
             Check(Native.ws_world_render_rgb(_handle, rgb, (UIntPtr)rgb.Length));
+        }
+
+        /// <summary>Bytes of a tile snapshot of this world (width x height x 4).</summary>
+        public int TilesLength
+        {
+            get
+            {
+                WorldInfo info = Info;
+                return checked((int)(info.Width * info.Height * 4));
+            }
+        }
+
+        /// <summary>The tile snapshot into <paramref name="tiles"/>: one little-endian word per tile, row 0 = the
+        /// lit surface, so the buffer is an RGBA32 image (ADR-0016). Read-only.</summary>
+        public void Tiles(byte[] tiles)
+        {
+            if (tiles == null)
+            {
+                throw new ArgumentNullException(nameof(tiles));
+            }
+            Check(Native.ws_world_tiles(_handle, tiles, (UIntPtr)tiles.Length));
+        }
+
+        /// <summary>The record of the cell on (x, y): <see cref="CellRecord.Present"/> is 0 on an empty tile. A tile
+        /// outside the world throws <see cref="WorldSimException"/> with <see cref="WorldSimException.StatusInvalid"/>
+        /// (the world stays usable).</summary>
+        public CellRecord Cell(uint x, uint y)
+        {
+            Check(Native.ws_world_cell(_handle, x, y, out CellRecord cell));
+            return cell;
         }
 
         public void Dispose()
