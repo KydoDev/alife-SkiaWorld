@@ -13,7 +13,7 @@ the F-phase experiments).
 5. [x] M2 Port `World.step()` for default flags; per-step hash vs Python for 1000 steps; report first divergence
 6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [x] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
-8. [~] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
+8. [x] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
 9. [ ] M6 Optional fast (parallel) kernel: step 1 (bit-exact field passes) done; the rest DEFERRED by ADR-0015
 
 ## Scope of the first milestone (M0–M2)
@@ -540,3 +540,7 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   The cell loop is now about 85% of a 50k step, at about 180 ns per cell. Making it faster bit-exactly means a
   hot/cold split of `Cell` (about 400 bytes, visited in shuffled order). That is left for step 2 to weigh against a
   parallel kernel. Fast-forward x10 at 50k (3e7 cell-updates/s) is still about 6x away.
+- **M5 closed** (2026-11-12): the owner checked the Unity viewer in Play mode after the URP migration (774a4c8) and
+  the v9 kernel: rendering, New world and the sandbox tools work as before. Not a regression, but noted: clicking a
+  cell shows nothing in Unity, because the C ABI has no per-cell view yet (the pygame viewer has an inspector); this is
+  G3 P4 (ABI 4 cell view) and P6 (inspector). With M6 deferred (ADR-0015), G2 is done.

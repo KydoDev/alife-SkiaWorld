@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **G2 done**: M5 closed after the owner's Play-mode check of the Unity viewer (URP, v9 kernel, sandbox tools); M6
+  deferred (ADR-0015). Next: G3 (`docs/G3_PLAN.md`).
 - **ADR-0015, the parallel kernel is deferred** (G2 M6): the single-threaded reference kernel stays the only kernel
   (50k cells at about 100 steps/s already meets the 60 fps target); M6 reopens only when a concrete world needs it.
 - **M6 step 1, faster field passes in the Rust kernel**: light and organic matter are updated without a per-tile

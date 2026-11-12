@@ -13,7 +13,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 6. [x] ADR-0013 piece 2: `refresh_terrain` refactor; all hashes and renders unchanged
 7. [x] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
 8. [x] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first
-9. [?] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
+9. [x] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
 10. [x] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
 11. [ ] Owner's idea: obstacles and scattered resources; PARKED 2026-11-12 as a hypothesis to revisit (item 10 null)
 12. [x] ADR-0014: trait table first, then `sense_r`; the kernel refuses `sense_range` until validated

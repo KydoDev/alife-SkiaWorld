@@ -7,7 +7,7 @@ C ABI; Python stays the reference lab. This file is the G3 working plan, kept ap
 like [G2_PLAN.md](G2_PLAN.md).
 
 ## Checklist
-1. [ ] P0 Owner checks the URP viewer in Play mode (texture visible, row 0 on top, tool click hits the right cell)
+1. [x] P0 Owner checks the URP viewer in Play mode (texture visible, row 0 on top, tool click hits the right cell)
 2. [ ] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
 3. [ ] P2 Touch camera: pinch zoom (integer steps), two-finger pan wrapping in x, tap = inspect cell
 4. [ ] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
