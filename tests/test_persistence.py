@@ -117,6 +117,72 @@ def test_load_rejects_hostile_values(mutate, message):
         world_from_dict(d)
 
 
+MAX_COUNT = 1 << 62     # the Rust loader's bound (engine-rs/src/save.rs MAX_COUNT)
+
+
+def _set_cell(field, value):
+    def mutate(d):
+        d["cells"][0][field] = value
+    return mutate
+
+
+@pytest.mark.parametrize("value", [MAX_COUNT + 1, -1, 1.5, True, "7"])
+@pytest.mark.parametrize("mutate, message", [
+    (lambda v: _set_cell(0, v), "cell id"),
+    (lambda v: _set_cell(4, v), "age"),
+    (lambda v: _set_cell(6, v), "lineage"),
+    (lambda v: lambda d: d.update(step_count=v), "step_count"),
+    (lambda v: lambda d: d.update(next_id=v), "next_id"),
+    (lambda v: lambda d: d["counters"].update(births=v), "counter"),
+])
+def test_load_bounds_ids_ages_lineages_and_counters_like_the_kernel(mutate, message, value):
+    """Integers the kernel hashes as u64 must be in 0..=2^62 in both loaders, so the two accept the same saves."""
+    d = _saved()
+    mutate(value)(d)
+    with pytest.raises(SaveFormatError, match=message):
+        world_from_dict(d)
+
+
+def test_load_accepts_the_largest_bound_values():
+    d = _saved()
+    d["cells"][0][4] = d["cells"][0][6] = MAX_COUNT
+    d["step_count"] = d["next_id"] = MAX_COUNT
+    world = world_from_dict(d)
+    assert world.next_id == MAX_COUNT and world.cells[0].lineage == MAX_COUNT
+
+
+def test_load_accepts_a_next_id_equal_to_the_newest_cell_id():
+    """`new_id` pre-increments, so `next_id` is the last id handed out: equal is the normal case."""
+    d = _saved()
+    d["next_id"] = max(row[0] for row in d["cells"])
+    world_from_dict(d)
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda d: d["cells"][0].__setitem__(1, True), "outside the grid"),
+    (lambda d: d["cells"][0].__setitem__(2, 1.0), "outside the grid"),
+    (lambda d: next(r for r in d["cells"] if r[8])[8].__setitem__(0, 1.0 * next(r for r in d["cells"] if r[8])[8][0]),
+     "bonded to missing"),
+    (lambda d: d["tracker"].update(next_id=1), "tracker next_id"),
+    (lambda d: d["tracker"].update(novelty=-1), "tracker novelty"),
+    (lambda d: d.update(step_count="x" * 100_000), "step_count"),
+])
+def test_load_wants_json_integers_for_tiles_bonds_and_the_tracker(mutate, message):
+    d = _saved()
+    mutate(d)
+    with pytest.raises(SaveFormatError, match=message) as e:
+        world_from_dict(d)
+    assert len(str(e.value)) < 200, "the message must not echo a huge hostile value"
+
+
+def test_load_rejects_a_next_id_below_a_cell_id():
+    """The next birth would reuse a living cell's id."""
+    d = _saved()
+    d["next_id"] = max(row[0] for row in d["cells"]) - 1
+    with pytest.raises(SaveFormatError, match="next_id"):
+        world_from_dict(d)
+
+
 def test_load_ignores_unknown_counters():
     d = _saved()
     d["counters"]["rng"] = "pwned"

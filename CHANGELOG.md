@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- **Save loader bounds the integers like the kernel**: `persistence.py` now refuses a cell `id`, `age` or `lineage`,
+  the `step_count`, `next_id` or an event counter that is not an integer in `0..=2^62`, and a `next_id` below a
+  living cell's id (the next birth would reuse it). The Rust loader already refused these, so a hostile save could
+  load in Python and not in the kernel; both now accept the same saves on these fields. Tile coordinates and bond
+  ids must be JSON integers (`1.0` or `true` used to resolve to cell #1); the species tracker's `next_id` and
+  counters get the same bound, and its `next_id` may not be below a species id (the next species would overwrite
+  it). Error messages show a shortened repr of the bad value. Python's own saves are unaffected.
+
 ### Changed
 - **G3 P2b, the whole world on screen** (owner's review on the phone): the first view fits width and depth, and every
   new world or screen turn fits again; the world is drawn once, never repeated, and panning is clamped in x as in y

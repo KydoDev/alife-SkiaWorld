@@ -11,10 +11,11 @@
 //!
 //! The checks mirror `persistence.py` (`world_from_dict`) and `Config.validate()`, with
 //! deliberate differences:
+//! - the same integer bounds: ids, ages, lineages and the step/id/event counters must be integers
+//!   in `0..=2^62` (headroom against overflow; they are hashed as `u64`), and `next_id` must not be
+//!   below a cell id (Python checks these too since G3, `persistence._count`);
 //! - **stricter** where Python accepts a value its own engine never writes or could not continue
-//!   from: ids, ages, lineages and the step/id/event counters must be integers in `0..=2^62`
-//!   (headroom against overflow; they are hashed as `u64`), and `next_id` must not be below a
-//!   cell id; rock tiles must be the integers 0/1; bonds must be symmetric, at most 8 per cell
+//!   from: rock tiles must be the integers 0/1; bonds must be symmetric, at most 8 per cell
 //!   (bonded cells are neighbours), with no duplicates or self-bonds; every config key must be
 //!   present (Python would fill in its defaults); the seed must be None, an int or a string; the
 //!   RNG state version must be the integer 3 and its words must fit in 32 bits (CPython on Linux

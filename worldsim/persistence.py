@@ -19,6 +19,7 @@ and the insertion order of every `Cell.bonds` (energy sharing iterates it).
 import gzip
 import json
 import math
+import reprlib
 
 import numpy as np
 
@@ -88,6 +89,22 @@ def _terrain_from_dict(d: dict | None, width: int, height: int) -> Terrain:
     return terrain
 
 
+MAX_COUNT = 1 << 62   # ids, ages, lineages, step and event counters: the kernel hashes them as u64 (headroom)
+
+
+def _is_int(v) -> bool:
+    """A JSON integer: an int that is not a bool (True == 1 in Python)."""
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _count(v, what: str) -> int:
+    """An integer in 0..=2^62 (not a bool), as the Rust loader requires; anything else is a malformed save.
+    The message shows a shortened repr: a hostile field may be megabytes long."""
+    if not _is_int(v) or not 0 <= v <= MAX_COUNT:
+        raise SaveFormatError(f"malformed save: {what} {reprlib.repr(v)} is not an integer in 0..=2^62")
+    return v
+
+
 def world_from_dict(d: dict) -> World:
     """Rebuild a world from a save dict. Any malformed content raises SaveFormatError (saves are untrusted)."""
     try:
@@ -111,14 +128,11 @@ def _world_from_dict(d: dict) -> World:
     terrain = _terrain_from_dict(d.get("terrain"), cfg.width, cfg.height)
     world = World(cfg, seed=d["seed"], track_species=d["tracker"] is not None, populate=False,
                   terrain=terrain)
-    world.step_count = d["step_count"]
+    world.step_count = _count(d["step_count"], "step_count")
     world.now = world.step_count
-    world.next_id = d["next_id"]
+    world.next_id = _count(d["next_id"], "next_id")
     for k in COUNTERS:                       # whitelist: a save must not overwrite other attributes
-        v = d["counters"].get(k)
-        if not isinstance(v, int) or isinstance(v, bool) or v < 0:
-            raise SaveFormatError(f"invalid counter {k!r}")
-        setattr(world, k, v)
+        setattr(world, k, _count(d["counters"].get(k), f"counter {k!r}"))
     if world.hgt_foreign > world.hgt_events:
         raise SaveFormatError("invalid counters: hgt_foreign exceeds hgt_events")
     rng = d["rng"]
@@ -136,8 +150,11 @@ def _world_from_dict(d: dict) -> World:
         raise SaveFormatError(f"every cell row must have {CELL_ROW_LEN} fields")
     for (cid, x, y, energy, age, genes, lineage, species, _, rules, sex_p, plast_p, diet, hgt_p, armor_p,
          sense_r) in d["cells"]:
-        if not (0 <= x < world.W and 0 <= y < world.H):
-            raise SaveFormatError(f"cell #{cid} outside the grid at ({x}, {y})")
+        cid, age, lineage = _count(cid, "cell id"), _count(age, "cell age"), _count(lineage, "cell lineage")
+        if cid > world.next_id:
+            raise SaveFormatError(f"malformed save: next_id {world.next_id} is below cell id {cid}")
+        if not (_is_int(x) and _is_int(y) and 0 <= x < world.W and 0 <= y < world.H):
+            raise SaveFormatError(f"cell #{cid} outside the grid at ({reprlib.repr(x)}, {reprlib.repr(y)})")
         if world.grid[y * world.W + x] is not None or world.blocked[y * world.W + x]:
             raise SaveFormatError(f"cell #{cid} on an occupied or rock tile at ({x}, {y})")
         valid = (len(genes) == N_GENES and cid not in by_id and _finite(energy)
@@ -166,8 +183,8 @@ def _world_from_dict(d: dict) -> World:
     for row in d["cells"]:
         cell = by_id[row[0]]
         for bid in row[8]:
-            if bid not in by_id:
-                raise SaveFormatError(f"cell #{row[0]} bonded to missing cell #{bid}")
+            if not _is_int(bid) or bid not in by_id:      # 1.0 or true would hash to cell #1
+                raise SaveFormatError(f"cell #{row[0]} bonded to missing cell #{reprlib.repr(bid)}")
             cell.bonds[by_id[bid]] = None
 
     if d["tracker"] is not None:
@@ -185,6 +202,11 @@ def _load_tracker(data, cells) -> SpeciesTracker:
     """Rebuild the species tracker and check it against the cells, so that a hostile or stale save
     fails here rather than at the first birth or death."""
     tracker = SpeciesTracker.from_dict(data)
+    for k in ("next_id", "speciations", "novelty", "pruned"):
+        _count(getattr(tracker, k), f"tracker {k}")
+    for s in tracker.species.values():
+        if _count(s.id, "species id") > tracker.next_id:     # the next species would overwrite this one
+            raise SaveFormatError(f"malformed save: tracker next_id {tracker.next_id} is below species id {s.id}")
     for s in tracker.species.values():
         genes = s.founder_genes
         if len(genes) != N_GENES or not all(_finite(g) and 0.0 <= g <= 1.0 for g in genes):

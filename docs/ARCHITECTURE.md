@@ -178,6 +178,8 @@ predation splits the prey's energy + body between predator and organic matter.
   terrain), tracker purity, no cell ever on rock.
 - No network, no secrets. Save files are JSON, never pickle (safe to share).
   Planet forms, images and saves are untrusted input: bounded and validated.
+  Ids, ages, lineages and counters are integers in `0..=2^62` in both loaders
+  (`persistence._count`, `engine-rs/src/save.rs`), which accept the same saves on these fields.
 
 ## Decisions
 See [`adr/`](./adr/) — decisions are recorded there, not here.
