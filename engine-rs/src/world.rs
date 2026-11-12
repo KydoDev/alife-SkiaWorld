@@ -473,6 +473,9 @@ pub struct World {
     pub(crate) has_chem: bool,
     /// `VIEWS` (F3), see [`views`].
     views: [[f64; 9]; 4],
+    /// Scratch buffer of `update_organic` (the field before diffusion), reused every step. Not state:
+    /// it is overwritten before it is read, so it is neither saved nor hashed.
+    organic_old: Vec<f64>,
 }
 
 impl World {
@@ -512,6 +515,7 @@ impl World {
             base_light: Vec::new(),
             shade_pow: Vec::new(),
             views: views(),
+            organic_old: Vec::new(),
             cfg,
         };
         world.refresh_terrain();
@@ -999,51 +1003,63 @@ impl World {
     }
 
     /// `World.update_light` at step `now`: base light x `shade ** (cells above)` x factor.
+    /// Row by row (no `%` per tile); the same products in the same order as before (M6 step 1).
     pub(crate) fn update_light(&mut self, now: u64) {
         let w = self.width;
         let f = self.light_factor(now);
         let mut above = vec![0usize; w];
-        for (i, light) in self.light.iter_mut().enumerate() {
-            let x = i % w;
-            *light = self.base_light[i] * self.shade_pow[above[x]];
-            if f != 1.0 {
-                *light *= f;
-            }
-            if self.grid[i] != EMPTY {
-                above[x] += 1;
+        let rows = self
+            .light
+            .chunks_exact_mut(w)
+            .zip(self.base_light.chunks_exact(w))
+            .zip(self.grid.chunks_exact(w));
+        for ((light, base), grid) in rows {
+            for x in 0..w {
+                let mut l = base[x] * self.shade_pow[above[x]];
+                if f != 1.0 {
+                    l *= f;
+                }
+                light[x] = l;
+                if grid[x] != EMPTY {
+                    above[x] += 1;
+                }
             }
         }
     }
 
     /// `World.update_organic`: diffusion (x toroidal, y closed), sinking, decay.
+    ///
+    /// M6 step 1: the previous field lives in a reused buffer (no clone per step), the x wrap is
+    /// two edge cases instead of a `%` per tile, and sinking runs in place, bottom row first. Each
+    /// tile still gets the same operations in the same order: `moved[i]` is taken from the
+    /// diffused value before row `i` changes, row `i + 1` has already lost its own `moved`
+    /// when `moved[i]` is added (Python: all subtractions, then all additions), then the decay.
     fn update_organic(&mut self) {
         let (w, h) = (self.width, self.height);
         let cfg = &self.cfg;
-        let old = self.organic.clone();
+        let old = &mut self.organic_old;
+        old.clear();
+        old.extend_from_slice(&self.organic);
         let o = &mut self.organic;
         for y in 0..h {
-            let up = y.saturating_sub(1);
-            let down = if y + 1 < h { y + 1 } else { y };
+            let row = y * w;
+            let up = y.saturating_sub(1) * w;
+            let down = if y + 1 < h { row + w } else { row };
             for x in 0..w {
-                let i = y * w + x;
-                let left = old[y * w + (x + w - 1) % w];
-                let right = old[y * w + (x + 1) % w];
-                let mean = (old[up * w + x] + old[down * w + x] + left + right) * 0.25;
+                let i = row + x;
+                let left = old[row + if x == 0 { w - 1 } else { x - 1 }];
+                let right = old[row + if x + 1 == w { 0 } else { x + 1 }];
+                let mean = (old[up + x] + old[down + x] + left + right) * 0.25;
                 o[i] = old[i] + cfg.organic_diffusion * (mean - old[i]);
             }
         }
         // moved = o[:-1] * sink (zero above rock); o[:-1] -= moved; o[1:] += moved
-        let mut moved = vec![0.0; w * (h - 1)];
-        for (i, m) in moved.iter_mut().enumerate() {
-            *m = o[i] * cfg.organic_sink;
+        for i in (0..w * (h - 1)).rev() {
+            let mut m = o[i] * cfg.organic_sink;
             if self.has_rock && self.terrain.rock[i + w] {
-                *m *= 0.0;
+                m *= 0.0;
             }
-        }
-        for (i, &m) in moved.iter().enumerate() {
             o[i] -= m;
-        }
-        for (i, &m) in moved.iter().enumerate() {
             o[i + w] += m;
         }
         let keep = 1.0 - cfg.organic_decay;

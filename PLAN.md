@@ -15,11 +15,13 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 8. [x] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first
 9. [?] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
 10. [x] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
-11. [ ] Owner's idea (2026-11-11, after 10): obstacles and scattered resources that make exploration pay (see below)
+11. [ ] Owner's idea: obstacles and scattered resources; PARKED 2026-11-12 as a hypothesis to revisit (item 10 null)
 12. [x] ADR-0014: trait table first, then `sense_r`; the kernel refuses `sense_range` until validated
 13. [x] Item 10, commit 1: trait table refactor (Python); every golden file byte-identical, steps/s measured
 14. [x] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
 15. [x] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
+16. [x] G2 M6 step 1: profile the Rust reference kernel; bit-exact speed-ups only, every golden hash unchanged
+17. [ ] G2 M6 step 2: ADR-0015, parallel kernel or not; statistical equivalence criteria fixed before any code
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side
@@ -135,6 +137,9 @@ Consequences:
   radius is selected". Item 11 is to be rescoped by the owner: game-only, or with a new hypothesis.
 
 ## Item 11: obstacles and scattered resources that make exploration pay (owner's idea, 2026-11-11)
+**Parked (owner, 2026-11-12).** Item 10 gave a null result, so this mechanism is kept aside as a hypothesis
+to revisit when movement matters more in the world; no engine work until then.
+
 **Idea.** Use the terrain together with `sense_r` (item 10): obstacles placed at random by the world generator, or
 by the player as a game move, so that resources sit behind or between them and cells must explore to find them.
 The starting point, how energy disperses and how resources are resupplied become game variables too.

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **M6 step 1, faster field passes in the Rust kernel**: light and organic matter are updated without a per-tile
+  `%`, a per-step clone or a temporary buffer. The arithmetic is unchanged and every golden hash is equal. The
+  passes are about 2.6x faster; whole steps are about 12% faster at 50k cells and up to about 45% faster on the
+  default world.
 - **Unity front-end on URP 17.5**: the deprecated Built-in Render Pipeline is replaced by a URP asset and renderer
   (`unity/Assets/Settings`, no post-processing), assigned in Graphics and every Quality level by
   `WorldSimSetup.ConfigureRenderPipeline`; the IMGUI view is unchanged. Packages trimmed to URP, Test Framework and

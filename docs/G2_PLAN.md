@@ -518,3 +518,25 @@ the Windows-made hashes). Cross-platform identity, if ever needed, is a separate
   `(kind, radius, amount)` equal what `g2_intervention_vectors.game_actions` makes of a G1 log (the expansion the
   kernel is proven against), and follow changed `GameRules`. The viewer compiles and the EditMode tests pass
   (**12/12**); the click-to-apply path is checked by hand in the Editor, by the owner (Unity is not in CI).
+- **M6 step 1, bit-exact field passes** (2026-11-12, Windows 11, PLAN item 16): the light and organic passes are
+  rewritten without changing any arithmetic.
+  - **Light:** computed row by row, with no `%` per tile.
+  - **Organic:** the previous field lives in a reused buffer instead of a 2 MB clone per step; the x wrap is two
+    edge cases; sinking runs in place, bottom row first. Every tile gets the same operations in the same order.
+
+  An empty 800x320 world, i.e. the field passes alone, goes from 1.75-1.82 to 0.65-0.71 ms per step.
+
+  `bench` example, with the cell loop unchanged:
+
+  | World | Before (cell-updates/s) | After (cell-updates/s) |
+  |---|---|---|
+  | 800 | 5.6-6.0e6 | 8.7-9.0e6 |
+  | 10k | 6.5-7.0e6 | 7.2-7.8e6 |
+  | 50k (runs interleaved with a HEAD build) | 2.33 / 4.72 / 4.64e6 | 2.69 / 5.36 / 5.12e6 |
+
+  The 50k world gains about 12%. The first pair of 50k runs was slowed by other load on the machine. The hash after
+  Python's timed steps is still equal on all three worlds, and `cargo test` is green on every golden set.
+
+  The cell loop is now about 85% of a 50k step, at about 180 ns per cell. Making it faster bit-exactly means a
+  hot/cold split of `Cell` (about 400 bytes, visited in shuffled order). That is left for step 2 to weigh against a
+  parallel kernel. Fast-forward x10 at 50k (3e7 cell-updates/s) is still about 6x away.
