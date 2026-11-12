@@ -14,7 +14,7 @@ the F-phase experiments).
 6. [x] M3 Benchmark: cell-updates/s at 800 / 10k / 50k cells vs the 60 fps target
 7. [x] M4 Unity front-end: P/Invoke wrapper, render the world to a texture, play/pause/speed
 8. [~] M5 Port the optional flags (sensing, open_genome, sex, plasticity, later F flags), planets, interventions
-9. [ ] M6 Optional fast (parallel) kernel, judged statistically, never claimed equivalent
+9. [ ] M6 Optional fast (parallel) kernel: step 1 (bit-exact field passes) done; the rest DEFERRED by ADR-0015
 
 ## Scope of the first milestone (M0–M2)
 Default flags only: `sensing`, `open_genome`, `sex`, `plasticity` off; species tracker off (it is a

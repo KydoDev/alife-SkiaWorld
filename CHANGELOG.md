@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **ADR-0015, the parallel kernel is deferred** (G2 M6): the single-threaded reference kernel stays the only kernel
+  (50k cells at about 100 steps/s already meets the 60 fps target); M6 reopens only when a concrete world needs it.
 - **M6 step 1, faster field passes in the Rust kernel**: light and organic matter are updated without a per-tile
   `%`, a per-step clone or a temporary buffer. The arithmetic is unchanged and every golden hash is equal. The
   passes are about 2.6x faster; whole steps are about 12% faster at 50k cells and up to about 45% faster on the
@@ -23,6 +25,9 @@ All notable changes to this project are documented here. Format based on
   follows the four trait means.
 
 ### Added
+- **G3 plan** (`docs/G3_PLAN.md`): the game front-end in the Neon Abyss design, mobile first (phones and tablets,
+  portrait and landscape), built on the Unity viewer and the Rust kernel; P0 is the owner's Play-mode check of the
+  URP viewer.
 - **ADR-0014 commit 3, `sense_r` experiment** (`scripts/sense_range_experiment.py`): P1, 20 pairs, with and without
   F5e armour. The cost control fires, but a wider perception radius is not selected and brings no hunting or fleeing
   (null result, ROADMAP F3); `sense_range` is not ported to the kernel.

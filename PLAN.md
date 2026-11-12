@@ -21,7 +21,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 14. [x] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
 15. [x] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
 16. [x] G2 M6 step 1: profile the Rust reference kernel; bit-exact speed-ups only, every golden hash unchanged
-17. [ ] G2 M6 step 2: ADR-0015, parallel kernel or not; statistical equivalence criteria fixed before any code
+17. [x] G2 M6 step 2: ADR-0015, the owner deferred the parallel kernel (reopen only for a concrete need)
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

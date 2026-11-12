@@ -27,7 +27,8 @@ Numbered, append-only records of the decisions that shaped the system:
 [0011 prey defence and save v8](./adr/0011-prey-defence-and-save-v8.md) ·
 [0012 world creation in the kernel](./adr/0012-world-creation-in-the-kernel.md) ·
 [0013 interventions through the C ABI](./adr/0013-interventions-through-the-c-abi.md) ·
-[0014 trait table and perception radius](./adr/0014-trait-table-and-perception-radius.md).
+[0014 trait table and perception radius](./adr/0014-trait-table-and-perception-radius.md) ·
+[0015 defer the parallel kernel](./adr/0015-defer-the-parallel-kernel.md).
 
 ### [G2 engine port plan](./G2_PLAN.md)
 Milestones and verification criteria for the Rust core port (ADR-0008).
