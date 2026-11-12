@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Changed
+- **G3 P1, UI Toolkit shell for the Unity viewer**: the IMGUI view is replaced by UXML + USS in the Neon Abyss
+  palette with the Pixelify Sans font (SIL OFL): HUD, control bar (play/pause, step, speed, seed, New world), the
+  world scale-to-fit, and a tool dock. Layout classes follow portrait or landscape and padding follows the screen's
+  safe area. `WorldSimSetup.CreateScene` now also creates the panel settings and the `UIDocument`. Every control and
+  key of the IMGUI viewer is kept; `ViewMath` (fit and click-to-tile mapping) gains EditMode tests.
 - **G2 done**: M5 closed after the owner's Play-mode check of the Unity viewer (URP, v9 kernel, sandbox tools); M6
   deferred (ADR-0015). Next: G3 (`docs/G3_PLAN.md`).
 - **ADR-0015, the parallel kernel is deferred** (G2 M6): the single-threaded reference kernel stays the only kernel

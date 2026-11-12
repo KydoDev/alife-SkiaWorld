@@ -1,0 +1,169 @@
+/* G3 P1 shell in the Neon Abyss palette (docs/G3_PLAN.md, "Design reference"). Touch targets >= 44 px. */
+
+.ws-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-direction: column;
+    background-color: #07080f;
+    color: #e8fbff;
+    -unity-font-definition: url("Fonts/PixelifySans.ttf");
+    font-size: 18px;
+}
+
+.ws-hud {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background-color: #0e0f1f;
+    border-bottom-width: 2px;
+    border-bottom-color: #2c3560;
+}
+
+.ws-title {
+    color: #39f5e0;
+    font-size: 22px;
+    -unity-font-style: bold;
+}
+
+.ws-stats {
+    color: #9fd8e0;
+}
+
+.ws-bar {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 4px 8px;
+    background-color: #0e0f1f;
+}
+
+.ws-btn {
+    min-height: 44px;
+    min-width: 44px;
+    margin: 3px;
+    padding: 0 12px;
+    background-color: #0e0f1f;
+    color: #e8fbff;
+    border-width: 2px;
+    border-color: #2c3560;
+    border-radius: 0;
+}
+
+.ws-btn:hover {
+    border-color: #39f5e0;
+}
+
+.ws-btn:active {
+    background-color: #2c3560;
+}
+
+.ws-btn:disabled {
+    color: #2c3560;
+}
+
+.ws-btn--primary {
+    background-color: #39f5e0;
+    border-color: #39f5e0;
+    color: #07080f;
+}
+
+.ws-btn--primary:active {
+    background-color: #9fd8e0;
+}
+
+.ws-btn--square {
+    padding: 0;
+    width: 44px;
+}
+
+.ws-speed {
+    min-width: 72px;
+    -unity-text-align: middle-center;
+    color: #9fd8e0;
+}
+
+.ws-seed {
+    flex-direction: row;
+    align-items: center;
+    margin: 3px 3px 3px 12px;
+}
+
+.ws-seed > .unity-label {
+    min-width: 0;
+    margin-right: 6px;
+    color: #9fd8e0;
+}
+
+.ws-seed .unity-base-text-field__input {
+    min-height: 44px;
+    min-width: 180px;
+    background-color: #07080f;
+    color: #e8fbff;
+    border-width: 2px;
+    border-color: #2c3560;
+    border-radius: 0;
+}
+
+.ws-world {
+    flex-grow: 1;
+    background-color: #000000;
+}
+
+.ws-world-image {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.ws-error {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    right: 8px;
+    color: #ff3fd1;
+    white-space: normal;
+    display: none;
+}
+
+.ws-dock {
+    padding: 4px 8px;
+    background-color: #0e0f1f;
+    border-top-width: 2px;
+    border-top-color: #2c3560;
+}
+
+.ws-tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.ws-tool {
+    flex-grow: 1;
+}
+
+.ws-tool--on {
+    background-color: #ff3fd1;
+    border-color: #ff3fd1;
+    color: #07080f;
+}
+
+.ws-status {
+    color: #9fd8e0;
+    white-space: normal;
+    padding: 2px 4px;
+}
+
+/* Portrait phones: the controls wrap and the title gives way to the numbers. */
+.ws-portrait .ws-title {
+    font-size: 18px;
+}
+
+.ws-portrait .ws-seed .unity-base-text-field__input {
+    min-width: 120px;
+}

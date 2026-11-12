@@ -22,6 +22,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 15. [x] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
 16. [x] G2 M6 step 1: profile the Rust reference kernel; bit-exact speed-ups only, every golden hash unchanged
 17. [x] G2 M6 step 2: ADR-0015, the owner deferred the parallel kernel (reopen only for a concrete need)
+18. [~] G3 P1: UI Toolkit shell replaces IMGUI in the Unity viewer (`docs/G3_PLAN.md`); owner checks in Play mode
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

@@ -1,7 +1,6 @@
 # Test Report
 
-Last run: 2026-11-12 - ADR-0014 commit 2 (`sense_r`, save v9, kernel refuses `sense_range`), `main`, working tree
-before the commit
+Last run: 2026-11-12 - G3 P1 (UI Toolkit shell for the Unity viewer), `main`, working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -9,11 +8,12 @@ before the commit
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| Unit + integration (`tests/`, 366 tests) | 366 | 0 | 0 | 99.36% |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, 16 tests) | 16 | 0 | 0 | |
 | `ruff check .` | clean | | | |
-| Rust (`cargo test --locked`, `fmt --check`, `clippy -D warnings`) | all | 0 | 0 | |
-| Golden regeneration (`g2_golden.py --all`, fresh root) | hashes and renders byte-identical | | | |
 
 ## Notes
-- Unity EditMode (batchmode, Unity 6000.5.6f1, after the URP migration 774a4c8 and `scripts/unity_sync.py` with the
-  v9 kernel DLL and save): 12 passed, 0 failed.
+- Only `unity/` and docs change in this commit: Python (366 tests, 99.36%) and Rust were last green at ADR-0014
+  commit 2 and the kernel is untouched.
+- New: `ViewMathTests` (4), scale-to-fit placement and click-to-tile mapping. `CreateScene` ran in batchmode with no
+  compiler or import errors; the scene's `UIDocument` points at `WorldSimPanel.asset` and `WorldSimView.uxml`.
+- Not covered by tests: the UI in Play mode (buttons, keys, tool clicks, safe area). The owner checks it by hand.

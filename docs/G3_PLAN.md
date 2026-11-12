@@ -8,7 +8,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 
 ## Checklist
 1. [x] P0 Owner checks the URP viewer in Play mode (texture visible, row 0 on top, tool click hits the right cell)
-2. [ ] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
+2. [?] P1 UI Toolkit shell over today's texture: HUD, tool dock, safe area, Pixelify Sans; IMGUI removed
 3. [ ] P2 Touch camera: pinch zoom (integer steps), two-finger pan wrapping in x, tap = inspect cell
 4. [ ] P3 Android build spike on ABI 3: arm64 `.so` via cargo-ndk, IL2CPP, golden EditMode set on device
 5. [ ] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
@@ -45,6 +45,8 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   point-filtered texture. Layout classes switch on aspect ratio (portrait phone / landscape tablet);
   `Screen.safeArea` padding. Font: Pixelify Sans (SIL OFL, ship `OFL.txt` beside it). Pass: every control
   of today's IMGUI viewer works through the new UI; EditMode tests stay green.
+  *Result (2026-11-12)*: built (`WorldSimView.uxml/.uss`, `ViewMath`, panel settings from `CreateScene`);
+  EditMode 16/16 with the new `ViewMathTests`. Pending: the owner's Play-mode check of every control.
 - **P2 Touch camera** — Input System package (comes back into the manifest). Pinch zoom in integer
   scale steps; pan wraps in x (the world is toroidal), clamps in y; tap maps screen → cell. Pass: a
   PlayMode test maps known screen points to known cells at three zoom levels and across the x seam.

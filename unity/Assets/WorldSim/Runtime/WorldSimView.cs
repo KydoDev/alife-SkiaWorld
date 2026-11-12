@@ -1,15 +1,18 @@
-// G2 M4 front-end: shows a kernel world as a texture, with play / pause / step / speed, (ADR-0012)
-// "New world": a world the kernel creates from an exported config and a seed typed in the bar, and (ADR-0013)
-// sandbox tools: the five G1 edits applied with a click, with the parameters Python's GameRules() exports.
-// No budget or milestones (they stay in Python until G3).
-// IMGUI only (no prefabs, no input package): the controls are buttons and keys handled in OnGUI.
+// G3 P1 front-end shell (docs/G3_PLAN.md): a kernel world shown as a point-filtered texture, with play / pause /
+// step / speed, (ADR-0012) "New world" from an exported config and a typed seed, and (ADR-0013) the five G1
+// sandbox tools applied with a click, with the parameters Python's GameRules() exports. No budget or milestones
+// yet (G3 P7). The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette); keys come from the legacy
+// Input Manager (no input package until P2).
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace WorldSim
 {
+    [RequireComponent(typeof(UIDocument))]
     public sealed class WorldSimView : MonoBehaviour
     {
         private static readonly int[] Speeds = { 1, 2, 5, 10, 20, 30, 60, 120, 240, 480 };
@@ -18,7 +21,6 @@ namespace WorldSim
         private const long MaxSaveBytes = 256L * 1024 * 1024;
         private const long MaxConfigBytes = 64 * 1024;
         private const long MaxToolsBytes = 16 * 1024;
-        private const float RowHeight = 30f;
 
         [Tooltip("Save in StreamingAssets, copied by scripts/unity_sync.py")]
         public string saveFile = "world.json.gz";
@@ -46,10 +48,16 @@ namespace WorldSim
         private byte[] _rgb;
         private byte[] _flipped;
         private double _pending;
-        private string _error;
         private ToolSpec[] _tools = Array.Empty<ToolSpec>();
         private int _tool = -1;              // index into _tools; -1: no tool (clicks do nothing)
-        private string _toolStatus = "";
+
+        // UI Toolkit elements (WorldSimView.uxml)
+        private VisualElement _root;
+        private Image _image;
+        private Label _stats, _speed, _error, _toolStatus;
+        private Button _play, _step;
+        private TextField _seed;
+        private readonly List<Button> _toolButtons = new List<Button>();
 
         // game_tools.json: one entry per G1 tool, the arguments of ws_world_intervene
         [Serializable]
@@ -71,10 +79,158 @@ namespace WorldSim
 
         private void Start()
         {
+            BindUi();
+            LoadTools();
             string path = Path.Combine(Application.streamingAssetsPath, saveFile);
             Open(() => NativeWorld.Load(ReadCapped(path, MaxSaveBytes)), $"save: {path}");
-            LoadTools();
+            RefreshHud();
         }
+
+        // ------------------------------------------------------------------ UI
+
+        private void BindUi()
+        {
+            VisualElement doc = GetComponent<UIDocument>().rootVisualElement;
+            _root = doc.Q("root");
+            _stats = doc.Q<Label>("stats");
+            _speed = doc.Q<Label>("speed");
+            _error = doc.Q<Label>("error");
+            _toolStatus = doc.Q<Label>("tool-status");
+            _play = Bind(doc, "play", () => running = !running);
+            _step = Bind(doc, "step", () =>
+            {
+                if (!running && _world != null)
+                {
+                    Advance(1);
+                }
+            });
+            Bind(doc, "slower", () => speedIndex = Math.Max(0, speedIndex - 1));
+            Bind(doc, "faster", () => speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1));
+            Bind(doc, "new-world", NewWorld);
+            _seed = doc.Q<TextField>("seed");
+            _seed.value = seedText;
+            _seed.RegisterValueChangedCallback(e => seedText = e.newValue);
+            // Return in the seed field creates the world (TrickleDown: before the field handles the key)
+            _seed.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                {
+                    NewWorld();
+                    _seed.Blur();
+                    e.StopPropagation();
+                }
+            }, TrickleDown.TrickleDown);
+            _image = new Image { scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Position };
+            _image.AddToClassList("ws-world-image");
+            doc.Q("world").Insert(0, _image);
+            _image.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
+            _root.RegisterCallback<GeometryChangedEvent>(_ => ApplyLayout());
+        }
+
+        /// <summary>A button that runs <paramref name="action"/> and then refreshes the HUD. Buttons never take
+        /// the focus, so Space (play / pause) is never also a "submit" of the last button clicked.</summary>
+        private Button Bind(VisualElement doc, string name, Action action)
+        {
+            var button = doc.Q<Button>(name);
+            button.focusable = false;
+            button.clicked += () =>
+            {
+                action();
+                RefreshHud();
+            };
+            return button;
+        }
+
+        /// <summary>Portrait or landscape classes, and padding for the screen's safe area (notches, bars).</summary>
+        private void ApplyLayout()
+        {
+            if (_root?.panel == null || Screen.width <= 0 || Screen.height <= 0)
+            {
+                return;
+            }
+            bool portrait = Screen.height > Screen.width;
+            _root.EnableInClassList("ws-portrait", portrait);
+            _root.EnableInClassList("ws-landscape", !portrait);
+            float k = _root.panel.visualTree.layout.width / Screen.width;   // screen pixels -> panel units
+            Rect safe = Screen.safeArea;
+            SetIfChanged(_root.style.paddingLeft, safe.xMin * k, v => _root.style.paddingLeft = v);
+            SetIfChanged(_root.style.paddingRight, (Screen.width - safe.xMax) * k, v => _root.style.paddingRight = v);
+            SetIfChanged(_root.style.paddingTop, (Screen.height - safe.yMax) * k, v => _root.style.paddingTop = v);
+            SetIfChanged(_root.style.paddingBottom, safe.yMin * k, v => _root.style.paddingBottom = v);
+        }
+
+        private static void SetIfChanged(StyleLength current, float value, Action<StyleLength> set)
+        {
+            if (current.keyword != StyleKeyword.Undefined || Mathf.Abs(current.value.value - value) > 0.5f)
+            {
+                set(new StyleLength(value));
+            }
+        }
+
+        private void RefreshHud()
+        {
+            if (_stats == null)
+            {
+                return;
+            }
+            _stats.text = _world == null ? "no world" : $"step {_info.StepCount}   cells {_info.Population}";
+            _speed.text = $"{StepsPerSecond}/s";
+            _play.text = running ? "Pause" : "Play";
+            _step.SetEnabled(!running && _world != null);
+        }
+
+        private void ShowError(string message)
+        {
+            _error.text = message ?? "";
+            _error.style.display = message == null ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        /// <summary>One dock button per tool: pick a tool (tap it again to put it down), then tap the world.</summary>
+        private void BuildToolDock()
+        {
+            VisualElement dock = _root.Q("tools");
+            dock.Clear();
+            _toolButtons.Clear();
+            for (int i = 0; i < _tools.Length; i++)
+            {
+                int index = i;
+                var button = new Button(() => SelectTool(index)) { text = _tools[i].name, focusable = false };
+                button.AddToClassList("ws-btn");
+                button.AddToClassList("ws-tool");
+                dock.Add(button);
+                _toolButtons.Add(button);
+            }
+        }
+
+        private void SelectTool(int index)
+        {
+            _tool = _tool == index ? -1 : index;
+            for (int i = 0; i < _toolButtons.Count; i++)
+            {
+                _toolButtons[i].EnableInClassList("ws-tool--on", i == _tool);
+            }
+            if (_tool < 0)
+            {
+                _toolStatus.text = "pick a tool, then tap the world";
+            }
+        }
+
+        /// <summary>A left click (or a touch) on the world applies the selected tool to the tile under it.</summary>
+        private void OnWorldPointerDown(PointerDownEvent e)
+        {
+            if (e.button != 0 || _tool < 0 || _world == null || _texture == null)
+            {
+                return;
+            }
+            Rect drawn = ViewMath.FittedRect(_image.contentRect, _texture.width, _texture.height);
+            if (ViewMath.TileAt(e.localPosition, drawn, (int)_info.Width, (int)_info.Height, out int x, out int y))
+            {
+                ApplyTool((uint)x, (uint)y);
+            }
+            e.StopPropagation();
+        }
+
+        // ------------------------------------------------------------------ world
 
         /// <summary>Read the tool parameters; without them the viewer works, with no tools.</summary>
         private void LoadTools()
@@ -85,13 +241,14 @@ namespace WorldSim
                 string text = System.Text.Encoding.UTF8.GetString(ReadCapped(path, MaxToolsBytes));
                 ToolFile file = JsonUtility.FromJson<ToolFile>(text);
                 _tools = file?.tools ?? Array.Empty<ToolSpec>();
-                _toolStatus = _tools.Length == 0 ? $"no tools in {path}" : "";
+                _toolStatus.text = _tools.Length == 0 ? $"no tools in {path}" : "pick a tool, then tap the world";
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException)
             {
                 _tools = Array.Empty<ToolSpec>();
-                _toolStatus = $"no tools ({e.GetType().Name}): run scripts/unity_sync.py";
+                _toolStatus.text = $"no tools ({e.GetType().Name}): run scripts/unity_sync.py";
             }
+            BuildToolDock();
         }
 
         /// <summary>Apply the selected tool at tile (x, y), between steps; a refusal changes nothing.</summary>
@@ -103,52 +260,19 @@ namespace WorldSim
                 ulong changed = _world.Intervene((Edit)t.kind, x, y, t.radius, t.amount);
                 _info = _world.Info;
                 Redraw();
-                _toolStatus = $"{t.name} at ({x}, {y}): {changed}";
+                _toolStatus.text = $"{t.name} at ({x}, {y}): {changed}";
             }
             catch (WorldSimException e)
             {
-                _toolStatus = e.Message;
+                _toolStatus.text = e.Message;
                 if (e.Status != WorldSimException.StatusInvalid)
                 {
                     running = false;    // the world is unusable after a panic
-                    _error = e.Message;
-                    Debug.LogError(_error);
+                    ShowError(e.Message);
+                    Debug.LogError(e.Message);
                 }
             }
-        }
-
-        /// <summary>Where ScaleToFit draws the texture inside <paramref name="area"/>.</summary>
-        private Rect FittedRect(Rect area)
-        {
-            float aspect = (float)_texture.width / _texture.height;
-            float w = area.width, h = area.height;
-            if (w / h > aspect)
-            {
-                w = h * aspect;
-            }
-            else
-            {
-                h = w / aspect;
-            }
-            return new Rect(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h);
-        }
-
-        /// <summary>A left click on the world applies the selected tool to the tile under the mouse.</summary>
-        private void HandleClick(Event e, Rect drawn)
-        {
-            if (e.type != EventType.MouseDown || e.button != 0 || _tool < 0 || _world == null
-                || !drawn.Contains(e.mousePosition))
-            {
-                return;
-            }
-            // row 0 (the surface) is drawn at the top: texture rows were flipped in Redraw
-            int x = Mathf.FloorToInt((e.mousePosition.x - drawn.x) / drawn.width * _info.Width);
-            int y = Mathf.FloorToInt((e.mousePosition.y - drawn.y) / drawn.height * _info.Height);
-            if (x >= 0 && y >= 0 && x < _info.Width && y < _info.Height)   // the kernel refuses the rest anyway
-            {
-                ApplyTool((uint)x, (uint)y);
-            }
-            e.Use();
+            RefreshHud();
         }
 
         /// <summary>Replace the shown world by one the kernel creates from the exported config and the seed.</summary>
@@ -157,10 +281,11 @@ namespace WorldSim
             string path = Path.Combine(Application.streamingAssetsPath, configFile);
             if (!ulong.TryParse(seedText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out ulong seed))
             {
-                _error = $"seed must be an integer from 0 to {ulong.MaxValue}";
+                ShowError($"seed must be an integer from 0 to {ulong.MaxValue}");
                 return;
             }
             Open(() => NativeWorld.Create(ReadCapped(path, MaxConfigBytes), seed), $"config: {path}, seed {seed}");
+            RefreshHud();
         }
 
         private static byte[] ReadCapped(string path, long limit)
@@ -208,22 +333,25 @@ namespace WorldSim
                         wrapMode = TextureWrapMode.Clamp,
                         name = "WorldSim",
                     };
+                    _image.image = _texture;
                 }
                 _pending = 0;
-                _error = null;
+                ShowError(null);
                 Redraw();
             }
             catch (Exception e) when (e is IOException || e is WorldSimException || e is DllNotFoundException
                                       || e is EntryPointNotFoundException || e is UnauthorizedAccessException
                                       || e is ArgumentException)
             {
-                _error = $"{e.GetType().Name}: {e.Message}\n({source}; run scripts/unity_sync.py)";
-                Debug.LogError(_error);
+                string message = $"{e.GetType().Name}: {e.Message}\n({source}; run scripts/unity_sync.py)";
+                ShowError(message);
+                Debug.LogError(message);
             }
         }
 
         private void Update()
         {
+            HandleKeys();
             if (_world == null || !running)
             {
                 return;
@@ -234,6 +362,42 @@ namespace WorldSim
             if (steps > 0)
             {
                 Advance((uint)steps);
+            }
+        }
+
+        /// <summary>Space play / pause, N step, +/- speed; ignored while the seed field has the focus.</summary>
+        private void HandleKeys()
+        {
+            var focused = _root?.panel?.focusController?.focusedElement as VisualElement;
+            if (focused != null && (focused == _seed || _seed.Contains(focused)))
+            {
+                return;
+            }
+            bool changed = true;
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                running = !running;
+            }
+            else if (Input.GetKeyDown(KeyCode.N) && !running && _world != null)
+            {
+                Advance(1);
+            }
+            else if (Input.GetKeyDown(KeyCode.Plus) || Input.GetKeyDown(KeyCode.Equals)
+                     || Input.GetKeyDown(KeyCode.KeypadPlus))
+            {
+                speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1);
+            }
+            else if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
+            {
+                speedIndex = Math.Max(0, speedIndex - 1);
+            }
+            else
+            {
+                changed = false;
+            }
+            if (changed)
+            {
+                RefreshHud();
             }
         }
 
@@ -248,9 +412,10 @@ namespace WorldSim
             catch (WorldSimException e)
             {
                 running = false;
-                _error = e.Message;
-                Debug.LogError(_error);
+                ShowError(e.Message);
+                Debug.LogError(e.Message);
             }
+            RefreshHud();
         }
 
         /// <summary>Render, flip rows (row 0 is the surface; texture row 0 is the bottom), upload.</summary>
@@ -265,118 +430,7 @@ namespace WorldSim
             }
             _texture.SetPixelData(_flipped, 0);
             _texture.Apply(false);
-        }
-
-        private void OnGUI()
-        {
-            HandleKeys(Event.current);
-            float bar = _tools.Length > 0 || _toolStatus.Length > 0 ? 2 * RowHeight + 2 : RowHeight + 2;
-            if (_texture != null)
-            {
-                Rect drawn = FittedRect(new Rect(0, bar, Screen.width, Screen.height - bar));
-                HandleClick(Event.current, drawn);
-                GUI.DrawTexture(drawn, _texture, ScaleMode.StretchToFill);
-            }
-            GUILayout.BeginArea(new Rect(4, 4, Screen.width - 8, RowHeight - 2));
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button(running ? "Pause" : "Play", GUILayout.Width(70)))
-            {
-                running = !running;
-            }
-            GUI.enabled = !running && _world != null;
-            if (GUILayout.Button("Step", GUILayout.Width(50)))
-            {
-                Advance(1);
-            }
-            GUI.enabled = true;
-            if (GUILayout.Button("-", GUILayout.Width(28)))
-            {
-                speedIndex = Math.Max(0, speedIndex - 1);
-            }
-            if (GUILayout.Button("+", GUILayout.Width(28)))
-            {
-                speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1);
-            }
-            GUILayout.Label("seed", GUILayout.Width(32));
-            seedText = GUILayout.TextField(seedText, 20, GUILayout.Width(150));
-            if (GUILayout.Button("New world", GUILayout.Width(90)))
-            {
-                GUIUtility.keyboardControl = 0;   // give the keys back to the controls
-                NewWorld();
-            }
-            GUILayout.Label(_world == null
-                ? "no world"
-                : $"step {_info.StepCount}   cells {_info.Population}   {StepsPerSecond} steps/s   "
-                  + "(Space play/pause, N step, +/- speed)");
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
-            if (bar > RowHeight + 2)
-            {
-                ToolBar(new Rect(4, RowHeight + 4, Screen.width - 8, RowHeight - 2));
-            }
-            if (_error != null)
-            {
-                GUI.Label(new Rect(8, bar + 8, Screen.width - 16, 120), _error);
-            }
-        }
-
-        /// <summary>Second row: pick a tool (click it again to put it down), then click the world.</summary>
-        private void ToolBar(Rect row)
-        {
-            GUILayout.BeginArea(row);
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("tool", GUILayout.Width(32));
-            for (int i = 0; i < _tools.Length; i++)
-            {
-                bool on = GUILayout.Toggle(_tool == i, _tools[i].name, "Button", GUILayout.Width(90));
-                if (on != (_tool == i))
-                {
-                    _tool = on ? i : -1;
-                }
-            }
-            GUILayout.Label(_tool < 0 && _toolStatus.Length == 0 ? "(pick a tool, then click the world)" : _toolStatus);
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
-        }
-
-        private void HandleKeys(Event e)
-        {
-            if (e.type != EventType.KeyDown)
-            {
-                return;
-            }
-            if (GUIUtility.keyboardControl != 0)
-            {
-                // the seed field has the focus: keys type into it; Return creates the world
-                if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
-                {
-                    GUIUtility.keyboardControl = 0;
-                    NewWorld();
-                    e.Use();
-                }
-                return;
-            }
-            switch (e.keyCode)
-            {
-                case KeyCode.Space:
-                    running = !running;
-                    break;
-                case KeyCode.N when !running && _world != null:
-                    Advance(1);
-                    break;
-                case KeyCode.Plus:
-                case KeyCode.Equals:
-                case KeyCode.KeypadPlus:
-                    speedIndex = Math.Min(Speeds.Length - 1, speedIndex + 1);
-                    break;
-                case KeyCode.Minus:
-                case KeyCode.KeypadMinus:
-                    speedIndex = Math.Max(0, speedIndex - 1);
-                    break;
-                default:
-                    return;
-            }
-            e.Use();
+            _image.MarkDirtyRepaint();   // the panel repaints only when something in it is dirty
         }
 
         private void OnDestroy()

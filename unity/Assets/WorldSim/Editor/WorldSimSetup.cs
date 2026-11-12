@@ -7,6 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UIElements;
 
 namespace WorldSim.EditorTools
 {
@@ -15,6 +16,9 @@ namespace WorldSim.EditorTools
         public const string ScenePath = "Assets/Scenes/WorldSim.unity";
         public const string PipelineAssetPath = "Assets/Settings/WorldSim_URP.asset";
         public const string RendererAssetPath = "Assets/Settings/WorldSim_URP_Renderer.asset";
+        public const string LayoutPath = "Assets/WorldSim/UI/WorldSimView.uxml";
+        public const string ThemePath = "Assets/WorldSim/UI/WorldSimTheme.tss";
+        public const string PanelSettingsPath = "Assets/WorldSim/UI/WorldSimPanel.asset";
 
         [MenuItem("WorldSim/Create front-end scene")]
         public static void CreateScene()
@@ -25,16 +29,42 @@ namespace WorldSim.EditorTools
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Color.black;
             camera.orthographic = true;
-            // The world is drawn by IMGUI on top of the camera's clear, so URP needs no post-processing,
-            // anti-aliasing or depth texture here.
+            // The whole view is a UI Toolkit panel drawn over the camera's clear, so URP needs no
+            // post-processing, anti-aliasing or depth texture here.
             var cameraData = camera.gameObject.AddComponent<UniversalAdditionalCameraData>();
             cameraData.renderPostProcessing = false;
             cameraData.antialiasing = AntialiasingMode.None;
-            new GameObject("WorldSim").AddComponent<WorldSimView>();
+            var view = new GameObject("WorldSim");
+            var document = view.AddComponent<UIDocument>();
+            document.panelSettings = PanelSettingsAsset();
+            document.visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(LayoutPath)
+                                       ?? throw new System.IO.FileNotFoundException(LayoutPath);
+            view.AddComponent<WorldSimView>();
             System.IO.Directory.CreateDirectory("Assets/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             Debug.Log($"WorldSim: scene written to {ScenePath}");
+        }
+
+        // The panel the view draws into: the Neon Abyss theme, scaled from a 1280x720 reference so the
+        // same layout reads on a desktop window and on a phone (G3 P1). Created once, then reused.
+        private static PanelSettings PanelSettingsAsset()
+        {
+            var panel = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelSettingsPath);
+            if (panel != null)
+            {
+                return panel;
+            }
+            panel = ScriptableObject.CreateInstance<PanelSettings>();
+            panel.themeStyleSheet = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(ThemePath)
+                                    ?? throw new System.IO.FileNotFoundException(ThemePath);
+            panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            panel.referenceResolution = new Vector2Int(1280, 720);
+            panel.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            panel.match = 0.5f;
+            AssetDatabase.CreateAsset(panel, PanelSettingsPath);
+            AssetDatabase.SaveAssets();
+            return panel;
         }
 
         // Creates (or reuses) the URP asset and its renderer, then assigns it in Graphics settings and in
@@ -46,7 +76,7 @@ namespace WorldSim.EditorTools
             if (pipeline == null)
             {
                 System.IO.Directory.CreateDirectory("Assets/Settings");
-                // No PostProcessData: the viewer draws a texture with IMGUI and uses no post-processing.
+                // No PostProcessData: the viewer is a UI Toolkit panel and uses no post-processing.
                 var renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
                 AssetDatabase.CreateAsset(renderer, RendererAssetPath);
                 pipeline = UniversalRenderPipelineAsset.Create(renderer);

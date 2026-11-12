@@ -1,0 +1,26 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- G3 P1 shell (docs/G3_PLAN.md): HUD, controls, the world, the tool dock. Bound by WorldSimView.cs. -->
+    <Style src="WorldSimView.uss" />
+    <ui:VisualElement name="root" class="ws-root">
+        <ui:VisualElement name="hud" class="ws-hud">
+            <ui:Label name="title" text="ABYSS GARDEN" class="ws-title" />
+            <ui:Label name="stats" text="no world" class="ws-stats" />
+        </ui:VisualElement>
+        <ui:VisualElement name="controls" class="ws-bar">
+            <ui:Button name="play" text="Pause" class="ws-btn ws-btn--primary" />
+            <ui:Button name="step" text="Step" class="ws-btn" />
+            <ui:Button name="slower" text="-" class="ws-btn ws-btn--square" />
+            <ui:Label name="speed" text="" class="ws-speed" />
+            <ui:Button name="faster" text="+" class="ws-btn ws-btn--square" />
+            <ui:TextField name="seed" label="seed" max-length="20" class="ws-seed" />
+            <ui:Button name="new-world" text="New world" class="ws-btn" />
+        </ui:VisualElement>
+        <ui:VisualElement name="world" class="ws-world">
+            <ui:Label name="error" class="ws-error" />
+        </ui:VisualElement>
+        <ui:VisualElement name="dock" class="ws-dock">
+            <ui:VisualElement name="tools" class="ws-tools" />
+            <ui:Label name="tool-status" class="ws-status" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

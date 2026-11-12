@@ -102,18 +102,25 @@ Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResult
   (+ `_Renderer`, no post-processing, MSAA off) is assigned in Graphics and in every Quality level;
   `WorldSimSetup.ConfigureRenderPipeline` (menu *WorldSim > Configure render pipeline*) recreates and reassigns it.
   The scene camera only clears to black and carries `UniversalAdditionalCameraData` (post-processing off); the world
-  is drawn by IMGUI on top. The project has no materials, lights or custom shaders, so nothing else depends on the
-  pipeline. Packages are kept minimal: URP, Test Framework and the IMGUI and JSON modules (used by the viewer)
-  plus UI Toolkit (editor and Test Runner windows); URP pulls in its own dependencies.
+  is a UI Toolkit panel on top. The project has no materials, lights or custom shaders, so nothing else depends on
+  the pipeline. Packages are kept minimal: URP, Test Framework, UI Toolkit (the viewer) and the IMGUI and JSON
+  modules; URP pulls in its own dependencies.
+- **UI (G3 P1)**: UI Toolkit. `Assets/WorldSim/UI/WorldSimView.uxml` is the layout (HUD, control bar, world, tool
+  dock), `WorldSimView.uss` the Neon Abyss style, `WorldSimTheme.tss` the theme and `WorldSimPanel.asset` the panel
+  settings (scale with screen size from 1280x720, created by `CreateScene`). The world is an `Image` showing the
+  point-filtered texture scale-to-fit; `ViewMath` maps a click to a tile. The root gets `ws-portrait` or
+  `ws-landscape` and padding from `Screen.safeArea`. Font: Pixelify Sans (`UI/Fonts`, SIL OFL, `OFL.txt` beside
+  it). Keys (Space, N, +/-) are read with the legacy Input Manager and ignored while the seed field has the focus.
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
-  `WorldSimView.cs` (texture, controls), `Editor/WorldSimSetup.cs` (scene, URP settings), `Tests/Editor/`.
+  `WorldSimView.cs` (texture, controls), `ViewMath.cs` (fit and click mapping), `Editor/WorldSimSetup.cs` (scene,
+  panel, URP settings), `Tests/Editor/`.
 - **New world** (ADR-0012): the kernel creates a world from `StreamingAssets/world_config.json` (a planet
   form's config, exported by `unity_sync.py`) and the seed typed in the bar (Return or the button). Planet forms
   and images themselves stay in Python; a kernel-made world cannot be saved yet.
 - **Edits** (ADR-0013): `NativeWorld.Intervene(Edit, x, y, radius, amount)` applies a G1 tool between steps,
   bit-exact with `worldsim/play.py`; a refusal throws `WorldSimException` with `Status == StatusInvalid` and leaves
-  the world as it was. In the viewer, the second bar row picks a tool (click it again to put it down) and a left
-  click on the world applies it; the parameters come from `StreamingAssets/game_tools.json`, which
+  the world as it was. In the viewer, the dock under the world picks a tool (tap it again to put it down) and a
+  left click or tap on the world applies it; the parameters come from `StreamingAssets/game_tools.json`, which
   `unity_sync.py` exports from `GameRules()`. A sandbox: no budget or milestones until G3.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
