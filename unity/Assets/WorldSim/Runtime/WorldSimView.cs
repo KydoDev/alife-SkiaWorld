@@ -53,6 +53,7 @@ namespace WorldSim
         private NativeWorld _world;
         private WorldCamera _camera;
         private bool _fitPending;            // a new camera fits the height once the view has a size
+        private Vector2Int _fittedScreen;    // the screen size FitView last used (device pixels per point follow it)
         private WorldInfo _info;
         private Texture2D _texture;
         private byte[] _rgb;
@@ -273,6 +274,7 @@ namespace WorldSim
                 return;
             }
             _camera.SetView(size);
+            _fittedScreen = new Vector2Int(Screen.width, Screen.height);
             if (_fitPending)
             {
                 _camera.FitHeight();
@@ -586,6 +588,12 @@ namespace WorldSim
 
         private void Update()
         {
+            // a resize that keeps the aspect ratio changes no layout in panel units, so no geometry event comes,
+            // yet the device pixels per point change: refit the camera here
+            if (_camera != null && (Screen.width != _fittedScreen.x || Screen.height != _fittedScreen.y))
+            {
+                FitView();
+            }
             HandleKeys();
             if (_world == null || !running)
             {

@@ -120,7 +120,7 @@ Unity -projectPath unity -runTests -testPlatform PlayMode -testResults unity-pla
   by a second finger) applies the selected tool or, with none, names the tile in the dock. Keys (Space, N, +/-) come
   from `Keyboard.current` (none on a phone) and are ignored while the seed field has the focus.
 - **Batchmode gives the UI no input**: with no window, UI Toolkit drops runtime input (the device gets its events,
-  the panel none), so `VirtualMouseReachesThePanel` skips itself in batchmode; run PlayMode without `-batchmode`.
+  the panel none), so `VirtualInputReachesTheView` skips itself in batchmode; run PlayMode without `-batchmode`.
 - Code: `Assets/WorldSim/Runtime/NativeWorld.cs` (wrapper; `AbiVersion` must match `ws_abi_version`),
   `WorldSimView.cs` (texture, controls), `WorldCamera.cs` (zoom, pan, screen point to tile), `Editor/WorldSimSetup.cs` (scene,
   panel, URP settings), `Tests/Editor/` (EditMode), `Tests/Play/` (PlayMode).

@@ -16,7 +16,8 @@ Last run: 2026-11-12 - G3 P2 (camera, Input System), `main`, working tree before
 ## Notes
 - Only `unity/` and docs change in this commit: Python (366 tests, 99.36%) and Rust were last green at ADR-0014
   commit 2 and the kernel is untouched.
-- `VirtualMouseReachesThePanel` skips itself in batchmode: with no window UI Toolkit gives runtime panels no input
-  (checked while writing it: the virtual mouse got its events, the panel none). It passes in a windowed Editor.
+- `VirtualInputReachesTheView` skips itself in batchmode: with no window UI Toolkit gives runtime panels no input
+  (checked while writing it: the virtual mouse got its events, the panel none). It passes in a windowed Editor:
+  a virtual mouse clicks Play and taps the world, and a virtual keyboard presses Space.
 - Not covered by tests: real touch (pinch, two-finger pan) on a device, which waits for P3; the owner checks pan and
   zoom with a mouse in the Editor.

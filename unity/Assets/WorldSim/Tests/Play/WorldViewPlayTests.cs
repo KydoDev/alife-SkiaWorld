@@ -23,9 +23,9 @@ namespace WorldSim.PlayTests
         private GameObject _host;
         private WorldSimView _view;
         private Mouse _mouse;
+        private Keyboard _keyboard;
         private InputSettings.EditorInputBehaviorInPlayMode _inputBehaviour;
         private InputSettings.BackgroundBehavior _backgroundBehaviour;
-        private bool _runInBackground;
 
         // the default golden start save (160 x 64), from the repository, so the test needs no unity_sync.py
         private static string GoldenSave() => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..",
@@ -69,9 +69,9 @@ namespace WorldSim.PlayTests
             if (_mouse != null)
             {
                 InputSystem.RemoveDevice(_mouse);
+                InputSystem.RemoveDevice(_keyboard);
                 InputSystem.settings.editorInputBehaviorInPlayMode = _inputBehaviour;
                 InputSystem.settings.backgroundBehavior = _backgroundBehaviour;
-                Application.runInBackground = _runInBackground;
                 _mouse = null;
             }
         }
@@ -124,7 +124,7 @@ namespace WorldSim.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator VirtualMouseReachesThePanel()
+        public IEnumerator VirtualInputReachesTheView()
         {
             if (Application.isBatchMode)
             {
@@ -132,16 +132,15 @@ namespace WorldSim.PlayTests
                 // events, the panel none); run it in a windowed Editor, see the header
                 Assert.Ignore("needs a windowed Editor: Unity -projectPath unity -runTests -testPlatform PlayMode");
             }
-            // a virtual mouse in the real input system (the UI provider's actions live there); in the Editor and
-            // in batchmode (no window focus) its events reach play mode only with these two settings
+            // a virtual mouse and keyboard in the real input system (the UI provider's actions live there); the
+            // two settings let their events reach play mode without the Game view's focus
             _inputBehaviour = InputSystem.settings.editorInputBehaviorInPlayMode;
             _backgroundBehaviour = InputSystem.settings.backgroundBehavior;
             InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
-            _runInBackground = Application.runInBackground;
-            Application.runInBackground = true;   // and the panel must read it without focus
             InputSystem.settings.editorInputBehaviorInPlayMode =
                 InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             _mouse = InputSystem.AddDevice<Mouse>("WorldSim test mouse");
+            _keyboard = InputSystem.AddDevice<Keyboard>("WorldSim test keyboard");
             Mouse mouse = _mouse;
             yield return OpenView();
             VisualElement root = _host.GetComponent<UIDocument>().rootVisualElement;
@@ -165,6 +164,13 @@ namespace WorldSim.PlayTests
             Vector2 panel = _view.WorldElement.LocalToWorld(local);
             yield return Click(mouse, new Vector2(panel.x * k, Screen.height - panel.y * k));
             Assert.AreEqual($"tile ({x}, {y})", root.Q<Label>("tool-status").text);
+
+            // Space toggles play / pause (Keyboard.current, read in Update)
+            InputSystem.QueueStateEvent(_keyboard, new KeyboardState(Key.Space));
+            yield return null;
+            InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
+            yield return null;
+            Assert.IsTrue(_view.running, "Space did not start the world");
         }
 
         // Input System screen coordinates: pixels, origin bottom-left
