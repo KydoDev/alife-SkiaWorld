@@ -69,6 +69,17 @@ namespace WorldSim.Tests
         }
 
         [Test]
+        public void DaylightIsNeonUpToTheMeanLightAndDayFromTwiceIt()
+        {
+            Assert.AreEqual(0f, SpriteArt.Daylight(0.0));
+            Assert.AreEqual(0f, SpriteArt.Daylight(1.0), "no cycles: the neon night look");
+            Assert.AreEqual(0.5f, SpriteArt.Daylight(1.5), 1e-6f);
+            Assert.AreEqual(1f, SpriteArt.Daylight(2.0));
+            Assert.AreEqual(1f, SpriteArt.Daylight(3.0));
+            Assert.AreEqual(0f, SpriteArt.Daylight(double.NaN));
+        }
+
+        [Test]
         public void AtlasHoldsEachRoleWhereTheShaderReadsIt()
         {
             Texture2D atlas = SpriteArt.BuildAtlas();

@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-12 - G3 P5b (sprite layer), `main`, working tree before the commit; pytest and cargo from the
+Last run: 2026-11-12 - G3 P5c (night and day sprites; PlayMode from the P5b run), `main`, working tree before the commit; pytest and cargo from the
 save-loader run (no Python or Rust change since)
 
 > Archive protocol: before overwriting this file, append its current content to
@@ -12,7 +12,7 @@ save-loader run (no Python or Rust change since)
 | pytest (418 tests) | 418 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 33 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 34 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (4 tests) | 4 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 

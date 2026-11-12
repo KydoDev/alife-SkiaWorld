@@ -50,6 +50,16 @@ namespace WorldSim
         /// <summary>Hex colour of a kind's base (0), light (1) or shade (2) at night or by day.</summary>
         public static string PaletteString(TileKind kind, int time, int shade) => PaletteHex[KindIndex(kind)][time, shade];
 
+        /// <summary>How far the palette moves from night (0) to day (1) for the world's light factor
+        /// (<see cref="WorldInfo.LightFactor"/>): the neon night look is the base, and only light above the mean
+        /// (factor 1) fades the day palette in, fully at twice the mean. A world without cycles (factor 1) stays
+        /// neon. On the volcanic planet (day amplitude 1, seasons 0.5) the factor spans 0 to 3, above 1 for 43 %
+        /// of a year.</summary>
+        public static float Daylight(double lightFactor)
+        {
+            return double.IsNaN(lightFactor) ? 0f : Mathf.Clamp01((float)(lightFactor - 1.0));
+        }
+
         public static int KindIndex(TileKind kind)
         {
             int i = (int)kind - 1;

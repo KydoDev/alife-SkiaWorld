@@ -144,7 +144,10 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   frames come from a time uniform, at most 2 frame swaps a second. The project is in gamma space, so the palette
   hex values come out as written. The camera scale is a whole number of device pixels per tile but not a multiple
   of 5, so sprite pixels can differ by one device pixel; the owner judges it on the phone (snap the fit to
-  multiples of 5 only if it shows). **Margins**: the abyss continues (owner's choice, 2026-11-12): the water
+  multiples of 5 only if it shows). **Night and day** (P5c): the sprites mix the night and day palette rows by
+  `SpriteArt.Daylight(light_factor) = clamp01(light_factor - 1)`: the neon night look is the base (a world without
+  cycles stays neon), and light above the mean fades the day palette in, fully at twice the mean; the RGB
+  background already dims with the light field. **Margins**: the abyss continues (owner's choice, 2026-11-12): the water
   gradient and the seabed carry on into the bands, dimmed, with a subtle line at the world's edge.
 - **P6 Inspector and population** — from P4 views. Pass: the inspector's values for a golden cell equal
   the Python export.

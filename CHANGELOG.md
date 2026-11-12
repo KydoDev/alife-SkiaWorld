@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P5c, night and day sprites**: the sprite palette moves from the neon night colours to the day colours as the
+  world's light factor rises above its mean (`SpriteArt.Daylight`, fully day at twice the mean); a world without
+  day or season cycles keeps the neon look.
 - **G3 P5b, sprite layer** (`SpriteLayer.cs`, `Resources/WorldSimSprites.shader`): the ABI 4 tile words are uploaded as
   a data texture and one unlit shader blits a 5x5 sprite per occupied tile into a render texture, shown over the RGB
   world from 5 device pixels per tile (below that the flat RGB world is the level of detail). Idle frames swap every

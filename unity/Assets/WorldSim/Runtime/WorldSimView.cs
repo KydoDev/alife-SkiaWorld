@@ -428,7 +428,7 @@ namespace WorldSim
                 return;
             }
             _sprites.Upload(_world);
-            _sprites.Render(_spriteFrame, 0f);    // night palette until P5c drives it from the light factor
+            _sprites.Render(_spriteFrame, SpriteArt.Daylight(_info.LightFactor));
             _spritesStale = false;
             _spriteImage?.MarkDirtyRepaint();
         }
