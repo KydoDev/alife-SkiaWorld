@@ -5,7 +5,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **ADR-0014 commit 1, trait table**: the per-cell traits outside the genome (`sex_p`, `plast_p`, `hgt_p`,
+  `armor_p`) are driven by one table, `worldsim.world.TRAITS`, for draws, inheritance, upkeep, stats, save checks
+  and the inspector. `Cell` takes `traits=` (`make_traits(...)`) and `World.offspring_traits` replaces the four
+  `offspring_*_p` methods. Every hash, render and save is unchanged; in `stats.csv` the `diet_shift` column now
+  follows the four trait means.
+
 ### Added
+- **ADR-0014, trait table and evolvable perception radius**: the trait refactor first, then `sense_r` with save v9;
+  the Rust kernel reads v9 but refuses `sense_range` until the experiment validates it.
 - **ADR-0013 piece 5, Unity sandbox tools**: the viewer gets the five G1 tools (pick one, click the world), with
   the parameters `scripts/unity_sync.py` exports from `GameRules()` to `StreamingAssets/game_tools.json`.
 - **ADR-0013 piece 4, `ws_world_intervene` (C ABI 3)**: front-ends apply the five G1 edits through the C ABI;

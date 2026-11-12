@@ -5,7 +5,7 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
-from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, Cell, genetic_diet
+from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, TRAIT_NAMES, Cell, genetic_diet, make_traits
 
 HGT_COL = 13                                                     # hgt_p in a v7 cell row
 
@@ -18,8 +18,8 @@ def world(**kw):
 
 def put(w, x, y, value, hgt_p=1.0, energy=20.0, lineage=None, plast_p=0.0):
     cid = w._new_id()
-    c = Cell(cid, x, y, energy, [value] * N_GENES, cid if lineage is None else lineage, w.cfg, hgt_p=hgt_p,
-             plast_p=plast_p)
+    c = Cell(cid, x, y, energy, [value] * N_GENES, cid if lineage is None else lineage, w.cfg,
+             traits=make_traits(hgt_p=hgt_p, plast_p=plast_p))
     w._place(c)
     return c
 
@@ -27,8 +27,14 @@ def put(w, x, y, value, hgt_p=1.0, energy=20.0, lineage=None, plast_p=0.0):
 def test_off_world_never_runs_transfer_code(monkeypatch):
     def boom(*_):
         raise AssertionError("transfer code ran with hgt off")
-    for name in ("transfer_gene", "offspring_hgt_p"):
-        monkeypatch.setattr(World, name, boom)
+    monkeypatch.setattr(World, "transfer_gene", boom)
+    inherit = World.offspring_traits     # shared with the traits that are on: hgt_p must stay out of it
+
+    def checked(self, c):
+        traits = inherit(self, c)
+        assert traits[TRAIT_NAMES.index("hgt_p")] == 0.0, "transfer code ran with hgt off"
+        return traits
+    monkeypatch.setattr(World, "offspring_traits", checked)
     w = World(Config(width=40, height=20, initial_cells=120, sensing=True, open_genome=True, sex=True,
                      plasticity=True), seed=11)
     for _ in range(300):
@@ -48,7 +54,7 @@ def test_transfer_copies_one_gene_from_a_neighbour_and_re_expresses():
     assert len(changed) == 1 and c.genes[changed[0]] == 0.9
     assert old == [0.2] * N_GENES                                 # a new list: nothing aliased is edited
     assert d.genes == [0.9] * N_GENES                             # the donor keeps its genes
-    fresh = Cell(99, 0, 0, 1.0, list(c.genes), 99, w.cfg, hgt_p=c.hgt_p)
+    fresh = Cell(99, 0, 0, 1.0, list(c.genes), 99, w.cfg, traits=make_traits(hgt_p=c.hgt_p))
     assert (c.photo, c.upkeep, c.div_thr, c.mut_sigma) == (fresh.photo, fresh.upkeep, fresh.div_thr,
                                                            fresh.mut_sigma)
     assert w.hgt_events == 1 and w.hgt_foreign == 1               # the donor has another lineage

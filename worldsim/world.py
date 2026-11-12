@@ -5,6 +5,7 @@ Headless: no graphics dependencies. The grid is toroidal in x, and y = depth
 """
 import math
 import random
+from typing import NamedTuple
 
 import numpy as np
 
@@ -25,6 +26,34 @@ NEIGH8 = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
 # Candidate tiles of a sensed move: stay put, or one of the 8 neighbours.
 # VIEWS[(top, bottom)][d] = how many of the mover's neighbour tiles inside the grid touch candidate d;
 # it normalises the social inputs (on the surface or floor row some neighbour tiles do not exist).
+
+
+class Trait(NamedTuple):
+    """A per-cell value outside the genome (ADR-0014): a 17th gene would change every world's RNG stream."""
+    name: str            # Cell slot (and save field)
+    flag: str            # Config switch: off, the value is 0.0 and no code touches it (no RNG draw)
+    upkeep: str | None   # Config cost per step per unit of the value, or None
+
+
+# The trait table, in the order founders draw and children inherit (one draw each while its flag is on): the
+# order is part of the RNG stream, so new traits are appended, never inserted.
+TRAITS = (
+    Trait("sex_p", "sex", None),                       # F5a propensity to mate at division
+    Trait("plast_p", "plasticity", "plastic_upkeep"),  # F5b rate of diet acclimation
+    Trait("hgt_p", "hgt", "hgt_upkeep"),               # F5c propensity to copy a neighbour's gene
+    Trait("armor_p", "defence", "defence_upkeep"),     # F5e share of attacks it can repel
+)
+TRAIT_NAMES = tuple(t.name for t in TRAITS)
+NO_TRAITS = (0.0,) * len(TRAITS)
+_UPKEEP_TRAITS = tuple((t.flag, t.upkeep, t.name) for t in TRAITS if t.upkeep is not None)   # express() hot path
+
+
+def make_traits(**values):
+    """A trait tuple in table order from named values (unnamed ones 0.0), e.g. `make_traits(armor_p=0.5)`."""
+    unknown = set(values) - set(TRAIT_NAMES)
+    if unknown:
+        raise ValueError(f"unknown traits {sorted(unknown)}; known: {TRAIT_NAMES}")
+    return tuple(float(values.get(name, 0.0)) for name in TRAIT_NAMES)
 
 
 def _view(top, bottom):
@@ -70,8 +99,7 @@ class Cell:
         "sense", "species", "rules", "rule_fx", "sex_p", "plast_p", "diet", "hgt_p", "armor_p",
     )
 
-    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), sex_p=0.0, plast_p=0.0, hgt_p=0.0,
-                 armor_p=0.0):
+    def __init__(self, cid, x, y, energy, genes, lineage, cfg, rules=(), traits=NO_TRAITS):
         self.id = cid
         self.x = x
         self.y = y
@@ -79,11 +107,9 @@ class Cell:
         self.age = 0
         self.genes = genes
         self.rules = rules        # F4 rule genes (list of 4-value lists); empty unless open_genome is on
-        self.sex_p = sex_p        # F5a propensity to mate at division; 0 unless sex is on
-        self.plast_p = plast_p    # F5b rate of diet acclimation; 0 unless plasticity is on
+        # the TRAITS values, in table order; each is 0.0 unless its flag is on
+        self.sex_p, self.plast_p, self.hgt_p, self.armor_p = traits
         self.diet = ()            # F5b acclimated (photo, sapro, chemo) split; empty unless plasticity is on
-        self.hgt_p = hgt_p        # F5c propensity to copy a neighbour's gene; 0 unless hgt is on
-        self.armor_p = armor_p    # F5e armour: share of attacks it can repel; 0 unless defence is on
         # Insertion-ordered dict used as an ordered set (values unused). Energy sharing
         # iterates it, so its order is part of the simulation state: a dict keeps the
         # same order across runs AND across save/load, which a set cannot guarantee.
@@ -127,14 +153,12 @@ class Cell:
             self.upkeep += cfg.rule_upkeep * len(self.rules)
             if not cfg.rules_neutral:
                 self.rule_fx = tuple(decode_rule(r) for r in self.rules)
+        for flag, cost, name in _UPKEEP_TRAITS:   # in table order: the float sum is part of the state
+            if getattr(cfg, flag):
+                self.upkeep += getattr(cfg, cost) * getattr(self, name)
         if cfg.plasticity:
-            self.upkeep += cfg.plastic_upkeep * self.plast_p
             self.diet = genetic_diet(self.photo, self.sapro, self.chemo)
             self.apply_diet(cfg)
-        if cfg.hgt:
-            self.upkeep += cfg.hgt_upkeep * self.hgt_p
-        if cfg.defence:
-            self.upkeep += cfg.defence_upkeep * self.armor_p
 
     def apply_diet(self, cfg):
         """F5b: phenotype shares from the acclimated diet; the predation share stays genetic.
@@ -221,10 +245,7 @@ class World:
             x, y = i % self.W, i // self.W
             cid = self._new_id()
             cell = Cell(cid, x, y, self.cfg.initial_energy, self.random_genes(), cid, self.cfg,
-                        sex_p=self.rng.random() if self.cfg.sex else 0.0,
-                        plast_p=self.rng.random() if self.cfg.plasticity else 0.0,
-                        hgt_p=self.rng.random() if self.cfg.hgt else 0.0,
-                        armor_p=self.rng.random() if self.cfg.defence else 0.0)
+                        traits=self.founder_traits())
             self._place(cell)
             if self.tracker is not None:
                 self.tracker.on_root(cell, ORIGIN_SEED, self.now)
@@ -315,23 +336,19 @@ class World:
         rand = self.rng.random
         return [a if rand() < 0.5 else b for a, b in zip(c.genes, mate.genes)]
 
-    def offspring_sex_p(self, c):
-        """F5a: the dividing parent's propensity, mutated. Never the mate's: mates are not chosen by their
-        propensity, so taking it half the time would pull the mean towards the population mean by itself
-        (by about share_of_matings / 2 x variance per generation) and fake selection against sex."""
-        return min(1.0, max(0.0, c.sex_p + self.rng.gauss(0.0, c.mut_sigma)))
+    def founder_traits(self):
+        """A founder's or immigrant's traits: one `random()` per trait whose flag is on, in table order."""
+        rand, cfg = self.rng.random, self.cfg
+        return tuple(rand() if getattr(cfg, t.flag) else 0.0 for t in TRAITS)
 
-    def offspring_plast_p(self, c):
-        """F5b: the dividing parent's acclimation rate, mutated (never a mate's, as for sex_p)."""
-        return min(1.0, max(0.0, c.plast_p + self.rng.gauss(0.0, c.mut_sigma)))
-
-    def offspring_hgt_p(self, c):
-        """F5c: the dividing parent's transfer propensity, mutated (never a mate's, as for sex_p)."""
-        return min(1.0, max(0.0, c.hgt_p + self.rng.gauss(0.0, c.mut_sigma)))
-
-    def offspring_armor_p(self, c):
-        """F5e: the dividing parent's armour, mutated (never a mate's, as for sex_p)."""
-        return min(1.0, max(0.0, c.armor_p + self.rng.gauss(0.0, c.mut_sigma)))
+    def offspring_traits(self, c):
+        """A child's traits: each the dividing parent's value plus `gauss(0, mut_sigma)`, clamped to [0, 1], for
+        the traits whose flag is on, in table order. Never the mate's: mates are not chosen by these values, so
+        taking them half the time would pull the mean towards the population mean by itself (by about
+        share_of_matings / 2 x variance per generation) and fake selection against the trait (F5a)."""
+        gauss, cfg, sigma = self.rng.gauss, self.cfg, c.mut_sigma
+        return tuple(min(1.0, max(0.0, getattr(c, t.name) + gauss(0.0, sigma))) if getattr(cfg, t.flag) else 0.0
+                     for t in TRAITS)
 
     def transfer_gene(self, c):
         """F5c: copy one random fixed gene from a random neighbour (any lineage, bonded or not) and re-express.
@@ -503,11 +520,12 @@ class World:
         chem = self.chem if self.has_chem else None
         sensing = cfg.sensing
         open_genome = cfg.open_genome
-        sex_on, mating = cfg.sex, cfg.sex and not cfg.sex_neutral
-        plastic_on, plastic = cfg.plasticity, cfg.plasticity and not cfg.plastic_neutral
-        hgt_on, transfer = cfg.hgt, cfg.hgt and not cfg.hgt_neutral
+        mating = cfg.sex and not cfg.sex_neutral
+        plastic = cfg.plasticity and not cfg.plastic_neutral
+        transfer = cfg.hgt and not cfg.hgt_neutral
+        traits_on = any(getattr(cfg, t.flag) for t in TRAITS)   # off: children skip the trait code (no draws)
         hgt_rate = cfg.hgt_rate
-        defence_on, armour = cfg.defence, cfg.defence and not cfg.defence_neutral
+        armour = cfg.defence and not cfg.defence_neutral
         defence_strength = cfg.defence_strength
         self.now = self.step_count + 1
         self.update_light()
@@ -603,12 +621,8 @@ class World:
                     c.energy -= child_e
                     genes = self.mutate(self.offspring_genes(c, mate) if mating else c.genes, c.mut_sigma)
                     rules = self.mutate_rules(c.rules, c.mut_sigma) if open_genome else ()
-                    sex_p = self.offspring_sex_p(c) if sex_on else 0.0
-                    plast_p = self.offspring_plast_p(c) if plastic_on else 0.0
-                    hgt_p = self.offspring_hgt_p(c) if hgt_on else 0.0
-                    armor_p = self.offspring_armor_p(c) if defence_on else 0.0
-                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, sex_p,
-                                 plast_p, hgt_p, armor_p)
+                    traits = self.offspring_traits(c) if traits_on else NO_TRAITS
+                    child = Cell(self._new_id(), spot[0], spot[1], child_e, genes, c.lineage, cfg, rules, traits)
                     grid[child.y * W + child.x] = child
                     newborns.append(child)
                     self.births += 1
@@ -633,10 +647,7 @@ class World:
                 if self.grid[i] is None and not self.blocked[i]:
                     cid = self._new_id()
                     cell = Cell(cid, i % self.W, i // self.W, cfg.initial_energy,
-                                self.random_genes(), cid, cfg, sex_p=rng.random() if cfg.sex else 0.0,
-                                plast_p=rng.random() if cfg.plasticity else 0.0,
-                                hgt_p=rng.random() if cfg.hgt else 0.0,
-                                armor_p=rng.random() if cfg.defence else 0.0)
+                                self.random_genes(), cid, cfg, traits=self.founder_traits())
                     self._place(cell)
                     if tracker is not None:
                         tracker.on_root(cell, ORIGIN_IMMIGRANT, self.now)
@@ -674,18 +685,18 @@ class World:
                 s["mean_" + name] = round(sum(c.genes[gi] for c in cells) / n, 4)
             s["mean_age"] = round(sum(c.age for c in cells) / n, 1)
             s["rules_mean"] = round(sum(len(c.rules) for c in cells) / n, 3)
-            s["sex_p_mean"] = round(sum(c.sex_p for c in cells) / n, 4)
-            s["plast_p_mean"] = round(sum(c.plast_p for c in cells) / n, 4)
+            for name in TRAIT_NAMES:
+                s[name + "_mean"] = round(sum(getattr(c, name) for c in cells) / n, 4)
             s["diet_shift"] = round(sum(self.diet_shift(c) for c in cells) / n, 4)
-            s["hgt_p_mean"] = round(sum(c.hgt_p for c in cells) / n, 4)
-            s["armor_p_mean"] = round(sum(c.armor_p for c in cells) / n, 4)
             s["rules_max"] = max(len(c.rules) for c in cells)
         else:
             for name in GENE_NAMES:
                 s["mean_" + name] = 0.0
             s["mean_age"] = 0.0
-            s["rules_mean"], s["rules_max"], s["sex_p_mean"] = 0.0, 0, 0.0
-            s["plast_p_mean"], s["diet_shift"], s["hgt_p_mean"], s["armor_p_mean"] = 0.0, 0.0, 0.0, 0.0
+            s["rules_mean"], s["rules_max"] = 0.0, 0
+            for name in TRAIT_NAMES:
+                s[name + "_mean"] = 0.0
+            s["diet_shift"] = 0.0
         if self.tracker is not None:
             s.update(self.tracker.stats())
         return s

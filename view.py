@@ -21,7 +21,7 @@ from worldsim import Config, World
 from worldsim.persistence import load_world
 from worldsim.render import LEGEND, render_rgb, save_png
 from worldsim.worldgen import PlanetError, load_planet
-from worldsim.world import GENE_NAMES, describe_rule
+from worldsim.world import GENE_NAMES, TRAITS, describe_rule
 
 PANEL_W = 260
 PANEL_TOP = 10
@@ -144,15 +144,9 @@ def main():
             if selected.alive:
                 lines += [f"cell #{selected.id}", f"energy {selected.energy:.1f}  age {selected.age}",
                           f"bonds {len(selected.bonds)}  strategy {selected.strategy}"]
-                extra = []                                  # F5a/F5b/F5c values: one line, short labels to fit
-                if cfg.sex:
-                    extra.append(f"sex {selected.sex_p:.2f}")
-                if cfg.plasticity:
-                    extra.append(f"plast {selected.plast_p:.2f}")
-                if cfg.hgt:
-                    extra.append(f"hgt {selected.hgt_p:.2f}")
-                if cfg.defence:
-                    extra.append(f"armor {selected.armor_p:.2f}")
+                # the traits whose flag is on (F5, ADR-0014): one line, short labels to fit
+                extra = [f"{t.name.removesuffix('_p')} {getattr(selected, t.name):.2f}"
+                         for t in TRAITS if getattr(cfg, t.flag)]
                 if extra:
                     lines.append("  ".join(extra))
                 lines.append("")

@@ -5,7 +5,7 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
-from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, Cell
+from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, TRAIT_NAMES, Cell, make_traits
 
 ARMOR_COL = 14                                                   # armor_p in a v8 cell row
 
@@ -19,7 +19,7 @@ def world(seed=1, **kw):
 
 def put(w, x, y, genes, armor_p=0.0, energy=20.0):
     cid = w._new_id()
-    c = Cell(cid, x, y, energy, list(genes), cid, w.cfg, armor_p=armor_p)
+    c = Cell(cid, x, y, energy, list(genes), cid, w.cfg, traits=make_traits(armor_p=armor_p))
     w._place(c)
     return c
 
@@ -37,9 +37,15 @@ def hunter_and_prey(w, armor_p):
 
 
 def test_off_world_never_runs_defence_code(monkeypatch):
-    def boom(*_):
-        raise AssertionError("defence code ran with defence off")
-    monkeypatch.setattr(World, "offspring_armor_p", boom)
+    # the other traits are on, so children run the shared trait code: armour must stay out of it (its "no draw"
+    # is proven by the golden sets of the other flags, whose hashes did not move when the code was shared)
+    inherit = World.offspring_traits
+
+    def checked(self, c):
+        traits = inherit(self, c)
+        assert traits[TRAIT_NAMES.index("armor_p")] == 0.0, "defence code ran with defence off"
+        return traits
+    monkeypatch.setattr(World, "offspring_traits", checked)
     w = World(Config(width=40, height=20, initial_cells=120, sensing=True, open_genome=True, sex=True,
                      plasticity=True, hgt=True), seed=11)
     for _ in range(300):

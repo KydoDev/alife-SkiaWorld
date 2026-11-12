@@ -25,7 +25,7 @@ import numpy as np
 from .config import Config
 from .species import SpeciesTracker
 from .terrain import Terrain
-from .world import N_GENES, RULE_LEN, Cell, World
+from .world import N_GENES, RULE_LEN, TRAITS, Cell, World
 
 FORMAT = "worldsim-save"
 VERSION = 8
@@ -145,18 +145,13 @@ def _world_from_dict(d: dict) -> World:
             raise SaveFormatError(f"invalid cell #{cid}")
         if not _valid_rules(rules, cfg):
             raise SaveFormatError(f"cell #{cid} has invalid rule genes")
-        if not (_finite(sex_p) and 0.0 <= sex_p <= 1.0) or (sex_p and not cfg.sex):
-            raise SaveFormatError(f"cell #{cid} has an invalid sex_p")
-        if not (_finite(plast_p) and 0.0 <= plast_p <= 1.0) or (plast_p and not cfg.plasticity):
-            raise SaveFormatError(f"cell #{cid} has an invalid plast_p")
+        traits = (sex_p, plast_p, hgt_p, armor_p)               # TRAITS order (the row keeps v8's layout)
+        for t, v in zip(TRAITS, traits, strict=True):
+            if not (_finite(v) and 0.0 <= v <= 1.0) or (v and not getattr(cfg, t.flag)):
+                raise SaveFormatError(f"cell #{cid} has an invalid {t.name}")
         if not _valid_diet(diet, cfg):
             raise SaveFormatError(f"cell #{cid} has an invalid diet")
-        if not (_finite(hgt_p) and 0.0 <= hgt_p <= 1.0) or (hgt_p and not cfg.hgt):
-            raise SaveFormatError(f"cell #{cid} has an invalid hgt_p")
-        if not (_finite(armor_p) and 0.0 <= armor_p <= 1.0) or (armor_p and not cfg.defence):
-            raise SaveFormatError(f"cell #{cid} has an invalid armor_p")
-        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], sex_p, plast_p, hgt_p,
-                 armor_p)
+        c = Cell(cid, x, y, energy, list(genes), lineage, cfg, [list(r) for r in rules], traits)
         if cfg.plasticity:
             frozen = cfg.plastic_neutral or plast_p == 0.0      # such a diet never leaves the genetic split
             if frozen and any(abs(a - b) > 1e-9 for a, b in zip(diet, c.diet)):

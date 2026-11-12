@@ -5,7 +5,7 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
-from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, Cell, genetic_diet
+from worldsim.world import G_CHEMO, G_PHOTO, G_PRED, G_SAPRO, N_GENES, TRAIT_NAMES, Cell, genetic_diet, make_traits
 
 
 def world(**kw):
@@ -23,7 +23,7 @@ def mixed_genes():
 
 def put(w, x, y, plast_p=1.0, energy=20.0, genes=None):
     cid = w._new_id()
-    c = Cell(cid, x, y, energy, genes or mixed_genes(), cid, w.cfg, plast_p=plast_p)
+    c = Cell(cid, x, y, energy, genes or mixed_genes(), cid, w.cfg, traits=make_traits(plast_p=plast_p))
     w._place(c)
     return c
 
@@ -31,8 +31,14 @@ def put(w, x, y, plast_p=1.0, energy=20.0, genes=None):
 def test_off_world_never_runs_plasticity_code(monkeypatch):
     def boom(*_):
         raise AssertionError("plasticity code ran with plasticity off")
-    for name in ("acclimate", "offspring_plast_p"):
-        monkeypatch.setattr(World, name, boom)
+    monkeypatch.setattr(World, "acclimate", boom)
+    inherit = World.offspring_traits     # shared with the traits that are on: plast_p must stay out of it
+
+    def checked(self, c):
+        traits = inherit(self, c)
+        assert traits[TRAIT_NAMES.index("plast_p")] == 0.0, "plasticity code ran with plasticity off"
+        return traits
+    monkeypatch.setattr(World, "offspring_traits", checked)
     monkeypatch.setattr(Cell, "apply_diet", boom)
     w = World(Config(width=40, height=20, initial_cells=120, sensing=True, open_genome=True, sex=True), seed=11)
     for _ in range(300):

@@ -5,7 +5,7 @@ import pytest
 
 from worldsim import Config, World
 from worldsim.persistence import SaveFormatError, load_world, save_world, world_from_dict, world_to_dict
-from worldsim.world import N_GENES, Cell
+from worldsim.world import N_GENES, TRAIT_NAMES, Cell, make_traits
 
 
 def world(**kw):
@@ -16,7 +16,7 @@ def world(**kw):
 
 def put(w, x, y, genes=None, sex_p=1.0, energy=20.0):
     cid = w._new_id()
-    c = Cell(cid, x, y, energy, list(genes or [0.5] * N_GENES), cid, w.cfg, sex_p=sex_p)
+    c = Cell(cid, x, y, energy, list(genes or [0.5] * N_GENES), cid, w.cfg, traits=make_traits(sex_p=sex_p))
     w._place(c)
     return c
 
@@ -24,7 +24,7 @@ def put(w, x, y, genes=None, sex_p=1.0, energy=20.0):
 def test_off_world_never_runs_mating_code(monkeypatch):
     def boom(*_):
         raise AssertionError("mating code ran with sex off")
-    for name in ("find_mate", "offspring_genes", "offspring_sex_p"):
+    for name in ("find_mate", "offspring_genes", "offspring_traits"):
         monkeypatch.setattr(World, name, boom)
     w = World(Config(width=40, height=20, initial_cells=120, sensing=True, open_genome=True, rule_new_rate=0.3),
               seed=11)
@@ -139,7 +139,7 @@ def test_child_propensity_comes_from_the_dividing_parent_only():
     w = world()
     c = put(w, 10, 10, sex_p=0.9)
     c.mut_sigma = 0.0
-    assert w.offspring_sex_p(c) == 0.9
+    assert w.offspring_traits(c)[TRAIT_NAMES.index("sex_p")] == 0.9
     w2 = world()
     parent = put(w2, 10, 10, sex_p=1.0, energy=w2.cfg.div_max + 10.0)
     put(w2, 11, 10, sex_p=0.0, energy=1.0)

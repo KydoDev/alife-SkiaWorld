@@ -14,8 +14,12 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 7. [x] ADR-0013 piece 3: `World::intervene` with validation; interventions golden kind; `play.replay` pytest
 8. [x] ADR-0013 piece 4: `ws_world_intervene`, `WS_ERR_INVALID`, ABI 3, FFI tests; security review first
 9. [?] ADR-0013 piece 5: Unity sandbox tools from exported `GameRules()` parameters (checked by hand)
-10. [ ] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
+10. [~] Owner's idea (2026-11-11, as soon as possible): evolvable perception radius `sense_r` (see below)
 11. [ ] Owner's idea (2026-11-11, after 10): obstacles and scattered resources that make exploration pay (see below)
+12. [x] ADR-0014: trait table first, then `sense_r`; the kernel refuses `sense_range` until validated
+13. [x] Item 10, commit 1: trait table refactor (Python); every golden file byte-identical, steps/s measured
+14. [ ] Item 10, commit 2: `sense_r`, `sense_range` flags, save v9; kernel reads v9 and refuses the flag
+15. [ ] Item 10, commit 3: `sense_r` experiment (on / neutral / off, P1), verdict as fixed in ADR-0014
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side
@@ -66,6 +70,18 @@ day/night plus `volcanic.json`, P1 standard (30k steps x 20 pairs). Questions: (
 neutral, >= 16/20 pairs)? (2) do hunting or fleeing appear (`w_danger`, kills by mobile predators)? Known risk: with
 immigration 0 the median life is 6-8 steps and almost no cell moves, so the result may be null for the same reason
 as F3 and F5d; also try it where F5e lengthens life (`defence=1`) or on the flat world.
+
+**Results log.**
+- **Commit 1, trait table (2026-11-12).** `worldsim/world.py` holds the four traits in `TRAITS`; founders,
+  immigrants, children, upkeep, stats, save checks and the inspector loop over it (ADR-0014 decision 1).
+  Verdict met:
+  - a full `g2_golden.py --all` into a fresh root reproduced every committed `hashes.csv`, render, `config.json`,
+    the three vector files and the decompressed start saves byte for byte;
+  - pytest 352 passed (99.32%), ruff clean; the four F5 test files changed only for `traits=make_traits(...)` and
+    `offspring_traits`, plus the new `tests/test_traits.py`;
+  - steps/s with every flag off (CPU time, five interleaved runs each): before 387 / 483 / 471 / 490 / 510, after
+    465 / 467 / 506 / 487 / 516, within the machine's noise. A first wall-clock pass read 3-4% slower; the
+    interleaved run did not reproduce it.
 
 ## Item 11: obstacles and scattered resources that make exploration pay (owner's idea, 2026-11-11)
 **Idea.** Use the terrain together with `sense_r` (item 10): obstacles placed at random by the world generator, or
