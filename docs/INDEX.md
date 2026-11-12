@@ -32,6 +32,9 @@ Numbered, append-only records of the decisions that shaped the system:
 ### [G2 engine port plan](./G2_PLAN.md)
 Milestones and verification criteria for the Rust core port (ADR-0008).
 
+### [G3 game front-end plan](./G3_PLAN.md)
+Neon Abyss design on mobile: phases, data gaps in the kernel ABI, sprites and palette.
+
 ### [Developer Guide](./DEVELOPER_GUIDE.md)
 Bootstrap, running locally, tests, contribution rules.
 
