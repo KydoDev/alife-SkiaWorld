@@ -13,6 +13,8 @@ All notable changes to this project are documented here. Format based on
   ids must be JSON integers (`1.0` or `true` used to resolve to cell #1); the species tracker's `next_id` and
   counters get the same bound, and its `next_id` may not be below a species id (the next species would overwrite
   it). Error messages show a shortened repr of the bad value. Python's own saves are unaffected.
+- **CI on Linux**: `test_views.py` expected the Windows-made state hash after 37 steps; like the other golden
+  step tests it now xfails when the golden steps were made on another OS (the hash depends on libm).
 
 ### Changed
 - **G3 P2b, the whole world on screen** (owner's review on the phone): the first view fits width and depth, and every
