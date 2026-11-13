@@ -10,6 +10,7 @@
 
 pub mod config;
 pub mod ffi;
+pub mod game;
 pub mod hash;
 pub mod numpy;
 pub mod render;

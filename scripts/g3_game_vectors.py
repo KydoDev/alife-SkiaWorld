@@ -3,9 +3,12 @@
 Each case starts from a golden start save, attaches a `play.Game` with its rules, applies a G1 action log (step offset
 from the save, tool, x, y) when the world reaches that step, `play.replay`'s timing, and records per action whether
 it happened and the budget after it, the milestones reached and their steps, the state hash every HASH_EVERY steps
-and at the end, and the final budget. Floats are IEEE-754 bit patterns (hex). The generator asserts the verdict's
-non-vacuous conditions in Python (each milestone case reaches its milestones, idle cases reach none, the budget case
-refuses for budget and refuses a mountain on rock for free), so a golden file can never pass vacuously.
+and at the end, and the final budget. At every milestone check it also records what the check measures (the trace:
+chemosynthesizers near player vents, specialists per strategy, the largest colony, cells per sea, the smoothed
+population and the cataclysm state), so a port that differs below a threshold still fails. Floats are IEEE-754 bit
+patterns (hex). The generator asserts the verdict's non-vacuous conditions in Python (each milestone case reaches its
+milestones, idle cases reach none, the budget case refuses for budget and refuses a mountain on rock for free, strikes
+spread past the window never collapse), so a golden file can never pass vacuously.
 
 Stepped values depend on libm (`volcanic` steps through sin): like the other golden files it is regenerated per
 platform; `scripts/g2_golden.py --all` writes it too. On its own:
@@ -20,10 +23,12 @@ import platform
 import sys
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from worldsim.persistence import load_world  # noqa: E402
-from worldsim.play import MILESTONES, TOOLS, Game, GameRules  # noqa: E402
+from worldsim.play import MILESTONES, SPECIALIST, TOOLS, Game, GameRules, colony_sizes, seas  # noqa: E402
 
 GOLDEN = ROOT / "engine-rs/tests/golden"
 HASH_EVERY = 100
@@ -33,6 +38,11 @@ _BIG = dict(budget_start=1e6, budget_max=1e6)      # milestone cases: the budget
 def _walls():
     """Two full-depth mountain walls (x is toroidal): two seas."""
     return [(0, "mountain", x, y) for x in (20, 100) for y in range(0, 64, 2)]
+
+
+def _strike_rows(plan):
+    """A row of eight meteorites (radius 10) at depth y for each (offset, y)."""
+    return [(offset, "meteorite", x, y) for offset, y in plan for x in range(0, 160, 20)]
 
 
 def case_specs():
@@ -59,6 +69,10 @@ def case_specs():
          [(0, "volcano", 80, 62), (0, "volcano", 30, 62)], 400, {"abyss", "giant"}),
         ("survivor", "default", GameRules(collapse_window=50, **_BIG),
          [(30, "meteorite", x, y) for x in range(0, 160, 20) for y in (8, 30, 52)], 900, {"survivor"}),
+        # strikes spread past the 20-step window: no single record kills a third of life, though all of them
+        # together do (76 of 225); the last two batches share one record (the window's accumulation)
+        ("strike_window", "default", GameRules(collapse_window=20, **_BIG),
+         _strike_rows([(0, 30), (30, 30), (60, 30), (70, 52), (70, 30)]), 120, set()),
         ("divided", "default", GameRules(divided_cells=20, **_BIG), _walls(), 50, {"divided"}),
     ]
 
@@ -78,12 +92,31 @@ def rules_dict(rules: GameRules) -> dict:
     return d
 
 
+def measures(game, g2) -> dict:
+    """What `Game.check_milestones` measures, whatever has been reached already (the kernel's `Game::measures`)."""
+    w = game.world
+    cells = w.cells
+    per_sea = []
+    if w.has_rock:
+        labels, n = seas(w)
+        per_sea = np.bincount([labels[c.y, c.x] for c in cells], minlength=n).tolist() if n else []
+    collapse = game._collapsed_from
+    return {"step": w.step_count,
+            "near": game._chemo_near_player_vents(),
+            "specialists": [sum(1 for c in cells if getattr(c, a) >= SPECIALIST) for a in ("photo", "sapro", "pred")],
+            "colony": max(colony_sizes(cells), default=0),
+            "seas": per_sea,
+            "smoothed": g2.f64_hex(float(game._smoothed())),
+            "collapse": None if collapse is None else g2.f64_hex(float(collapse)),
+            "dipped": bool(game._strike and game._strike["dipped"])}
+
+
 def run_case(name, set_name, rules, log, steps, root: Path, g2) -> dict:
     world = load_world(root / set_name / "start.json.gz")
     game = Game(world, rules)
     start = world.step_count
     pending = sorted(log, key=lambda a: a[0])          # stable: same-offset order kept
-    actions, hashes, i = [], [], 0
+    actions, hashes, trace, i = [], [], [], 0
     for k in range(steps + 1):
         while i < len(pending) and pending[i][0] <= k:
             offset, tool, x, y = pending[i]
@@ -95,10 +128,13 @@ def run_case(name, set_name, rules, log, steps, root: Path, g2) -> dict:
             hashes.append([world.step_count, g2.state_hash(game.world)])
         if k < steps:
             game.step()
+            if world.step_count % rules.check_every == 0:
+                trace.append(measures(game, g2))
     assert i == len(pending), f"{name}: actions after the last step"
     return {"name": name, "set": set_name, "rules": rules_dict(rules), "steps": steps, "start_step": start,
             "actions": actions, "achieved": {k: game.achieved[k] for k in MILESTONES if k in game.achieved},
-            "budget": g2.f64_hex(game.budget), "player_vents": len(set(game.player_vents)), "hashes": hashes}
+            "budget": g2.f64_hex(game.budget), "player_vents": len(set(game.player_vents)), "hashes": hashes,
+            "trace": trace}
 
 
 def check_not_vacuous(case: dict, expected: set) -> None:
@@ -108,6 +144,8 @@ def check_not_vacuous(case: dict, expected: set) -> None:
     if name.startswith("idle"):
         assert not reached, f"{name}: an idle player reached {sorted(reached)}"
         assert not case["actions"]
+    if name == "strike_window":
+        assert all(t["collapse"] is None for t in case["trace"]), "strikes outside the window must not add up"
     if name == "budget":
         acts = case["actions"]
         assert any(a["tool"] == "meteorite" and a["accepted"] for a in acts)

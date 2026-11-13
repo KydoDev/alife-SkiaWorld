@@ -130,6 +130,568 @@
      1200,
      "574dd7e4007d58fbde54423f1f6907fe49a578278cb1e4dfe1f8f7a424ab737e"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      8,
+      1,
+      0
+     ],
+     "colony": 25,
+     "seas": [],
+     "smoothed": "0000000000406d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      10,
+      1,
+      0
+     ],
+     "colony": 23,
+     "seas": [],
+     "smoothed": "0000000000c06d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      8,
+      1,
+      0
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000407040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      11,
+      1,
+      0
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000107240",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 325,
+     "near": 0,
+     "specialists": [
+      15,
+      0,
+      2
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000b07440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 350,
+     "near": 0,
+     "specialists": [
+      22,
+      0,
+      2
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000707840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 375,
+     "near": 0,
+     "specialists": [
+      31,
+      0,
+      0
+     ],
+     "colony": 11,
+     "seas": [],
+     "smoothed": "0000000000807a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 400,
+     "near": 0,
+     "specialists": [
+      59,
+      0,
+      0
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000607d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 425,
+     "near": 0,
+     "specialists": [
+      87,
+      0,
+      0
+     ],
+     "colony": 22,
+     "seas": [],
+     "smoothed": "0000000000e88040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 450,
+     "near": 0,
+     "specialists": [
+      129,
+      0,
+      0
+     ],
+     "colony": 33,
+     "seas": [],
+     "smoothed": "0000000000088240",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 475,
+     "near": 0,
+     "specialists": [
+      169,
+      0,
+      0
+     ],
+     "colony": 33,
+     "seas": [],
+     "smoothed": "0000000000808340",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 500,
+     "near": 0,
+     "specialists": [
+      264,
+      0,
+      4
+     ],
+     "colony": 25,
+     "seas": [],
+     "smoothed": "0000000000d08640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 525,
+     "near": 0,
+     "specialists": [
+      371,
+      0,
+      5
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000588a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 550,
+     "near": 0,
+     "specialists": [
+      418,
+      2,
+      7
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000988b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 575,
+     "near": 0,
+     "specialists": [
+      408,
+      2,
+      12
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000988b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 600,
+     "near": 0,
+     "specialists": [
+      439,
+      2,
+      10
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000a88c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 625,
+     "near": 0,
+     "specialists": [
+      428,
+      0,
+      14
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000e88c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 650,
+     "near": 0,
+     "specialists": [
+      405,
+      1,
+      16
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000488d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 675,
+     "near": 0,
+     "specialists": [
+      396,
+      1,
+      15
+     ],
+     "colony": 20,
+     "seas": [],
+     "smoothed": "0000000000e08c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 700,
+     "near": 0,
+     "specialists": [
+      377,
+      0,
+      15
+     ],
+     "colony": 20,
+     "seas": [],
+     "smoothed": "0000000000c08b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 725,
+     "near": 0,
+     "specialists": [
+      359,
+      0,
+      17
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000a08b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 750,
+     "near": 0,
+     "specialists": [
+      339,
+      1,
+      21
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000708b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 775,
+     "near": 0,
+     "specialists": [
+      331,
+      3,
+      21
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000a08a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 800,
+     "near": 0,
+     "specialists": [
+      305,
+      1,
+      32
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000e88940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 825,
+     "near": 0,
+     "specialists": [
+      302,
+      1,
+      35
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000e88940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 850,
+     "near": 0,
+     "specialists": [
+      312,
+      1,
+      36
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000508940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 875,
+     "near": 0,
+     "specialists": [
+      289,
+      1,
+      31
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000d88840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 900,
+     "near": 0,
+     "specialists": [
+      287,
+      1,
+      32
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000988840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 925,
+     "near": 0,
+     "specialists": [
+      273,
+      0,
+      36
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000c08740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 950,
+     "near": 0,
+     "specialists": [
+      289,
+      0,
+      28
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000c08640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 975,
+     "near": 0,
+     "specialists": [
+      293,
+      1,
+      40
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000c08640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1000,
+     "near": 0,
+     "specialists": [
+      345,
+      3,
+      34
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000b88840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1025,
+     "near": 0,
+     "specialists": [
+      345,
+      2,
+      29
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000908840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1050,
+     "near": 0,
+     "specialists": [
+      358,
+      3,
+      33
+     ],
+     "colony": 11,
+     "seas": [],
+     "smoothed": "0000000000f88840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1075,
+     "near": 0,
+     "specialists": [
+      407,
+      2,
+      29
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000688a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1100,
+     "near": 0,
+     "specialists": [
+      428,
+      2,
+      31
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000c88b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1125,
+     "near": 0,
+     "specialists": [
+      413,
+      2,
+      35
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000908b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1150,
+     "near": 0,
+     "specialists": [
+      363,
+      2,
+      52
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000f08940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1175,
+     "near": 0,
+     "specialists": [
+      279,
+      3,
+      53
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000808640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1200,
+     "near": 0,
+     "specialists": [
+      309,
+      3,
+      39
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000388640",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -216,6 +778,648 @@
      1200,
      "443c829b2a639f64cea9a35aa36d60def5eeaab0966dbb41b461e61425552c13"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      525,
+      0,
+      0
+     ],
+     "colony": 13,
+     "seas": [
+      688
+     ],
+     "smoothed": "0000000000388140",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      760,
+      0,
+      0
+     ],
+     "colony": 20,
+     "seas": [
+      1023
+     ],
+     "smoothed": "7b14ae47e10e8640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      799,
+      1,
+      1
+     ],
+     "colony": 19,
+     "seas": [
+      1190
+     ],
+     "smoothed": "824e1be8b4698a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      685,
+      0,
+      11
+     ],
+     "colony": 15,
+     "seas": [
+      1162
+     ],
+     "smoothed": "ae47e17a14308d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 325,
+     "near": 0,
+     "specialists": [
+      425,
+      0,
+      21
+     ],
+     "colony": 11,
+     "seas": [
+      812
+     ],
+     "smoothed": "9cc420b072808d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 350,
+     "near": 0,
+     "specialists": [
+      218,
+      0,
+      11
+     ],
+     "colony": 8,
+     "seas": [
+      498
+     ],
+     "smoothed": "2222222222ea8b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 375,
+     "near": 0,
+     "specialists": [
+      126,
+      0,
+      1
+     ],
+     "colony": 6,
+     "seas": [
+      336
+     ],
+     "smoothed": "9dfbec0262b38940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 400,
+     "near": 0,
+     "specialists": [
+      178,
+      0,
+      2
+     ],
+     "colony": 10,
+     "seas": [
+      372
+     ],
+     "smoothed": "6666666666c08740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 425,
+     "near": 0,
+     "specialists": [
+      567,
+      0,
+      3
+     ],
+     "colony": 41,
+     "seas": [
+      830
+     ],
+     "smoothed": "713d0ad7a3df8740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 450,
+     "near": 0,
+     "specialists": [
+      877,
+      5,
+      12
+     ],
+     "colony": 54,
+     "seas": [
+      1295
+     ],
+     "smoothed": "ae47e17a14cc8840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 475,
+     "near": 0,
+     "specialists": [
+      822,
+      3,
+      39
+     ],
+     "colony": 12,
+     "seas": [
+      1337
+     ],
+     "smoothed": "b81e85eb51b28940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 500,
+     "near": 0,
+     "specialists": [
+      641,
+      1,
+      47
+     ],
+     "colony": 12,
+     "seas": [
+      1101
+     ],
+     "smoothed": "6666666666c08940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 525,
+     "near": 0,
+     "specialists": [
+      373,
+      1,
+      27
+     ],
+     "colony": 14,
+     "seas": [
+      734
+     ],
+     "smoothed": "52b81e85eb758940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 550,
+     "near": 0,
+     "specialists": [
+      107,
+      0,
+      14
+     ],
+     "colony": 17,
+     "seas": [
+      344
+     ],
+     "smoothed": "3d0ad7a370038940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 575,
+     "near": 0,
+     "specialists": [
+      27,
+      0,
+      2
+     ],
+     "colony": 12,
+     "seas": [
+      204
+     ],
+     "smoothed": "295c8fc2f56e8840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 600,
+     "near": 0,
+     "specialists": [
+      58,
+      0,
+      0
+     ],
+     "colony": 12,
+     "seas": [
+      255
+     ],
+     "smoothed": "ec51b81e85088840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 625,
+     "near": 0,
+     "specialists": [
+      397,
+      0,
+      0
+     ],
+     "colony": 14,
+     "seas": [
+      697
+     ],
+     "smoothed": "295c8fc2f57f8740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 650,
+     "near": 0,
+     "specialists": [
+      744,
+      2,
+      0
+     ],
+     "colony": 16,
+     "seas": [
+      1220
+     ],
+     "smoothed": "a4703d0ad7058740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 675,
+     "near": 0,
+     "specialists": [
+      893,
+      3,
+      3
+     ],
+     "colony": 19,
+     "seas": [
+      1506
+     ],
+     "smoothed": "713d0ad7a3348740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 700,
+     "near": 0,
+     "specialists": [
+      762,
+      3,
+      4
+     ],
+     "colony": 23,
+     "seas": [
+      1445
+     ],
+     "smoothed": "85eb51b81e5d8840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 725,
+     "near": 0,
+     "specialists": [
+      558,
+      2,
+      15
+     ],
+     "colony": 23,
+     "seas": [
+      1124
+     ],
+     "smoothed": "1f85eb51b8f48940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 750,
+     "near": 0,
+     "specialists": [
+      275,
+      2,
+      5
+     ],
+     "colony": 14,
+     "seas": [
+      662
+     ],
+     "smoothed": "3d0ad7a3705a8b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 775,
+     "near": 0,
+     "specialists": [
+      97,
+      0,
+      3
+     ],
+     "colony": 7,
+     "seas": [
+      398
+     ],
+     "smoothed": "9a999999994e8c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 800,
+     "near": 0,
+     "specialists": [
+      182,
+      0,
+      6
+     ],
+     "colony": 10,
+     "seas": [
+      450
+     ],
+     "smoothed": "6666666666f58c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 825,
+     "near": 0,
+     "specialists": [
+      681,
+      1,
+      5
+     ],
+     "colony": 14,
+     "seas": [
+      1022
+     ],
+     "smoothed": "48e17a14ae1a8e40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 850,
+     "near": 0,
+     "specialists": [
+      936,
+      1,
+      4
+     ],
+     "colony": 21,
+     "seas": [
+      1420
+     ],
+     "smoothed": "7b14ae47e11d8f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 875,
+     "near": 0,
+     "specialists": [
+      899,
+      2,
+      13
+     ],
+     "colony": 13,
+     "seas": [
+      1491
+     ],
+     "smoothed": "5c8fc2f5286f8f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 900,
+     "near": 0,
+     "specialists": [
+      771,
+      0,
+      9
+     ],
+     "colony": 10,
+     "seas": [
+      1327
+     ],
+     "smoothed": "8fc2f5285c208f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 925,
+     "near": 0,
+     "specialists": [
+      505,
+      0,
+      12
+     ],
+     "colony": 7,
+     "seas": [
+      963
+     ],
+     "smoothed": "1f85eb51b86c8e40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 950,
+     "near": 0,
+     "specialists": [
+      174,
+      0,
+      5
+     ],
+     "colony": 14,
+     "seas": [
+      551
+     ],
+     "smoothed": "3d0ad7a370fc8d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 975,
+     "near": 0,
+     "specialists": [
+      50,
+      0,
+      4
+     ],
+     "colony": 10,
+     "seas": [
+      365
+     ],
+     "smoothed": "6666666666b48d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1000,
+     "near": 0,
+     "specialists": [
+      114,
+      0,
+      4
+     ],
+     "colony": 18,
+     "seas": [
+      435
+     ],
+     "smoothed": "14ae47e17aa48d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1025,
+     "near": 0,
+     "specialists": [
+      610,
+      0,
+      3
+     ],
+     "colony": 22,
+     "seas": [
+      1094
+     ],
+     "smoothed": "0000000000a68d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1050,
+     "near": 0,
+     "specialists": [
+      905,
+      0,
+      7
+     ],
+     "colony": 19,
+     "seas": [
+      1535
+     ],
+     "smoothed": "ec51b81e852c8e40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1075,
+     "near": 0,
+     "specialists": [
+      899,
+      0,
+      9
+     ],
+     "colony": 26,
+     "seas": [
+      1629
+     ],
+     "smoothed": "85eb51b81ea78e40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1100,
+     "near": 0,
+     "specialists": [
+      723,
+      1,
+      13
+     ],
+     "colony": 16,
+     "seas": [
+      1502
+     ],
+     "smoothed": "c3f5285c8f3f8f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1125,
+     "near": 0,
+     "specialists": [
+      488,
+      1,
+      20
+     ],
+     "colony": 16,
+     "seas": [
+      1183
+     ],
+     "smoothed": "a4703d0a57119040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1150,
+     "near": 0,
+     "specialists": [
+      135,
+      4,
+      16
+     ],
+     "colony": 10,
+     "seas": [
+      617
+     ],
+     "smoothed": "f6285c8fc2569040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1175,
+     "near": 0,
+     "specialists": [
+      27,
+      3,
+      18
+     ],
+     "colony": 11,
+     "seas": [
+      399
+     ],
+     "smoothed": "d7a3703d0a6d9040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 1200,
+     "near": 0,
+     "specialists": [
+      56,
+      3,
+      18
+     ],
+     "colony": 16,
+     "seas": [
+      447
+     ],
+     "smoothed": "8fc2f5285c819040",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -343,6 +1547,72 @@
      320,
      "f924ed9cc3137b8b37d4d16fcf294f0de464eb262fdd0f82d617caf42ee6e94f"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      12,
+      1,
+      0
+     ],
+     "colony": 20,
+     "seas": [
+      233
+     ],
+     "smoothed": "0000000000206d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      8,
+      1,
+      0
+     ],
+     "colony": 16,
+     "seas": [
+      252
+     ],
+     "smoothed": "0000000000806f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      7,
+      1,
+      2
+     ],
+     "colony": 16,
+     "seas": [
+      255
+     ],
+     "smoothed": "0000000000e06f40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      7,
+      2,
+      0
+     ],
+     "colony": 17,
+     "seas": [
+      269
+     ],
+     "smoothed": "0000000000d07040",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -506,6 +1776,344 @@
      800,
      "b1cd987e65f0981f8c62ff2ded4e0172384b34cbb06ddb41ba2d3773b4629036"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      7,
+      1,
+      0
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000a06c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      8,
+      1,
+      0
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000507040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      6,
+      1,
+      0
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000607040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 1,
+     "specialists": [
+      8,
+      5,
+      0
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000907140",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 325,
+     "near": 1,
+     "specialists": [
+      14,
+      3,
+      0
+     ],
+     "colony": 23,
+     "seas": [],
+     "smoothed": "0000000000107340",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 350,
+     "near": 2,
+     "specialists": [
+      20,
+      1,
+      0
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000307640",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 375,
+     "near": 2,
+     "specialists": [
+      24,
+      4,
+      0
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000207840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 400,
+     "near": 3,
+     "specialists": [
+      28,
+      3,
+      0
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000507940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 425,
+     "near": 2,
+     "specialists": [
+      29,
+      3,
+      0
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000407b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 450,
+     "near": 3,
+     "specialists": [
+      31,
+      3,
+      0
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000d07c40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 475,
+     "near": 4,
+     "specialists": [
+      31,
+      2,
+      3
+     ],
+     "colony": 11,
+     "seas": [],
+     "smoothed": "0000000000707e40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 500,
+     "near": 6,
+     "specialists": [
+      25,
+      2,
+      3
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000588040",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 525,
+     "near": 13,
+     "specialists": [
+      27,
+      0,
+      0
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000208140",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 550,
+     "near": 27,
+     "specialists": [
+      28,
+      0,
+      0
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000208240",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 575,
+     "near": 42,
+     "specialists": [
+      32,
+      0,
+      0
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000a88340",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 600,
+     "near": 55,
+     "specialists": [
+      35,
+      0,
+      0
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000c88540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 625,
+     "near": 50,
+     "specialists": [
+      42,
+      0,
+      0
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000008840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 650,
+     "near": 54,
+     "specialists": [
+      60,
+      0,
+      1
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000408940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 675,
+     "near": 36,
+     "specialists": [
+      75,
+      1,
+      7
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000a08940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 700,
+     "near": 42,
+     "specialists": [
+      85,
+      2,
+      9
+     ],
+     "colony": 11,
+     "seas": [],
+     "smoothed": "0000000000588940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 725,
+     "near": 21,
+     "specialists": [
+      94,
+      1,
+      15
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000288940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 750,
+     "near": 14,
+     "specialists": [
+      100,
+      1,
+      16
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000d88840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 775,
+     "near": 13,
+     "specialists": [
+      133,
+      1,
+      19
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000008a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 800,
+     "near": 25,
+     "specialists": [
+      211,
+      1,
+      15
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000708c40",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -588,6 +2196,232 @@
      600,
      "3b7271ece58b0a0e3eb4fc79ca90259b3399dd00462b3f8e26dacf6b13adde2e"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      179,
+      1,
+      4
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000e88140",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      200,
+      0,
+      1
+     ],
+     "colony": 24,
+     "seas": [],
+     "smoothed": "0000000000108340",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      204,
+      0,
+      0
+     ],
+     "colony": 21,
+     "seas": [],
+     "smoothed": "0000000000208440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      230,
+      1,
+      0
+     ],
+     "colony": 20,
+     "seas": [],
+     "smoothed": "0000000000888540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 325,
+     "near": 0,
+     "specialists": [
+      217,
+      2,
+      0
+     ],
+     "colony": 20,
+     "seas": [],
+     "smoothed": "0000000000888540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 350,
+     "near": 0,
+     "specialists": [
+      223,
+      0,
+      0
+     ],
+     "colony": 21,
+     "seas": [],
+     "smoothed": "0000000000e08540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 375,
+     "near": 0,
+     "specialists": [
+      193,
+      0,
+      0
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000f88540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 400,
+     "near": 0,
+     "specialists": [
+      159,
+      1,
+      1
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000888540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 425,
+     "near": 1,
+     "specialists": [
+      162,
+      2,
+      4
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000588440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 450,
+     "near": 4,
+     "specialists": [
+      164,
+      0,
+      14
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000a08440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 475,
+     "near": 4,
+     "specialists": [
+      173,
+      0,
+      8
+     ],
+     "colony": 19,
+     "seas": [],
+     "smoothed": "0000000000488440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 500,
+     "near": 11,
+     "specialists": [
+      171,
+      0,
+      5
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000788440",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 525,
+     "near": 35,
+     "specialists": [
+      151,
+      0,
+      2
+     ],
+     "colony": 21,
+     "seas": [],
+     "smoothed": "0000000000e08540",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 550,
+     "near": 55,
+     "specialists": [
+      142,
+      1,
+      3
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000f88740",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 575,
+     "near": 34,
+     "specialists": [
+      136,
+      1,
+      5
+     ],
+     "colony": 23,
+     "seas": [],
+     "smoothed": "0000000000a08840",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 600,
+     "near": 9,
+     "specialists": [
+      138,
+      0,
+      9
+     ],
+     "colony": 24,
+     "seas": [],
+     "smoothed": "0000000000a08740",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -865,6 +2699,945 @@
      1100,
      "60255d890eb7c9c8bf24e1565bc0e066019fa2d02ff650f6cfc1793e1e76facc"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      8,
+      1,
+      0
+     ],
+     "colony": 25,
+     "seas": [],
+     "smoothed": "0000000000406d40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      4,
+      2,
+      1
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000405640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      5,
+      1,
+      2
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000c05d40",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      11,
+      0,
+      2
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000006440",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 325,
+     "near": 0,
+     "specialists": [
+      15,
+      0,
+      1
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000e06840",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 350,
+     "near": 0,
+     "specialists": [
+      16,
+      3,
+      1
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000e06f40",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 375,
+     "near": 0,
+     "specialists": [
+      15,
+      4,
+      0
+     ],
+     "colony": 24,
+     "seas": [],
+     "smoothed": "0000000000b07140",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 400,
+     "near": 0,
+     "specialists": [
+      13,
+      2,
+      0
+     ],
+     "colony": 27,
+     "seas": [],
+     "smoothed": "0000000000007340",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 425,
+     "near": 0,
+     "specialists": [
+      18,
+      0,
+      0
+     ],
+     "colony": 21,
+     "seas": [],
+     "smoothed": "0000000000407540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 450,
+     "near": 0,
+     "specialists": [
+      20,
+      0,
+      0
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000e07640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 475,
+     "near": 0,
+     "specialists": [
+      26,
+      0,
+      1
+     ],
+     "colony": 9,
+     "seas": [],
+     "smoothed": "0000000000507840",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 500,
+     "near": 0,
+     "specialists": [
+      26,
+      1,
+      1
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000807940",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 525,
+     "near": 0,
+     "specialists": [
+      27,
+      0,
+      1
+     ],
+     "colony": 11,
+     "seas": [],
+     "smoothed": "0000000000c07a40",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 550,
+     "near": 0,
+     "specialists": [
+      37,
+      0,
+      0
+     ],
+     "colony": 16,
+     "seas": [],
+     "smoothed": "0000000000007e40",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 575,
+     "near": 0,
+     "specialists": [
+      48,
+      0,
+      0
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000e07f40",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 600,
+     "near": 0,
+     "specialists": [
+      56,
+      0,
+      1
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000908040",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 625,
+     "near": 0,
+     "specialists": [
+      71,
+      0,
+      0
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000a88140",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 650,
+     "near": 0,
+     "specialists": [
+      89,
+      0,
+      2
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000988240",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 675,
+     "near": 0,
+     "specialists": [
+      96,
+      3,
+      1
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000c88240",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 700,
+     "near": 0,
+     "specialists": [
+      98,
+      1,
+      2
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000008340",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 725,
+     "near": 0,
+     "specialists": [
+      116,
+      1,
+      1
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000008440",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 750,
+     "near": 0,
+     "specialists": [
+      134,
+      1,
+      3
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000788540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 775,
+     "near": 0,
+     "specialists": [
+      145,
+      1,
+      1
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000d08540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 800,
+     "near": 0,
+     "specialists": [
+      151,
+      4,
+      1
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000188640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 825,
+     "near": 0,
+     "specialists": [
+      142,
+      4,
+      1
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000908540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 850,
+     "near": 0,
+     "specialists": [
+      145,
+      2,
+      1
+     ],
+     "colony": 12,
+     "seas": [],
+     "smoothed": "0000000000508540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 875,
+     "near": 0,
+     "specialists": [
+      142,
+      3,
+      3
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000988540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 900,
+     "near": 0,
+     "specialists": [
+      145,
+      2,
+      5
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000888540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 925,
+     "near": 0,
+     "specialists": [
+      172,
+      1,
+      11
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000e08640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 950,
+     "near": 0,
+     "specialists": [
+      160,
+      1,
+      9
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000f88640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 975,
+     "near": 0,
+     "specialists": [
+      152,
+      1,
+      9
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000888640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 1000,
+     "near": 0,
+     "specialists": [
+      176,
+      0,
+      8
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000388640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 1025,
+     "near": 0,
+     "specialists": [
+      173,
+      0,
+      10
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000c88640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 1050,
+     "near": 0,
+     "specialists": [
+      134,
+      0,
+      19
+     ],
+     "colony": 17,
+     "seas": [],
+     "smoothed": "0000000000f88440",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 1075,
+     "near": 0,
+     "specialists": [
+      162,
+      0,
+      14
+     ],
+     "colony": 14,
+     "seas": [],
+     "smoothed": "0000000000188540",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    },
+    {
+     "step": 1100,
+     "near": 0,
+     "specialists": [
+      194,
+      0,
+      13
+     ],
+     "colony": 15,
+     "seas": [],
+     "smoothed": "0000000000c88640",
+     "collapse": "0000000000e06c40",
+     "dipped": true
+    }
+   ]
+  },
+  {
+   "name": "strike_window",
+   "set": "default",
+   "rules": {
+    "budget_max": 1000000.0,
+    "budget_start": 1000000.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 20,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 120,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000058842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000030842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000008842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000e0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000b8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000090832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000068832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000040832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c0000001b832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c000000f3822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c000000cb822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c000000a3822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c0000007b822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c00000053822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c0000002b822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 30,
+     "accepted": true,
+     "budget": "0c00000003822e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 30,
+     "accepted": true,
+     "budget": "18000000de812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "18000000b6812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "180000008e812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 30,
+     "accepted": true,
+     "budget": "1800000066812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 30,
+     "accepted": true,
+     "budget": "180000003e812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "1800000016812e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 30,
+     "accepted": true,
+     "budget": "18000000ee802e41"
+    },
+    {
+     "offset": 60,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 30,
+     "accepted": true,
+     "budget": "18000000c6802e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c0000009f802e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c00000077802e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c0000004f802e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c00000027802e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c000000ff7f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c000000d77f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c000000af7f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 52,
+     "accepted": true,
+     "budget": "1c000000877f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c0000005f7f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c000000377f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c0000000f7f2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c000000e77e2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c000000bf7e2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c000000977e2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c0000006f7e2e41"
+    },
+    {
+     "offset": 70,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 30,
+     "accepted": true,
+     "budget": "1c000000477e2e41"
+    }
+   ],
+   "achieved": {},
+   "budget": "300000004c7e2e41",
+   "player_vents": 0,
+   "hashes": [
+    [
+     200,
+     "ca1e7421a7769a0a59b1a197f5f2b9524d570ac2fa9009dc24c1c1efe7f4610f"
+    ],
+    [
+     300,
+     "ac5e156aeeed04615b9fbe66cd2a8a37ed274f1ab237c99029696b7da784304a"
+    ],
+    [
+     320,
+     "35cecb0a4909c863d904b332a4215946deeba9b184e8171ab4257b5ef4e7880a"
+    ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      5,
+      0,
+      0
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000806940",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      7,
+      0,
+      0
+     ],
+     "colony": 18,
+     "seas": [],
+     "smoothed": "0000000000c06a40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 275,
+     "near": 0,
+     "specialists": [
+      8,
+      0,
+      0
+     ],
+     "colony": 10,
+     "seas": [],
+     "smoothed": "0000000000c06b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 300,
+     "near": 0,
+     "specialists": [
+      10,
+      1,
+      4
+     ],
+     "colony": 13,
+     "seas": [],
+     "smoothed": "0000000000d07040",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   },
   {
@@ -1430,6 +4203,42 @@
      250,
      "a2608cd1c5aee37218309c5523c8e82ef49d6dbe9708a4bf08b18c3c58f0b40a"
     ]
+   ],
+   "trace": [
+    {
+     "step": 225,
+     "near": 0,
+     "specialists": [
+      11,
+      4,
+      0
+     ],
+     "colony": 17,
+     "seas": [
+      77,
+      146
+     ],
+     "smoothed": "0000000000e06b40",
+     "collapse": null,
+     "dipped": false
+    },
+    {
+     "step": 250,
+     "near": 0,
+     "specialists": [
+      14,
+      8,
+      0
+     ],
+     "colony": 22,
+     "seas": [
+      87,
+      156
+     ],
+     "smoothed": "0000000000606e40",
+     "collapse": null,
+     "dipped": false
+    }
    ]
   }
  ]

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P7 piece 2, game rules in the Rust kernel**: `engine-rs/src/game.rs` ports `play.Game` (budget, tool costs,
+  the cataclysm tracking and the five milestones; rules validated, player vents deduplicated, smoothing window grown
+  as steps run). The game borrows the world on each call, ready for ABI 5 (piece 3). `tests/golden_games.rs`
+  replays `games.json` (8 cases) field by field, and the idle games keep every `hashes.csv` row. `games.json` now
+  also records, at every milestone check, what the check measures (`Game::measures`): milestone steps alone let
+  several wrong ports pass. New case `strike_window` covers the collapse window.
 - **G3 P7 piece 1, game rules for the kernel: ADR-0017 and golden games**: the decision to run the G1 game
   (budget, tool costs, the five milestones) inside the Rust kernel, attached to the world handle (ABI 5), with the
   rules as a validated struct; restart and saved games are later pieces (owner, 2026-11-13). `scripts/g3_game_vectors.py`

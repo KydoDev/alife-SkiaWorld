@@ -71,6 +71,9 @@ def test_the_generator_refuses_vacuous_cases():
         {"tool": "nutrients", "accepted": True, "budget": "c"}]}
     with pytest.raises(AssertionError, match="free"):
         gv.check_not_vacuous(free, set())
+    collapsed = {"name": "strike_window", "achieved": {}, "actions": [], "trace": [{"collapse": "00"}]}
+    with pytest.raises(AssertionError, match="window"):
+        gv.check_not_vacuous(collapsed, set())
 
 
 def test_integer_distance_rule_equals_math_hypot():

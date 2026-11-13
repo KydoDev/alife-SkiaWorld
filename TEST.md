@@ -1,7 +1,7 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P7 piece 1 (game vectors); Unity and cargo from the P6b run (unchanged since), `main`, working tree before the commit; pytest and cargo from the
-save-loader run (no Python or Rust change since)
+Last run: 2026-11-13 - G3 P7 piece 2 (`game.rs`); Unity from the P6b run (unchanged since), `main`, working tree before
+the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -10,13 +10,18 @@ save-loader run (no Python or Rust change since)
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
 | pytest (423 tests) | 423 | 0 | 0 | 99.39% |
-| `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
+| `cargo test --release` (`engine-rs`, 59 tests) | 59 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
 | Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 45 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (6 tests) | 6 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P7 piece 2: `engine-rs/tests/golden_games.rs` (6): the 8 `games.json` cases field by field, including
+  the per-check trace of measures and every `hashes.csv` row of the idle games; tool and milestone names; default
+  rules; rule validation; a kernel refusal and an off-world or unaffordable action leave the game unchanged. A
+  mutation check (specialist cut, vent distance, colony size, smoothing, collapse window, dip) now fails on each
+  mutation except one that is equivalent by construction (survivor without the dip).
 - New in P7 piece 1: `tests/test_game_vectors.py` (5): defaults, committed `games.json`, idle hashes equal
   `hashes.csv`, the generator refuses vacuous cases, integer distance equals `math.hypot` on a grid of offsets.
   pytest now takes about 2 minutes (the game vectors are rebuilt once, about 15 s).

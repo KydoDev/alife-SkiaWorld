@@ -170,6 +170,15 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   thresholds that reach abyss, balance and giant (`default`, 11 player vents: balance at step 475), abyss and giant
   on `plasticity`, survivor (24 meteorites, recovered at step 344) and divided (two mountain walls). On `volcanic`
   vents at the floor land on rock and are refused, so balance is shown on `default`.
+  *Piece 2* (2026-11-13): `engine-rs/src/game.rs` (`GameRules` with `validate`, `Game::act` / `step` /
+  `check_milestones` / `measures`; the game borrows the world per call and owns none of it) equals `games.json` on
+  every field (`tests/golden_games.rs`), and both idle games equal every row of `hashes.csv`. A mutation check showed
+  that milestone steps alone are too coarse (checks every 25 steps, lowered thresholds far below the measured
+  values): changing the specialist cut, the vent distance, the colony size or the smoothing went unnoticed. So the
+  vectors now record a trace at every check (what the check measures: chemo near player vents, specialists, largest
+  colony, cells per sea, smoothed population, collapse target, dip) and an eighth case, `strike_window`, whose
+  strikes add up to a third of life only if the 20-step window is ignored. Each of those mutations now fails; one
+  survives by construction (reaching survivor without the dip is equivalent once a collapse has killed a third).
 - **P8 Species** — port the tracker as a pure observer (it must never touch the RNG; ADR-0003/0005);
   expose a list and parent links. Pass: species ids and parents equal Python's on the golden runs.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
