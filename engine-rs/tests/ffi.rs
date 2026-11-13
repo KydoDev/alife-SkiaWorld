@@ -784,3 +784,243 @@ fn game_calls_refuse_bad_input_and_change_nothing() {
         ws_world_free(h2);
     }
 }
+
+// ------------------------------------------------------------------ species (ABI 6, ADR-0018)
+
+fn species_vectors() -> serde_json::Value {
+    let path = common::golden_root().join("species.json");
+    serde_json::from_str(&std::fs::read_to_string(&path).expect("species.json")).expect("json")
+}
+
+fn species_info(h: *mut WsWorld) -> WsSpeciesInfo {
+    let mut info = WsSpeciesInfo::default();
+    assert_eq!(unsafe { ws_world_species_info(h, &mut info) }, WS_OK);
+    info
+}
+
+fn species_by_id(h: *mut WsWorld, id: u64) -> (i32, WsSpecies) {
+    let mut s = WsSpecies::default();
+    let code = unsafe { ws_world_species_by_id(h, id, &mut s) };
+    (code, s)
+}
+
+/// A dump row (`Species.to_list()`) as the ABI lays it out.
+fn ws_species_of(row: &serde_json::Value) -> WsSpecies {
+    let r = row.as_array().unwrap();
+    let step = |v: &serde_json::Value| v.as_u64().unwrap_or(WS_STEP_NONE);
+    let origin = match r[2].as_str().unwrap() {
+        "seed" => WS_ORIGIN_SEED,
+        "immigrant" => WS_ORIGIN_IMMIGRANT,
+        "speciation" => WS_ORIGIN_SPECIATION,
+        other => panic!("origin {other}"),
+    };
+    WsSpecies {
+        id: r[0].as_u64().unwrap(),
+        parent: r[1].as_u64().unwrap_or(0),
+        born: r[4].as_u64().unwrap(),
+        extinct: step(&r[5]),
+        count: r[6].as_u64().unwrap(),
+        peak: r[7].as_u64().unwrap(),
+        activity: r[8].as_u64().unwrap(),
+        established: step(&r[9]),
+        children: r[10].as_u64().unwrap(),
+        origin,
+        reserved: 0,
+    }
+}
+
+/// Every cell's `[id, species]` read through `ws_world_cell`, in id order.
+fn cells_through_the_abi(h: *mut WsWorld) -> Vec<(u64, u64)> {
+    let mut info = WsInfo::default();
+    assert_eq!(unsafe { ws_world_info(h, &mut info) }, WS_OK);
+    let mut out = Vec::new();
+    for y in 0..info.height {
+        for x in 0..info.width {
+            let mut c = WsCell::default();
+            assert_eq!(unsafe { ws_world_cell(h, x, y, &mut c) }, WS_OK);
+            if c.present == 1 {
+                out.push((c.id, c.species));
+            }
+        }
+    }
+    out.sort_unstable();
+    out
+}
+
+#[test]
+fn species_through_the_abi_follow_the_vectors() {
+    let doc = species_vectors();
+    for name in ["created_default", "tracked_save"] {
+        let case = doc["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap();
+        let h = if case["config"].is_null() {
+            let save = common::golden_root().join(case["save"].as_str().unwrap());
+            load_bytes(&std::fs::read(save).expect("tracked save"))
+        } else {
+            let seed: u64 = case["seed"].as_str().unwrap().parse().unwrap();
+            create(case["config"].to_string().as_bytes(), seed)
+        };
+        assert!(!h.is_null(), "{name}: {}", last_error());
+        let (mut left, mut chunk) = (case["steps"].as_u64().unwrap() as u32, 1u32);
+        while left > 0 {
+            let n = chunk.min(left);
+            assert_eq!(unsafe { ws_world_step(h, n) }, WS_OK);
+            left -= n;
+            chunk = chunk % 53 + 11;
+        }
+        let d = &case["tracker"];
+        let rows = d["species"].as_array().unwrap();
+        let extant: Vec<WsSpecies> = rows
+            .iter()
+            .map(ws_species_of)
+            .filter(|s| s.extinct == WS_STEP_NONE)
+            .collect();
+        let want = WsSpeciesInfo {
+            tracked: 1,
+            reserved: 0,
+            extant: extant.len() as u64,
+            retained: rows.len() as u64,
+            next_id: d["next_id"].as_u64().unwrap(),
+            speciations: d["speciations"].as_u64().unwrap(),
+            novelty: d["novelty"].as_u64().unwrap(),
+            pruned: d["pruned"].as_u64().unwrap(),
+        };
+        assert_eq!(species_info(h), want, "{name}: species info");
+        for (i, s) in extant.iter().enumerate() {
+            let mut got = WsSpecies::default();
+            assert_eq!(unsafe { ws_world_species(h, i as u64, &mut got) }, WS_OK);
+            assert_eq!(&got, s, "{name}: living species {i}");
+        }
+        for row in rows {
+            let s = ws_species_of(row);
+            assert_eq!(
+                species_by_id(h, s.id),
+                (WS_OK, s),
+                "{name}: species {}",
+                s.id
+            );
+        }
+        let cells: Vec<(u64, u64)> = case["cells"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p[0].as_u64().unwrap(), p[1].as_u64().unwrap()))
+            .collect();
+        assert_eq!(cells_through_the_abi(h), cells, "{name}: cells' species");
+        unsafe { ws_world_free(h) };
+    }
+}
+
+#[test]
+fn species_calls_refuse_bad_input_and_keep_the_handle_usable() {
+    // an untracked save: no species, the views refused, the handle usable
+    let h = load_bytes(&golden_bytes("default"));
+    assert_eq!(species_info(h), WsSpeciesInfo::default());
+    let mut s = WsSpecies {
+        id: 7,
+        ..WsSpecies::default()
+    };
+    assert_eq!(unsafe { ws_world_species(h, 0, &mut s) }, WS_ERR_INVALID);
+    assert!(last_error().contains("does not track"));
+    assert_eq!(
+        unsafe { ws_world_species_by_id(h, 1, &mut s) },
+        WS_ERR_INVALID
+    );
+    assert_eq!(s.id, 7, "a refused call leaves *out untouched");
+    assert!(cells_through_the_abi(h).iter().all(|&(_, sp)| sp == 0));
+    assert_eq!(unsafe { ws_world_step(h, 3) }, WS_OK);
+    unsafe { ws_world_free(h) };
+
+    // a tracked world: indexes and ids out of range are refused
+    let h = create(
+        creation_config("create_default").as_bytes(),
+        creation_seed("create_default"),
+    );
+    assert_eq!(unsafe { ws_world_step(h, 50) }, WS_OK);
+    let info = species_info(h);
+    assert_eq!(info.tracked, 1);
+    assert!(info.extant > 0);
+    for index in [info.extant, u64::MAX] {
+        assert_eq!(
+            unsafe { ws_world_species(h, index, &mut s) },
+            WS_ERR_INVALID
+        );
+        assert_eq!(s.id, 7);
+    }
+    assert!(last_error().contains("past the"));
+    for id in [0, info.next_id + 1, u64::MAX] {
+        assert_eq!(species_by_id(h, id).0, WS_ERR_INVALID, "id {id}");
+    }
+    let null_species: *mut WsSpecies = std::ptr::null_mut();
+    assert_eq!(
+        unsafe { ws_world_species_info(h, std::ptr::null_mut()) },
+        WS_ERR_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { ws_world_species(h, 0, null_species) },
+        WS_ERR_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { ws_world_species_by_id(h, 1, null_species) },
+        WS_ERR_ARGUMENT
+    );
+    let mut i = WsSpeciesInfo::default();
+    assert_eq!(
+        unsafe { ws_world_species_info(std::ptr::null(), &mut i) },
+        WS_ERR_ARGUMENT
+    );
+    // the ancestry walk ends at a root or at a pruned ancestor, through ever older species
+    let mut last = WsSpecies::default();
+    assert_eq!(
+        unsafe { ws_world_species(h, info.extant - 1, &mut last) },
+        WS_OK
+    );
+    let (mut id, mut child) = (last.parent, last.id);
+    while id != 0 {
+        let (code, p) = species_by_id(h, id);
+        if code != WS_OK {
+            break; // pruned ancestor
+        }
+        assert!(p.id < child);
+        (id, child) = (p.parent, p.id);
+    }
+    assert_eq!(unsafe { ws_world_step(h, 1) }, WS_OK, "still usable");
+    unsafe { ws_world_free(h) };
+}
+
+#[test]
+fn a_tracked_world_keys_its_tiles_by_species() {
+    let h = create(
+        creation_config("create_default").as_bytes(),
+        creation_seed("create_default"),
+    );
+    assert_eq!(unsafe { ws_world_step(h, 20) }, WS_OK);
+    let mut info = WsInfo::default();
+    assert_eq!(unsafe { ws_world_info(h, &mut info) }, WS_OK);
+    let mut tiles = vec![0u8; info.width as usize * info.height as usize * 4];
+    assert_eq!(
+        unsafe { ws_world_tiles(h, tiles.as_mut_ptr(), tiles.len()) },
+        WS_OK
+    );
+    let mut seen = 0;
+    for (i, word) in tiles.as_chunks::<4>().0.iter().enumerate() {
+        let word = u32::from_le_bytes(*word);
+        let (x, y) = (
+            (i % info.width as usize) as u32,
+            (i / info.width as usize) as u32,
+        );
+        let mut c = WsCell::default();
+        assert_eq!(unsafe { ws_world_cell(h, x, y, &mut c) }, WS_OK);
+        if c.present == 1 {
+            assert_ne!(c.species, 0);
+            assert_eq!(u64::from(word >> 16), c.species % 65_536);
+            seen += 1;
+        }
+    }
+    assert!(seen > 0);
+    unsafe { ws_world_free(h) };
+}

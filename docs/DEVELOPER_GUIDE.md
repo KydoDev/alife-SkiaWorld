@@ -87,7 +87,8 @@ python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/go
 
 # C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract;
 # ABI 4 adds the read-only views of ADR-0016: ws_world_tiles, ws_world_cell, WsInfo.light_factor;
-# ABI 5 the game of ADR-0017: ws_game_default_rules, ws_game_attach, ws_game_act, ws_game_info)
+# ABI 5 the game of ADR-0017: ws_game_default_rules, ws_game_attach, ws_game_act, ws_game_info;
+# ABI 6 the species of ADR-0018: ws_world_species_info, ws_world_species, ws_world_species_by_id, WsCell.species)
 cd engine-rs && cargo build --release
 ```
 
@@ -166,6 +167,11 @@ python scripts/android_check.py             # device check APK: golden sets and 
   (tap it again to put it down; a tool the energy cannot pay for is dimmed), a tap on the world uses it, the HUD
   shows the energy, and each milestone reached is announced by a toast (texts in `GameText.cs`, checked against
   `play.py`). Tests can lower the thresholds through `WorldSimView.gameRules`.
+- **Species** (ADR-0018, ABI 6): a world the kernel creates tracks species from its founders; a save brings its
+  tracker if it has one. `Species` gives the counters (`IsTracked` false for a save without a tracker),
+  `LivingSpecies()` the living species in id order (refresh it now and then: it walks the list), `TryGetSpecies(id)`
+  any species still kept, `Ancestors(id)` its chain back to a root or a pruned ancestor, and `CellRecord.Species`
+  each cell's species. On a tracked world the tile key is the species id.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

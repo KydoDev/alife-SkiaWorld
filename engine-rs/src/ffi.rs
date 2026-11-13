@@ -2,8 +2,8 @@
 //!
 //! Only what `docs/G2_PLAN.md` allows across the boundary: loading a save, creating a world from a
 //! config and a seed (ADR-0012), stepping, the five validated G1 edits (ADR-0013), and read-only views
-//! (sizes and light factor, state hash, an RGB render, the tile snapshot and a cell's record: ADR-0016), and the G1
-//! game attached to a world (ADR-0017). No raw field writes: an edit is a domain operation that the core
+//! (sizes and light factor, state hash, an RGB render, the tile snapshot and a cell's record: ADR-0016), the G1
+//! game attached to a world (ADR-0017), and the species tracker's list (ADR-0018). No raw field writes: an edit is a domain operation that the core
 //! validates before changing anything.
 //!
 //! Contract for every function:
@@ -23,6 +23,7 @@ use crate::game::{Game, GameRules, Milestone, Tool};
 use crate::hash::state_hash;
 use crate::render::{render_rgb, rgb_len};
 use crate::save::{config_from_json, world_from_gzip, MAX_SAVE_BYTES};
+use crate::species::Species;
 use crate::views::{cell_record, tile_words, tiles_len, N_TRAITS};
 use crate::world::{
     Intervention, World, KIND_DIG, KIND_METEORITE, KIND_NUTRIENTS, KIND_RAISE_ROCK, KIND_VENT,
@@ -39,8 +40,9 @@ compile_error!("the C ABI needs panic = unwind");
 /// included, ADR-0012); front-ends refuse a mismatch. 2: [`ws_world_create`]; 3:
 /// [`ws_world_intervene`] and [`WS_ERR_INVALID`] (ADR-0013); 4: [`ws_world_tiles`], [`ws_world_cell`] and
 /// [`WsInfo::light_factor`] (ADR-0016); 5: the game entry points `ws_game_*` and the refusal of
-/// [`ws_world_intervene`] on a world with a game (ADR-0017).
-pub const WS_ABI_VERSION: u32 = 5;
+/// [`ws_world_intervene`] on a world with a game (ADR-0017); 6: the species views `ws_world_species*`,
+/// [`WsCell::species`] (its size grows to 256 bytes) and the species tile key on tracked worlds (ADR-0018).
+pub const WS_ABI_VERSION: u32 = 6;
 
 pub const WS_OK: i32 = 0;
 /// A null pointer or a buffer of the wrong size.
@@ -249,10 +251,94 @@ pub struct WsCell {
     pub colony: u32,
     /// Number of F4 rule genes.
     pub rules: u32,
+    /// The cell's species id (ADR-0018); 0 when the world does not track species.
+    pub species: u64,
 }
 
-// The layout C# mirrors: three ulong, 1 + 16 + 4 + 5 doubles, four uint; a change bumps the ABI.
-const _: () = assert!(std::mem::size_of::<WsCell>() == 248 && std::mem::align_of::<WsCell>() == 8);
+// The layout C# mirrors: three ulong, 1 + 16 + 4 + 5 doubles, four uint, one ulong; a change bumps the ABI.
+const _: () = assert!(std::mem::size_of::<WsCell>() == 256 && std::mem::align_of::<WsCell>() == 8);
+const _: () = assert!(std::mem::offset_of!(WsCell, present) == 232);
+const _: () = assert!(std::mem::offset_of!(WsCell, species) == 248);
+
+/// Origins of [`WsSpecies::origin`] (`species.ORIGIN_*`).
+pub const WS_ORIGIN_SEED: u32 = 0;
+pub const WS_ORIGIN_IMMIGRANT: u32 = 1;
+pub const WS_ORIGIN_SPECIATION: u32 = 2;
+/// A step that has not happened ([`WsSpecies::extinct`], [`WsSpecies::established`]).
+pub const WS_STEP_NONE: u64 = u64::MAX;
+
+/// The species tracker's counters (ADR-0018 Decision 5); all zero with `tracked` 0 on a world without one.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct WsSpeciesInfo {
+    /// 1 if the world tracks species.
+    pub tracked: u32,
+    pub reserved: u32,
+    /// Living species.
+    pub extant: u64,
+    /// Species kept in the tree (living, and extinct ones not pruned).
+    pub retained: u64,
+    /// The last species id given (ids start at 1).
+    pub next_id: u64,
+    pub speciations: u64,
+    /// Established speciation-born species.
+    pub novelty: u64,
+    pub pruned: u64,
+}
+
+// The layout C# mirrors: two uint, six ulong; a change bumps the ABI.
+const _: () = assert!(
+    std::mem::size_of::<WsSpeciesInfo>() == 56 && std::mem::align_of::<WsSpeciesInfo>() == 8
+);
+const _: () = assert!(std::mem::offset_of!(WsSpeciesInfo, extant) == 8);
+
+/// One species (`Species.to_list()` without the founder genome; ADR-0018 Decision 5).
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct WsSpecies {
+    pub id: u64,
+    /// The parent species, 0 for a root. It may have been pruned (then [`ws_world_species_by_id`] refuses it).
+    pub parent: u64,
+    /// Step of origin.
+    pub born: u64,
+    /// Step of extinction, [`WS_STEP_NONE`] while extant.
+    pub extinct: u64,
+    /// Living members.
+    pub count: u64,
+    pub peak: u64,
+    /// Cumulative population-steps.
+    pub activity: u64,
+    /// Step when it became established, [`WS_STEP_NONE`] if not yet.
+    pub established: u64,
+    /// Retained child species.
+    pub children: u64,
+    /// `WS_ORIGIN_*`.
+    pub origin: u32,
+    pub reserved: u32,
+}
+
+// The layout C# mirrors: nine ulong, two uint; a change bumps the ABI.
+const _: () =
+    assert!(std::mem::size_of::<WsSpecies>() == 80 && std::mem::align_of::<WsSpecies>() == 8);
+const _: () = assert!(std::mem::offset_of!(WsSpecies, origin) == 72);
+
+impl From<&Species> for WsSpecies {
+    fn from(s: &Species) -> Self {
+        Self {
+            id: s.id,
+            parent: s.parent.unwrap_or(0),
+            born: s.born,
+            extinct: s.extinct.unwrap_or(WS_STEP_NONE),
+            count: s.count,
+            peak: s.peak,
+            activity: s.activity,
+            established: s.established.unwrap_or(WS_STEP_NONE),
+            children: s.children,
+            origin: u32::from(s.origin.code()),
+            reserved: 0,
+        }
+    }
+}
 
 thread_local! {
     static LAST_ERROR: RefCell<String> = const { RefCell::new(String::new()) };
@@ -646,9 +732,121 @@ pub unsafe extern "C" fn ws_world_cell(
                     bonds: r.bonds,
                     colony: r.colony,
                     rules: r.rules,
+                    species: w.cell_at(x, y).map_or(0, |c| c.species),
                 },
             };
             WS_OK
+        })
+    }
+}
+
+/// Write the species tracker's counters into `*out` (ADR-0018 Decision 5): `tracked` 0 and every field 0 on a
+/// world that does not track species (a world loaded from a save without a tracker). Read-only, O(1).
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out` is null or points to a writable, 8-byte-aligned [`WsSpeciesInfo`].
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_species_info(
+    handle: *const WsWorld,
+    out: *mut WsSpeciesInfo,
+) -> i32 {
+    if out.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null species info pointer");
+    }
+    // SAFETY: forwarded caller guarantee; `out` checked non-null.
+    unsafe {
+        with_world(handle, |w| {
+            *out = match w.tracker() {
+                None => WsSpeciesInfo::default(),
+                Some(t) => {
+                    let c = t.counters();
+                    WsSpeciesInfo {
+                        tracked: 1,
+                        reserved: 0,
+                        extant: t.extant_count() as u64,
+                        retained: t.retained_count() as u64,
+                        next_id: c.next_id,
+                        speciations: c.speciations,
+                        novelty: c.novelty,
+                        pruned: c.pruned,
+                    }
+                }
+            };
+            WS_OK
+        })
+    }
+}
+
+/// Write the `index`-th living species, in id order, into `*out` (`index` < [`WsSpeciesInfo::extant`]). Refused
+/// with [`WS_ERR_INVALID`], `*out` untouched and the handle usable, on a world without a tracker or for an index
+/// past the last species. Read-only; O(index), so a front-end lists the species once per refresh, not per frame.
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out` is null or points to a writable, 8-byte-aligned [`WsSpecies`].
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_species(
+    handle: *const WsWorld,
+    index: u64,
+    out: *mut WsSpecies,
+) -> i32 {
+    if out.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null species pointer");
+    }
+    // SAFETY: forwarded caller guarantee; `out` checked non-null.
+    unsafe {
+        with_world(handle, |w| {
+            let Some(t) = w.tracker() else {
+                return fail(WS_ERR_INVALID, "this world does not track species");
+            };
+            let found = usize::try_from(index).ok().and_then(|i| t.extant().nth(i));
+            match found {
+                Some(s) => {
+                    *out = WsSpecies::from(s);
+                    WS_OK
+                }
+                None => fail(
+                    WS_ERR_INVALID,
+                    format!(
+                        "species index {index} past the {} living species",
+                        t.extant_count()
+                    ),
+                ),
+            }
+        })
+    }
+}
+
+/// Write the species with id `id` into `*out`, living or extinct (the ancestry walk follows
+/// [`WsSpecies::parent`]). Refused with [`WS_ERR_INVALID`], `*out` untouched and the handle usable, on a world
+/// without a tracker or for an id that is not retained (0, unknown, or pruned). Read-only, O(log species).
+///
+/// # Safety
+/// `handle` as for [`ws_world_step`]; `out` is null or points to a writable, 8-byte-aligned [`WsSpecies`].
+#[no_mangle]
+pub unsafe extern "C" fn ws_world_species_by_id(
+    handle: *const WsWorld,
+    id: u64,
+    out: *mut WsSpecies,
+) -> i32 {
+    if out.is_null() {
+        return fail(WS_ERR_ARGUMENT, "null species pointer");
+    }
+    // SAFETY: forwarded caller guarantee; `out` checked non-null.
+    unsafe {
+        with_world(handle, |w| {
+            let Some(t) = w.tracker() else {
+                return fail(WS_ERR_INVALID, "this world does not track species");
+            };
+            match t.get(id) {
+                Some(s) => {
+                    *out = WsSpecies::from(s);
+                    WS_OK
+                }
+                None => fail(
+                    WS_ERR_INVALID,
+                    format!("no species {id} (unknown or pruned)"),
+                ),
+            }
         })
     }
 }
@@ -847,6 +1045,11 @@ mod tests {
             assert_eq!(accepted, 7);
             let mut game = WsGameInfo::default();
             assert_eq!(ws_game_info(h, &mut game), WS_ERR_POISONED);
+            let mut info = WsSpeciesInfo::default();
+            assert_eq!(ws_world_species_info(h, &mut info), WS_ERR_POISONED);
+            let mut species = WsSpecies::default();
+            assert_eq!(ws_world_species(h, 0, &mut species), WS_ERR_POISONED);
+            assert_eq!(ws_world_species_by_id(h, 1, &mut species), WS_ERR_POISONED);
             ws_world_free(h);
         }
     }

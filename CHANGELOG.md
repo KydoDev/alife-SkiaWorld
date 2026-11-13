@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P8 piece 3, ABI 6 species views** (ADR-0018): `ws_world_species_info`, `ws_world_species` and
+  `ws_world_species_by_id`, the cell record's species id, and the C# mirror in `NativeWorld.cs` (`Species`,
+  `LivingSpecies()`, `TryGetSpecies`, `Ancestors`). Checked against `species.json` in Rust and in Unity EditMode.
 - **G3 P8 piece 2, species tracker in the kernel** (ADR-0018): `engine-rs/src/species.rs` ports
   `worldsim/species.py` as a pure observer. Worlds created by the kernel track species from their founders; saves
   load their tracker, validated as untrusted input (stricter than Python where a bad value could break a later

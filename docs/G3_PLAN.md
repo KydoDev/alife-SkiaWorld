@@ -231,6 +231,16 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   could pass 1 GB, an out-of-memory abort `catch_unwind` cannot catch on a phone), and the tracker field is no
   longer public (`tracker()`, `drop_tracker()`): attaching a tracker to a populated world would panic at the next
   birth.
+  *Piece 3* (2026-11-13): ABI 6 in `ffi.rs`: `ws_world_species_info` (`WsSpeciesInfo`, 56 bytes: tracked flag and
+  counters, all zero without a tracker), `ws_world_species` (the index-th living species in id order, `WsSpecies`,
+  80 bytes) and `ws_world_species_by_id` (any species still kept, for the ancestry walk); `WsCell` gains the cell's
+  species (256 bytes). An untracked world, an index past the end or an id not kept is refused with
+  `WS_ERR_INVALID`, `*out` untouched. C# mirror: `SpeciesInfo`, `SpeciesRecord`, `SpeciesOrigin`, `Species`,
+  `LivingSpecies()`, `TryGetSpecies`, `Ancestors`. Checks: Rust `tests/ffi.rs` (3: the created and loaded cases of
+  `species.json` through the ABI, refusals, the species tile key) and EditMode `SpeciesTests` (5) with the layouts
+  in `ViewTests`. Security review: no blocking issue. Noted: `LivingSpecies` is O(n^2) in the kernel (fine for a
+  drawer refreshed now and then; a bulk call can come later), and the tile key changed meaning in piece 2 while the
+  ABI was still 5, so no APK should be built from that commit.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
   (births, deaths, tool use), never from inside the kernel. Pass: owner playtest on a tablet.
 - **P10 iOS** — `aarch64-apple-ios` static library, `DllImport("__Internal")` under `UNITY_IOS`, built on

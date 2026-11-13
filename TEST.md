@@ -1,7 +1,7 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P8 piece 2 (species tracker in the kernel); pytest from the piece 1 run (no Python change
-since), Unity from the P7 runs (only a C# comment changed), `main`, working tree before the commit
+Last run: 2026-11-13 - G3 P8 piece 3 (ABI 6 species views); pytest from the piece 1 run (no Python change since),
+`main`, working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -10,13 +10,16 @@ since), Unity from the P7 runs (only a C# comment changed), `main`, working tree
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
 | pytest (429 tests) | 429 | 0 | 0 | 99.53% |
-| `cargo test --release` (`engine-rs`, 71 tests) | 71 | 0 | 0 | |
+| `cargo test --release` (`engine-rs`, 74 tests) | 74 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 51 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 56 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (7 tests) | 7 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P8 piece 3: `tests/ffi.rs` (3: species of the created and loaded cases through the ABI, refusals and
+  out-untouched, species tile key) and the ABI 6 entries in the poisoning unit test; EditMode `SpeciesTests` (5)
+  and the new struct layouts in `ViewTests`. PlayMode rerun (7/7) on the ABI 6 DLL.
 - New in P8 piece 2: `engine-rs/tests/golden_species.rs` (3: the six `species.json` cases sample by sample and
   field by field, a tracked and an untracked save, 13 refused trackers), 4 unit tests in `species.rs` (pruning
   cascade, novelty, `restore` refusals, origins) and one in `views.rs` (species key); `golden_save.rs`'s skipped-

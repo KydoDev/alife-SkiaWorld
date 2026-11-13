@@ -1,6 +1,7 @@
-// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 5).
+// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 6).
 // No UnityEngine dependency: this file is plain C# and is exercised by the EditMode tests.
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -60,7 +61,7 @@ namespace WorldSim
         }
     }
 
-    /// <summary>One cell's inspector record (`WsCell`, 248 bytes; ADR-0016 Decision 2).</summary>
+    /// <summary>One cell's inspector record (`WsCell`, 256 bytes; ADR-0016 Decision 2, species ADR-0018).</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct CellRecord
     {
@@ -80,6 +81,68 @@ namespace WorldSim
         /// <summary>Cells in its bonded component, itself included (1 when unbonded).</summary>
         public uint Colony;
         public uint Rules;
+        /// <summary>The cell's species id; 0 when the world does not track species (ADR-0018).</summary>
+        public ulong Species;
+    }
+
+    /// <summary>How a species began (`WS_ORIGIN_*`, `species.ORIGIN_*`).</summary>
+    public enum SpeciesOrigin : uint
+    {
+        Seed = 0,
+        Immigrant = 1,
+        Speciation = 2,
+    }
+
+    /// <summary>The species tracker's counters (`WsSpeciesInfo`, 56 bytes; ADR-0018). All zero with
+    /// <see cref="Tracked"/> 0 on a world without a tracker (loaded from a save without one).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SpeciesInfo
+    {
+        /// <summary>1 if the world tracks species.</summary>
+        public uint Tracked;
+        public uint Reserved;
+        /// <summary>Living species.</summary>
+        public ulong Extant;
+        /// <summary>Species kept in the tree (living, and extinct ones not pruned).</summary>
+        public ulong Retained;
+        /// <summary>The last species id given (ids start at 1).</summary>
+        public ulong NextId;
+        public ulong Speciations;
+        /// <summary>Established speciation-born species.</summary>
+        public ulong Novelty;
+        public ulong Pruned;
+
+        public bool IsTracked => Tracked == 1;
+    }
+
+    /// <summary>One species (`WsSpecies`, 80 bytes; ADR-0018). Blittable.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SpeciesRecord
+    {
+        /// <summary>A step that has not happened (<see cref="Extinct"/>, <see cref="Established"/>).</summary>
+        public const ulong StepNone = ulong.MaxValue;
+
+        public ulong Id;
+        /// <summary>The parent species, 0 for a root; it may have been pruned.</summary>
+        public ulong Parent;
+        /// <summary>Step of origin.</summary>
+        public ulong Born;
+        /// <summary>Step of extinction, <see cref="StepNone"/> while extant.</summary>
+        public ulong Extinct;
+        /// <summary>Living members.</summary>
+        public ulong Count;
+        public ulong Peak;
+        /// <summary>Cumulative population-steps.</summary>
+        public ulong Activity;
+        /// <summary>Step when it became established, <see cref="StepNone"/> if not yet.</summary>
+        public ulong Established;
+        /// <summary>Retained child species.</summary>
+        public ulong Children;
+        public SpeciesOrigin Origin;
+        public uint Reserved;
+
+        public bool IsExtant => Extinct == StepNone;
+        public bool IsEstablished => Established != StepNone;
     }
 
     /// <summary>The five G1 edits of `ws_world_intervene` (`WS_EDIT_*`; ADR-0013).</summary>
@@ -259,6 +322,15 @@ namespace WorldSim
         internal static extern int ws_game_info(WorldHandle handle, out GameInfo info);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_species_info(WorldHandle handle, out SpeciesInfo info);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_species(WorldHandle handle, ulong index, out SpeciesRecord species);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_world_species_by_id(WorldHandle handle, ulong id, out SpeciesRecord species);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UIntPtr ws_last_error([Out] byte[] buffer, UIntPtr len);
     }
 
@@ -268,7 +340,7 @@ namespace WorldSim
     public sealed class NativeWorld : IDisposable
     {
         /// <summary>The ABI this wrapper was written for (`WS_ABI_VERSION`).</summary>
-        public const uint AbiVersion = 5;
+        public const uint AbiVersion = 6;
 
         private const int HashLength = 64;
         private readonly WorldHandle _handle;
@@ -463,6 +535,67 @@ namespace WorldSim
         {
             Check(Native.ws_world_cell(_handle, x, y, out CellRecord cell));
             return cell;
+        }
+
+        /// <summary>The species tracker's counters; <see cref="SpeciesInfo.Tracked"/> is 0 on a world without one
+        /// (ADR-0018).</summary>
+        public SpeciesInfo Species
+        {
+            get
+            {
+                Check(Native.ws_world_species_info(_handle, out SpeciesInfo info));
+                return info;
+            }
+        }
+
+        /// <summary>The living species in id order (ADR-0018). Empty on a world without a tracker. Each call walks
+        /// the list (O(n^2) in the kernel): refresh it now and then, not every frame.</summary>
+        public SpeciesRecord[] LivingSpecies()
+        {
+            SpeciesInfo info = Species;
+            if (!info.IsTracked)
+            {
+                return Array.Empty<SpeciesRecord>();
+            }
+            var list = new SpeciesRecord[checked((int)info.Extant)];
+            for (int i = 0; i < list.Length; i++)
+            {
+                Check(Native.ws_world_species(_handle, (ulong)i, out list[i]));
+            }
+            return list;
+        }
+
+        /// <summary>The species <paramref name="id"/>, living or extinct; false if the world does not track species
+        /// or does not keep it (0, unknown, or pruned). Read-only.</summary>
+        public bool TryGetSpecies(ulong id, out SpeciesRecord species)
+        {
+            int status = Native.ws_world_species_by_id(_handle, id, out species);
+            if (status == WorldSimException.StatusInvalid)
+            {
+                species = default;
+                return false;
+            }
+            Check(status);
+            return true;
+        }
+
+        /// <summary>The chain of ancestors of species <paramref name="id"/>, parent first, back to its root or to
+        /// the first ancestor no longer kept (pruned). Empty for a root or an unknown id.</summary>
+        public List<SpeciesRecord> Ancestors(ulong id)
+        {
+            var chain = new List<SpeciesRecord>();
+            if (!TryGetSpecies(id, out SpeciesRecord s))
+            {
+                return chain;
+            }
+            // parents are always older (smaller ids), so the walk ends; the checks guard a broken kernel
+            while (s.Parent != 0 && s.Parent < s.Id && TryGetSpecies(s.Parent, out SpeciesRecord parent)
+                   && parent.Id == s.Parent)
+            {
+                chain.Add(parent);
+                s = parent;
+            }
+            return chain;
         }
 
         public void Dispose()

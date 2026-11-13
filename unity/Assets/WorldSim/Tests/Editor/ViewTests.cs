@@ -108,7 +108,13 @@ namespace WorldSim.Tests
         public void TheStructsHaveTheKernelsLayout()
         {
             Assert.AreEqual(56, Marshal.SizeOf<WorldInfo>());
-            Assert.AreEqual(248, Marshal.SizeOf<CellRecord>());
+            Assert.AreEqual(256, Marshal.SizeOf<CellRecord>());
+            Assert.AreEqual(232, (int)Marshal.OffsetOf<CellRecord>("Present"));
+            Assert.AreEqual(248, (int)Marshal.OffsetOf<CellRecord>("Species"));
+            Assert.AreEqual(56, Marshal.SizeOf<SpeciesInfo>());
+            Assert.AreEqual(8, (int)Marshal.OffsetOf<SpeciesInfo>("Extant"));
+            Assert.AreEqual(80, Marshal.SizeOf<SpeciesRecord>());
+            Assert.AreEqual(72, (int)Marshal.OffsetOf<SpeciesRecord>("Origin"));
             Assert.AreEqual(176, Marshal.SizeOf<GameRules>());
             Assert.AreEqual(64, Marshal.SizeOf<GameInfo>());
             // field order (the golden rules never tell budget_max from budget_start): offsets of WsGameRules
