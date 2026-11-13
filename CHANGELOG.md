@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P7 piece 1, game rules for the kernel: ADR-0017 and golden games**: the decision to run the G1 game
+  (budget, tool costs, the five milestones) inside the Rust kernel, attached to the world handle (ABI 5), with the
+  rules as a validated struct; restart and saved games are later pieces (owner, 2026-11-13). `scripts/g3_game_vectors.py`
+  writes `engine-rs/tests/golden/games.json` from `play.Game` (7 cases: idle, budget, every milestone) and refuses
+  vacuous cases; `scripts/g2_golden.py --all` writes it too. pytest checks the file, that an idle game keeps the
+  world's golden hashes, and that the kernel's integer distance rule equals `math.hypot`.
 - **G3 P6b, population panel**: a Population button opens a panel with the cells per kind, in their neon colours,
   and a chart of the counts over the whole run (at most 240 samples, thinned as the run grows). `Population.cs`,
   `PopulationChart.cs`; EditMode `PopulationTests` (counts add up to the population and agree with every cell

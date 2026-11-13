@@ -19,7 +19,8 @@ Every golden set is listed in SETS below, the single list that pytest, the Rust 
 `--all ROOT` (re)writes each of them under ROOT/<name>, the procedural-terrain vectors as ROOT/terrain.json
 (scripts/g2_terrain_vectors.py), the world-creation vectors as ROOT/create.json (scripts/g2_create_vectors.py) and
 the interventions vectors as ROOT/interventions.json (scripts/g2_intervention_vectors.py, from the sets' start saves)
-and the view vectors as ROOT/views.json (scripts/g3_view_vectors.py, likewise);
+the view vectors as ROOT/views.json (scripts/g3_view_vectors.py, likewise) and the game vectors as ROOT/games.json
+(scripts/g3_game_vectors.py, likewise);
 all use libm, so they are regenerated per platform like the sets:
 
     python scripts/g2_golden.py --all engine-rs/tests/golden
@@ -219,6 +220,7 @@ def main(argv=None, repo_relative=False) -> None:
             # after the sets: the interventions cases start from their start saves
             _sibling("g2_intervention_vectors").write(args.all, args.all / "interventions.json")
             _sibling("g3_view_vectors").write(args.all, args.all / "views.json")   # G3 P4, ADR-0016
+            _sibling("g3_game_vectors").write(args.all, args.all / "games.json")   # G3 P7, ADR-0017
         return
     if args.out is None:
         ap.error("--out or --all is required")

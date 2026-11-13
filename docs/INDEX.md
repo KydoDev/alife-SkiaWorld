@@ -29,7 +29,7 @@ Numbered, append-only records of the decisions that shaped the system:
 [0013 interventions through the C ABI](./adr/0013-interventions-through-the-c-abi.md) ·
 [0014 trait table and perception radius](./adr/0014-trait-table-and-perception-radius.md) ·
 [0015 defer the parallel kernel](./adr/0015-defer-the-parallel-kernel.md) ·
-[0016 kernel views for the front-end](./adr/0016-kernel-views-for-the-front-end.md).
+[0016 kernel views for the front-end](./adr/0016-kernel-views-for-the-front-end.md), [0017 game rules in the kernel](./adr/0017-game-rules-in-the-kernel.md).
 
 ### [G2 engine port plan](./G2_PLAN.md)
 Milestones and verification criteria for the Rust core port (ADR-0008).

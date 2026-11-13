@@ -15,7 +15,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [?] P6 Inspector bottom sheet and population screen from the ABI 4 views
-8. [ ] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
+8. [~] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
 9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
 11. [ ] P10 iOS build (needs a Mac and a static library) — owner's decision, not scheduled
@@ -164,6 +164,12 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the
   kernel, RNG-free, plus `ws_game_*` entry points. Pass: `play.replay` of the recorded scripted-player runs
   gives the same milestone steps in Rust; the idle player reaches none (the G1 rule).
+  *Piece 1* (2026-11-13, ADR-0017): `scripts/g3_game_vectors.py` writes `games.json`, 7 cases from the golden
+  start saves: idle on `default` and `volcanic` (1000 steps, no milestone, every 100th hash equal to `hashes.csv`),
+  a budget case (refusals for budget, a free refusal on rock, regeneration), and milestone cases with lowered
+  thresholds that reach abyss, balance and giant (`default`, 11 player vents: balance at step 475), abyss and giant
+  on `plasticity`, survivor (24 meteorites, recovered at step 344) and divided (two mountain walls). On `volcanic`
+  vents at the floor land on rock and are refused, so balance is shown on `default`.
 - **P8 Species** — port the tracker as a pure observer (it must never touch the RNG; ADR-0003/0005);
   expose a list and parent links. Pass: species ids and parents equal Python's on the golden runs.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs

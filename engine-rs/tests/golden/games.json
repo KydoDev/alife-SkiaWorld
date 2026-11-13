@@ -1,0 +1,1436 @@
+{
+ "system": "Windows",
+ "python": "3.12.10",
+ "tools": [
+  "nutrients",
+  "meteorite",
+  "mountain",
+  "dig",
+  "volcano"
+ ],
+ "milestones": [
+  "abyss",
+  "balance",
+  "giant",
+  "survivor",
+  "divided"
+ ],
+ "default_rules": {
+  "budget_max": 100.0,
+  "budget_start": 100.0,
+  "regen": 0.05,
+  "cost": [
+   10.0,
+   20.0,
+   4.0,
+   4.0,
+   40.0
+  ],
+  "radius": [
+   6,
+   10,
+   2,
+   2,
+   0
+  ],
+  "nutrients_amount": 15.0,
+  "max_chem": 4.0,
+  "check_every": 25,
+  "abyss_cells": 50,
+  "abyss_radius": 6.0,
+  "balance_cells": 30,
+  "giant_colony": 80,
+  "kill_fraction": 0.3333333333333333,
+  "collapse_window": 100,
+  "recover_fraction": 1.0,
+  "divided_cells": 100
+ },
+ "cases": [
+  {
+   "name": "idle_default",
+   "set": "default",
+   "rules": {
+    "budget_max": 100.0,
+    "budget_start": 100.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 1000,
+   "start_step": 200,
+   "actions": [],
+   "achieved": {},
+   "budget": "0000000000005940",
+   "player_vents": 0,
+   "hashes": [
+    [
+     200,
+     "8d12b32e4c62e89749598b881b90b6b9f9fbddfe53098bfba350607f71dc0673"
+    ],
+    [
+     300,
+     "bddb4b26d006583ea9eb9c13e858ba0d2a9b05c2e298561a98ad3bde8f74c102"
+    ],
+    [
+     400,
+     "3efa5f5bab3df0e12977158b3a88d0a919253cdb4fcff328e0de8bce8dfc16e7"
+    ],
+    [
+     500,
+     "610349819216555aea018a4e8d1b98da8ec931b3329a71718a1c8155263a860e"
+    ],
+    [
+     600,
+     "dcf164474e8a202968e848888f3fcbeaed668ff49d25ad7f50dea157348c5843"
+    ],
+    [
+     700,
+     "a03d484c72ecba47438c29bb78effbd580e8ba80edb4b22f7c7b1c67a59f07d2"
+    ],
+    [
+     800,
+     "4516d0382928c1a852c0c53d855bd5314e0543150a91611ec50a3ae0855b06f5"
+    ],
+    [
+     900,
+     "c2d279b1e7724bb9840befedc5d87eea863f1de14e88ac1ba4d2247b7cefb676"
+    ],
+    [
+     1000,
+     "f33a96bb864da4bd4d16227aa152159be90839bed8e49870b98cadabdb549c10"
+    ],
+    [
+     1100,
+     "5da6edea92f7fbadb7b85ee0f6ec1eb7f7bb9c8b34f6219077e8bc3b0416fbcf"
+    ],
+    [
+     1200,
+     "574dd7e4007d58fbde54423f1f6907fe49a578278cb1e4dfe1f8f7a424ab737e"
+    ]
+   ]
+  },
+  {
+   "name": "idle_volcanic",
+   "set": "volcanic",
+   "rules": {
+    "budget_max": 100.0,
+    "budget_start": 100.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 1000,
+   "start_step": 200,
+   "actions": [],
+   "achieved": {},
+   "budget": "0000000000005940",
+   "player_vents": 0,
+   "hashes": [
+    [
+     200,
+     "19a6704614f8b9540eec84a4d28113b4348473bb2badb4e12d17cc6848f3bfc9"
+    ],
+    [
+     300,
+     "d19490524f7b782a2c2d3af443a1434370b996de64482a48a60c7e0e2310756e"
+    ],
+    [
+     400,
+     "689a874d04140aff23dd996fd06d604d2ed55915a2774481e482a3a302644b4e"
+    ],
+    [
+     500,
+     "cc56e44eb78766888099596d18dade078ffbe2a9c2007543f37e65c2850e066f"
+    ],
+    [
+     600,
+     "a4e57980750af7b35733f8302cea83011202b2143e3c48a5f4ab77b85f57eed2"
+    ],
+    [
+     700,
+     "74aebf5174bd545f28defe8d2daa6d6d939e3242e73bccc9da35f43d21b4a1c0"
+    ],
+    [
+     800,
+     "4c146ba2613de221b88d0b94f339db26aa4a3220cce2be4dc7828ed8bdc3b1db"
+    ],
+    [
+     900,
+     "9343d15b687df8cad240393d038a32b3ad52fcad5c0cd042afee1bf30d7a9d9e"
+    ],
+    [
+     1000,
+     "17bbb05bd6e198956da9a1a745c0bc12c362622eaec246bb14333f39850c69da"
+    ],
+    [
+     1100,
+     "12f22d2ee79361fa653ed13f3a895c6c1f79a3cf53cddfb92b9f63e5ae832c80"
+    ],
+    [
+     1200,
+     "443c829b2a639f64cea9a35aa36d60def5eeaab0966dbb41b461e61425552c13"
+    ]
+   ]
+  },
+  {
+   "name": "budget",
+   "set": "default",
+   "rules": {
+    "budget_max": 100.0,
+    "budget_start": 100.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 120,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000000004e40"
+    },
+    {
+     "offset": 0,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 10,
+     "accepted": true,
+     "budget": "0000000000004440"
+    },
+    {
+     "offset": 0,
+     "tool": "nutrients",
+     "x": 10,
+     "y": 10,
+     "accepted": true,
+     "budget": "0000000000003e40"
+    },
+    {
+     "offset": 0,
+     "tool": "nutrients",
+     "x": 30,
+     "y": 10,
+     "accepted": true,
+     "budget": "0000000000003440"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 60,
+     "y": 20,
+     "accepted": true,
+     "budget": "0000000000003040"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 60,
+     "y": 20,
+     "accepted": false,
+     "budget": "0000000000003040"
+    },
+    {
+     "offset": 1,
+     "tool": "volcano",
+     "x": 70,
+     "y": 30,
+     "accepted": false,
+     "budget": "cdcccccccc0c3040"
+    },
+    {
+     "offset": 1,
+     "tool": "meteorite",
+     "x": 5,
+     "y": 5,
+     "accepted": false,
+     "budget": "cdcccccccc0c3040"
+    },
+    {
+     "offset": 90,
+     "tool": "meteorite",
+     "x": 5,
+     "y": 5,
+     "accepted": true,
+     "budget": "400200000000e03f"
+    }
+   ],
+   "achieved": {},
+   "budget": "9300000000000040",
+   "player_vents": 1,
+   "hashes": [
+    [
+     200,
+     "659812c0c993d3b54325ff3d2e5f9b476242e1726ecc523f08f45da525be832c"
+    ],
+    [
+     300,
+     "81602177a52c49f68ce081f0c9af3d2862f72c61f8ca2bd2ba0cc77d8903514b"
+    ],
+    [
+     320,
+     "f924ed9cc3137b8b37d4d16fcf294f0de464eb262fdd0f82d617caf42ee6e94f"
+    ]
+   ]
+  },
+  {
+   "name": "abyss_balance_giant",
+   "set": "default",
+   "rules": {
+    "budget_max": 1000000.0,
+    "budget_start": 1000000.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 1,
+    "abyss_radius": 6.0,
+    "balance_cells": 1,
+    "giant_colony": 12,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 600,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 5,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000030842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 20,
+     "y": 62,
+     "accepted": true,
+     "budget": "00000000e0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 35,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000090832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 50,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000040832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 65,
+     "y": 62,
+     "accepted": true,
+     "budget": "00000000f0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 80,
+     "y": 62,
+     "accepted": true,
+     "budget": "00000000a0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 95,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000050822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 110,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000000822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 125,
+     "y": 62,
+     "accepted": true,
+     "budget": "00000000b0812e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 140,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000060812e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 155,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000010812e41"
+    }
+   ],
+   "achieved": {
+    "abyss": 300,
+    "balance": 475,
+    "giant": 225
+   },
+   "budget": "f00000004c812e41",
+   "player_vents": 11,
+   "hashes": [
+    [
+     200,
+     "8d12b32e4c62e89749598b881b90b6b9f9fbddfe53098bfba350607f71dc0673"
+    ],
+    [
+     300,
+     "df6d6eea013d488a95dd25fd1c1a7a7c539c1171376448b28ccebb86da9abe68"
+    ],
+    [
+     400,
+     "c2d6dcd77b59c23ff05c3663212ddc56bfbc9326984b496f0a6e099ae3282d67"
+    ],
+    [
+     500,
+     "499f0de9c48a410f5ba8fd47121bf7060d6d18beda37aa1899167c2f470947af"
+    ],
+    [
+     600,
+     "e0ea95fe6ad519a6cbd904fa14a5b50f244641310153ced343ab0a4b1da2fe7d"
+    ],
+    [
+     700,
+     "1958532ec4da5e4b2b450aebe78f82448bdf2586e995579371485b1457314ef3"
+    ],
+    [
+     800,
+     "b1cd987e65f0981f8c62ff2ded4e0172384b34cbb06ddb41ba2d3773b4629036"
+    ]
+   ]
+  },
+  {
+   "name": "plastic_abyss_giant",
+   "set": "plasticity",
+   "rules": {
+    "budget_max": 1000000.0,
+    "budget_start": 1000000.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 3,
+    "abyss_radius": 6.0,
+    "balance_cells": 2,
+    "giant_colony": 12,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 400,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 80,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000030842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "volcano",
+     "x": 30,
+     "y": 62,
+     "accepted": true,
+     "budget": "00000000e0832e41"
+    }
+   ],
+   "achieved": {
+    "abyss": 450,
+    "giant": 225
+   },
+   "budget": "a000000008842e41",
+   "player_vents": 2,
+   "hashes": [
+    [
+     200,
+     "6c28bff86c47a3d6db777865615847225e86e952b7b47dc81de929ae1124c12a"
+    ],
+    [
+     300,
+     "9b3c15390fd68986762525e3557d435c8ca8ac8ff298f493e990b95e3f6c768c"
+    ],
+    [
+     400,
+     "12702a4f1655cd3f84a346b79fc00d23278ea9b47538a45316e439e48cb8ab6f"
+    ],
+    [
+     500,
+     "d25be0a6d3eb5ffb57a2f5789c7e4f71f99b4b1d01cb8c443dc618e1c06874d4"
+    ],
+    [
+     600,
+     "3b7271ece58b0a0e3eb4fc79ca90259b3399dd00462b3f8e26dacf6b13adde2e"
+    ]
+   ]
+  },
+  {
+   "name": "survivor",
+   "set": "default",
+   "rules": {
+    "budget_max": 1000000.0,
+    "budget_start": 1000000.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 50,
+    "recover_fraction": 1.0,
+    "divided_cells": 100
+   },
+   "steps": 900,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000058842e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000030842e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 0,
+     "y": 52,
+     "accepted": true,
+     "budget": "0000000008842e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 8,
+     "accepted": true,
+     "budget": "00000000e0832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000b8832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 20,
+     "y": 52,
+     "accepted": true,
+     "budget": "0000000090832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000068832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000040832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 40,
+     "y": 52,
+     "accepted": true,
+     "budget": "0000000018832e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 8,
+     "accepted": true,
+     "budget": "00000000f0822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000c8822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 60,
+     "y": 52,
+     "accepted": true,
+     "budget": "00000000a0822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000078822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000050822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 80,
+     "y": 52,
+     "accepted": true,
+     "budget": "0000000028822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000000822e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000d8812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 100,
+     "y": 52,
+     "accepted": true,
+     "budget": "00000000b0812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000088812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000060812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 120,
+     "y": 52,
+     "accepted": true,
+     "budget": "0000000038812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000010812e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 30,
+     "accepted": true,
+     "budget": "00000000e8802e41"
+    },
+    {
+     "offset": 30,
+     "tool": "meteorite",
+     "x": 140,
+     "y": 52,
+     "accepted": true,
+     "budget": "00000000c0802e41"
+    }
+   ],
+   "achieved": {
+    "survivor": 344
+   },
+   "budget": "5c01000017812e41",
+   "player_vents": 0,
+   "hashes": [
+    [
+     200,
+     "8d12b32e4c62e89749598b881b90b6b9f9fbddfe53098bfba350607f71dc0673"
+    ],
+    [
+     300,
+     "49c344de5c45155226e7cb009d773b5f1cc7c8c37cf83e0b786982d86780e642"
+    ],
+    [
+     400,
+     "491a45e25772f297e983842b48776af75c8b36ee743cfc1008214a2e3735e06d"
+    ],
+    [
+     500,
+     "08d4f15b7cfd1cb3a183c3afcb2c35e6d0ff77fa6c89e80ce992aa1f682964f3"
+    ],
+    [
+     600,
+     "6a6f8ffc40d8c1b0dc309dcb61b5b1673e1a8009321c96daa6a1e3cd4552e7ea"
+    ],
+    [
+     700,
+     "535137437466409de7f6aa8362dd755d0a8dd0234de8362a7dfcd532e0577c06"
+    ],
+    [
+     800,
+     "d4a288e6a43efbe7f8b4dc05e4e946a6169edcc4e0391129ee7a0f5e87cd0f72"
+    ],
+    [
+     900,
+     "1978818cc860a30ac74bc0d1cc6c98a3fd6ee9162d411e71b8982576e394f04b"
+    ],
+    [
+     1000,
+     "ee57b038ba57a64f499f49ab342aa4d18b1a25cbd8d33abd38de79b5f9c79a7f"
+    ],
+    [
+     1100,
+     "60255d890eb7c9c8bf24e1565bc0e066019fa2d02ff650f6cfc1793e1e76facc"
+    ]
+   ]
+  },
+  {
+   "name": "divided",
+   "set": "default",
+   "rules": {
+    "budget_max": 1000000.0,
+    "budget_start": 1000000.0,
+    "regen": 0.05,
+    "cost": [
+     10.0,
+     20.0,
+     4.0,
+     4.0,
+     40.0
+    ],
+    "radius": [
+     6,
+     10,
+     2,
+     2,
+     0
+    ],
+    "nutrients_amount": 15.0,
+    "max_chem": 4.0,
+    "check_every": 25,
+    "abyss_cells": 50,
+    "abyss_radius": 6.0,
+    "balance_cells": 30,
+    "giant_colony": 80,
+    "kill_fraction": 0.3333333333333333,
+    "collapse_window": 100,
+    "recover_fraction": 1.0,
+    "divided_cells": 20
+   },
+   "steps": 50,
+   "start_step": 200,
+   "actions": [
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 0,
+     "accepted": true,
+     "budget": "0000000078842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 2,
+     "accepted": true,
+     "budget": "0000000070842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 4,
+     "accepted": true,
+     "budget": "0000000068842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 6,
+     "accepted": true,
+     "budget": "0000000060842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000058842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 10,
+     "accepted": true,
+     "budget": "0000000050842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 12,
+     "accepted": true,
+     "budget": "0000000048842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 14,
+     "accepted": true,
+     "budget": "0000000040842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 16,
+     "accepted": true,
+     "budget": "0000000038842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 18,
+     "accepted": true,
+     "budget": "0000000030842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 20,
+     "accepted": true,
+     "budget": "0000000028842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 22,
+     "accepted": true,
+     "budget": "0000000020842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 24,
+     "accepted": true,
+     "budget": "0000000018842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 26,
+     "accepted": true,
+     "budget": "0000000010842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 28,
+     "accepted": true,
+     "budget": "0000000008842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000000842e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 32,
+     "accepted": true,
+     "budget": "00000000f8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 34,
+     "accepted": true,
+     "budget": "00000000f0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 36,
+     "accepted": true,
+     "budget": "00000000e8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 38,
+     "accepted": true,
+     "budget": "00000000e0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 40,
+     "accepted": true,
+     "budget": "00000000d8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 42,
+     "accepted": true,
+     "budget": "00000000d0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 44,
+     "accepted": true,
+     "budget": "00000000c8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 46,
+     "accepted": true,
+     "budget": "00000000c0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 48,
+     "accepted": true,
+     "budget": "00000000b8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 50,
+     "accepted": true,
+     "budget": "00000000b0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 52,
+     "accepted": true,
+     "budget": "00000000a8832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 54,
+     "accepted": true,
+     "budget": "00000000a0832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 56,
+     "accepted": true,
+     "budget": "0000000098832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 58,
+     "accepted": true,
+     "budget": "0000000090832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 60,
+     "accepted": true,
+     "budget": "0000000088832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 20,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000080832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 0,
+     "accepted": true,
+     "budget": "0000000078832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 2,
+     "accepted": true,
+     "budget": "0000000070832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 4,
+     "accepted": true,
+     "budget": "0000000068832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 6,
+     "accepted": true,
+     "budget": "0000000060832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 8,
+     "accepted": true,
+     "budget": "0000000058832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 10,
+     "accepted": true,
+     "budget": "0000000050832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 12,
+     "accepted": true,
+     "budget": "0000000048832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 14,
+     "accepted": true,
+     "budget": "0000000040832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 16,
+     "accepted": true,
+     "budget": "0000000038832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 18,
+     "accepted": true,
+     "budget": "0000000030832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 20,
+     "accepted": true,
+     "budget": "0000000028832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 22,
+     "accepted": true,
+     "budget": "0000000020832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 24,
+     "accepted": true,
+     "budget": "0000000018832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 26,
+     "accepted": true,
+     "budget": "0000000010832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 28,
+     "accepted": true,
+     "budget": "0000000008832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 30,
+     "accepted": true,
+     "budget": "0000000000832e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 32,
+     "accepted": true,
+     "budget": "00000000f8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 34,
+     "accepted": true,
+     "budget": "00000000f0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 36,
+     "accepted": true,
+     "budget": "00000000e8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 38,
+     "accepted": true,
+     "budget": "00000000e0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 40,
+     "accepted": true,
+     "budget": "00000000d8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 42,
+     "accepted": true,
+     "budget": "00000000d0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 44,
+     "accepted": true,
+     "budget": "00000000c8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 46,
+     "accepted": true,
+     "budget": "00000000c0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 48,
+     "accepted": true,
+     "budget": "00000000b8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 50,
+     "accepted": true,
+     "budget": "00000000b0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 52,
+     "accepted": true,
+     "budget": "00000000a8822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 54,
+     "accepted": true,
+     "budget": "00000000a0822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 56,
+     "accepted": true,
+     "budget": "0000000098822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 58,
+     "accepted": true,
+     "budget": "0000000090822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 60,
+     "accepted": true,
+     "budget": "0000000088822e41"
+    },
+    {
+     "offset": 0,
+     "tool": "mountain",
+     "x": 100,
+     "y": 62,
+     "accepted": true,
+     "budget": "0000000080822e41"
+    }
+   ],
+   "achieved": {
+    "divided": 225
+   },
+   "budget": "1400000085822e41",
+   "player_vents": 0,
+   "hashes": [
+    [
+     200,
+     "cb3f7fa52f050c8da19aeec0eefc58b695f43ad4bd2df130b67894cebe6a910f"
+    ],
+    [
+     250,
+     "a2608cd1c5aee37218309c5523c8e82ef49d6dbe9708a4bf08b18c3c58f0b40a"
+    ]
+   ]
+  }
+ ]
+}

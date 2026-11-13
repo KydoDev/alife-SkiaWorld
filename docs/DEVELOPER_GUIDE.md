@@ -68,7 +68,8 @@ python scripts/g2_golden.py --all engine-rs/tests/golden
 #  engine-rs/tests/golden/terrain.json, python scripts/g2_create_vectors.py --out engine-rs/tests/golden/create.json
 #  and python scripts/g2_intervention_vectors.py --root engine-rs/tests/golden
 #  --out engine-rs/tests/golden/interventions.json, which reads the sets' start saves; and views.json, the G3 P4
-#  view vectors of ADR-0016: python scripts/g3_view_vectors.py, likewise from the start saves)
+#  view vectors of ADR-0016: python scripts/g3_view_vectors.py, likewise from the start saves; and games.json, the
+#  G3 P7 game vectors of ADR-0017: python scripts/g3_game_vectors.py, likewise, about a minute)
 # numpy mean vectors (ndarray.mean(), pairwise summation; tied to the installed numpy)
 python scripts/g2_mean_vectors.py --out engine-rs/tests/mean_vectors.json
 # seeding vectors (random.Random(seed) for int and str seeds; platform-independent)

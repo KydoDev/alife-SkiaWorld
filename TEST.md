@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P6b (population panel), `main`, working tree before the commit; pytest and cargo from the
+Last run: 2026-11-13 - G3 P7 piece 1 (game vectors); Unity and cargo from the P6b run (unchanged since), `main`, working tree before the commit; pytest and cargo from the
 save-loader run (no Python or Rust change since)
 
 > Archive protocol: before overwriting this file, append its current content to
@@ -9,7 +9,7 @@ save-loader run (no Python or Rust change since)
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| pytest (418 tests) | 418 | 0 | 0 | 99.39% |
+| pytest (423 tests) | 423 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
 | Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 45 | 0 | 0 | |
@@ -17,6 +17,9 @@ save-loader run (no Python or Rust change since)
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P7 piece 1: `tests/test_game_vectors.py` (5): defaults, committed `games.json`, idle hashes equal
+  `hashes.csv`, the generator refuses vacuous cases, integer distance equals `math.hypot` on a grid of offsets.
+  pytest now takes about 2 minutes (the game vectors are rebuilt once, about 15 s).
 - New in P6b: `PopulationTests` (4 golden worlds + the bounded history) and PlayMode
   `PopulationPanelShowsTheCountsAndTheirHistory`.
 - New in P6a: `CellSheetTests` (4: names equal `worldsim/world.py`, kind rule, summary text, following across
