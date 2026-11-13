@@ -14,7 +14,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 12. [?] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
 5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
-7. [ ] P6 Inspector bottom sheet and population screen from the ABI 4 views
+7. [~] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [ ] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
 9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
@@ -151,7 +151,11 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   gradient and the seabed carry on into the bands, dimmed, with a subtle line at the world's edge. Built (P5d) from
   the world's own render rather than the design's water bands, so the margins match the RGB world they continue
   (the design palette applies to the sprites only, until the background itself becomes pixel art).
-- **P6 Inspector and population** — from P4 views. Pass: the inspector's values for a golden cell equal
+- **P6 Inspector and population** — from P4 views. *P6a* (2026-11-13): a tap with no tool opens a bottom sheet with
+  the cell's kind, id, energy, age, lineage, colony, traits in use, rule count, and bars for the feeding shares and
+  the 16 genes (names checked against `worldsim/world.py`); a marker outlines its tile. After each redraw the sheet
+  finds the cell again by id within 2 tiles of its last tile (x wraps), else says it was lost (moved too far in a
+  fast frame, or died) and keeps the last values. The record itself equals Python's (P4 `ViewTests`). Pass: the inspector's values for a golden cell equal
   the Python export.
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the
   kernel, RNG-free, plus `ws_game_*` entry points. Pass: `play.replay` of the recorded scripted-player runs

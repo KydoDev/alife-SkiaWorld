@@ -32,6 +32,8 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 25. [x] G3 P5c: night/day palette rows driven by `WorldInfo.LightFactor`
 26. [x] G3 P5d: margins as the abyss continuing (owner's choice 2026-11-12): dimmed water and seabed, edge line
 27. [~] G3 P5 check: APK 0.0.2 on the owner's phone; frame time <= 16 ms at every zoom; owner's look check
+28. [x] G3 P6a: cell sheet on a tap with no tool (record, shares, genes), follows the cell by id, marker on its tile
+29. [~] G3 P6b: population screen (cells per kind, history chart) from the tile words
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

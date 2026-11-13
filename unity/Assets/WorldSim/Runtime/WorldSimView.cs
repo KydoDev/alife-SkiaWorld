@@ -92,6 +92,16 @@ namespace WorldSim
         private Image _image;                // the world, drawn once (no copies: P2b)
         private Image _spriteImage;          // the sprites over it, shown at >= SpriteArt.Size device px per tile
         private Image _backdrop;             // under the world: the margins (P5d)
+
+        // P6a cell sheet: the selected cell, followed by id after each redraw (CellSheet.Follow)
+        private VisualElement _sheet, _marker;
+        private Label _sheetTitle, _sheetSummary;
+        private readonly List<VisualElement> _shareFills = new List<VisualElement>();
+        private readonly List<VisualElement> _geneFills = new List<VisualElement>();
+        private bool _selected;
+        private bool _selectionLost;
+        private int _selX, _selY;
+        private CellRecord _selRecord;
         private VisualElement _edge;         // a faint line just outside the world's edge
         private Label _stats, _speed, _error, _toolStatus;
 
@@ -205,6 +215,12 @@ namespace WorldSim
                     e.StopPropagation();
                 }
             }, TrickleDown.TrickleDown);
+            _sheet = doc.Q("sheet");
+            _sheetTitle = doc.Q<Label>("sheet-title");
+            _sheetSummary = doc.Q<Label>("sheet-summary");
+            Bind(doc, "sheet-close", Deselect);
+            BuildBars(doc.Q("sheet-shares"), CellSheet.ShareNames, _shareFills);
+            BuildBars(doc.Q("sheet-genes"), CellSheet.GeneNames, _geneFills);
             _worldView = doc.Q("world");
             _worldView.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
             _worldView.RegisterCallback<PointerMoveEvent>(OnWorldPointerMove);
@@ -214,6 +230,135 @@ namespace WorldSim
             _worldView.RegisterCallback<WheelEvent>(OnWorldWheel);
             _worldView.RegisterCallback<GeometryChangedEvent>(_ => FitView());
             _root.RegisterCallback<GeometryChangedEvent>(_ => ApplyLayout());
+        }
+
+        private static void BuildBars(VisualElement parent, string[] names, List<VisualElement> fills)
+        {
+            foreach (string name in names)
+            {
+                var row = new VisualElement();
+                row.AddToClassList("ws-bar-row");
+                var label = new Label(name);
+                label.AddToClassList("ws-bar-row__name");
+                var track = new VisualElement();
+                track.AddToClassList("ws-bar-row__track");
+                var fill = new VisualElement();
+                fill.AddToClassList("ws-bar-row__fill");
+                track.Add(fill);
+                row.Add(label);
+                row.Add(track);
+                parent.Add(row);
+                fills.Add(fill);
+            }
+        }
+
+        // ------------------------------------------------------------------ cell sheet (P6a)
+
+        /// <summary>True while the cell sheet is open.</summary>
+        public bool SheetOpen => _selected;
+
+        /// <summary>The selected cell's id and tile, and whether it was lost (moved too far or died).</summary>
+        public ulong SelectedId => _selRecord.Id;
+        public Vector2Int SelectedTile => new Vector2Int(_selX, _selY);
+        public bool SelectionLost => _selectionLost;
+        public ulong SelectedAge() => _selRecord.Age;
+
+        /// <summary>The sheet's title and text, for tests.</summary>
+        public string SheetText => $"{_sheetTitle?.text}\n{_sheetSummary?.text}";
+
+        /// <summary>A tap at a world-local point, as a finger or the mouse would make it (tests).</summary>
+        public void TapAt(Vector2 local) => Tap(local);
+
+        /// <summary>Run <paramref name="steps"/> steps now, as the Step button does (tests).</summary>
+        public void StepNow(uint steps) => Advance(steps);
+
+        private void Select(int x, int y, CellRecord record)
+        {
+            _selected = true;
+            _selectionLost = false;
+            _selX = x;
+            _selY = y;
+            _selRecord = record;
+            ShowSheet();
+        }
+
+        private void Deselect()
+        {
+            _selected = false;
+            _sheet?.RemoveFromClassList("ws-sheet--open");
+            if (_marker != null)
+            {
+                _marker.style.display = DisplayStyle.None;
+            }
+        }
+
+        private void ShowSheet()
+        {
+            if (_sheet == null)
+            {
+                return;
+            }
+            _sheet.AddToClassList("ws-sheet--open");
+            CellRecord r = _selRecord;
+            _sheetTitle.text = CellSheet.Title(r) + (_selectionLost ? "  (lost: moved away or died)" : "");
+            _sheetSummary.text = CellSheet.Summary(r);
+            for (int i = 0; i < _shareFills.Count; i++)
+            {
+                _shareFills[i].style.width = Length.Percent(Mathf.Clamp01((float)r.Shares[i]) * 100f);
+            }
+            for (int i = 0; i < _geneFills.Count; i++)
+            {
+                _geneFills[i].style.width = Length.Percent(Mathf.Clamp01((float)r.Genes[i]) * 100f);
+            }
+            PlaceMarker(PixelsPerPoint());
+        }
+
+        /// <summary>After <paramref name="steps"/> steps, find the selected cell again near its last tile.</summary>
+        private void RefreshSelection(uint steps)
+        {
+            if (!_selected || _selectionLost || _world == null)
+            {
+                return;
+            }
+            int radius = (int)Math.Min(steps, (uint)CellSheet.MaxFollowRadius);
+            if (CellSheet.Follow((x, y) => _world.Cell((uint)x, (uint)y), (int)_info.Width, (int)_info.Height,
+                                 _selX, _selY, _selRecord.Id, radius, out int nx, out int ny, out CellRecord r))
+            {
+                _selX = nx;
+                _selY = ny;
+                _selRecord = r;
+            }
+            else
+            {
+                _selectionLost = true;    // the last values stay on the sheet
+            }
+            ShowSheet();
+        }
+
+        /// <summary>An outline over the selected tile, in whole device pixels like the world.</summary>
+        private void PlaceMarker(float k)
+        {
+            if (_camera == null || _worldView == null)
+            {
+                return;
+            }
+            if (_marker == null)
+            {
+                _marker = new VisualElement { pickingMode = PickingMode.Ignore };
+                _marker.AddToClassList("ws-marker");
+                _worldView.Add(_marker);
+            }
+            bool show = _selected && !_selectionLost;
+            _marker.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show)
+            {
+                return;
+            }
+            int s = _camera.Scale;
+            _marker.style.left = (_camera.Left() + _selX * s) / k;
+            _marker.style.top = (_camera.Top() + _selY * s) / k;
+            _marker.style.width = s / k;
+            _marker.style.height = s / k;
         }
 
         /// <summary>A button that runs <paramref name="action"/> and then refreshes the HUD. Buttons never take
@@ -415,6 +560,10 @@ namespace WorldSim
             Place(_spriteImage, k);
             _spriteImage.style.display = SpritesShown ? DisplayStyle.Flex : DisplayStyle.None;
             RefreshSprites();
+            if (_selected)
+            {
+                PlaceMarker(k);
+            }
         }
 
         /// <summary>The backdrop covers the view in whole tiles aligned with the world's grid; the edge line sits
@@ -613,10 +762,17 @@ namespace WorldSim
             if (_tool >= 0)
             {
                 ApplyTool((uint)x, (uint)y);
+                return;
+            }
+            _toolStatus.text = $"tile ({x}, {y})";
+            CellRecord record = _world.Cell((uint)x, (uint)y);
+            if (record.Present == 1)
+            {
+                Select(x, y, record);
             }
             else
             {
-                _toolStatus.text = $"tile ({x}, {y})";
+                Deselect();
             }
         }
 
@@ -683,6 +839,7 @@ namespace WorldSim
                 ulong changed = _world.Intervene((Edit)t.kind, x, y, t.radius, t.amount);
                 _info = _world.Info;
                 Redraw();
+                RefreshSelection(0);    // an edit kills cells but moves none
                 _toolStatus.text = $"{t.name} at ({x}, {y}): {changed}";
             }
             catch (WorldSimException e)
@@ -741,6 +898,7 @@ namespace WorldSim
                 }
                 _world?.Dispose();   // only now: on failure the current world stays
                 _world = world;
+                Deselect();    // a new world has none of the old cells
                 _info = info;
                 _rgb = new byte[rgbLength];
                 _tileWords = new byte[world.TilesLength];
@@ -881,6 +1039,7 @@ namespace WorldSim
                 _world.Step(steps);
                 _info = _world.Info;
                 Redraw();
+                RefreshSelection(steps);
             }
             catch (WorldSimException e)
             {

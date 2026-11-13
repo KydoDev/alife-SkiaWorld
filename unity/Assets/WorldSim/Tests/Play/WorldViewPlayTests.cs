@@ -220,6 +220,62 @@ namespace WorldSim.PlayTests
             Assert.IsTrue(_view.running, "Space did not start the world");
         }
 
+        [UnityTest]
+        public IEnumerator TappingACellOpensItsSheetAndTheSheetFollowsIt()
+        {
+            yield return OpenView();
+            yield return null;
+            using NativeWorld twin = NativeWorld.Load(File.ReadAllBytes(GoldenSave()));    // the same world, apart
+            WorldCamera camera = _view.Camera;
+            int w = camera.Width, h = camera.Height;
+            int cx = -1, cy = -1, ex = -1, ey = -1;
+            for (int i = 0; i < w * h && (cx < 0 || ex < 0); i++)
+            {
+                bool present = twin.Cell((uint)(i % w), (uint)(i / w)).Present == 1;
+                if (present && cx < 0)
+                {
+                    (cx, cy) = (i % w, i / w);
+                }
+                else if (!present && ex < 0)
+                {
+                    (ex, ey) = (i % w, i / w);
+                }
+            }
+            CellRecord want = twin.Cell((uint)cx, (uint)cy);
+
+            _view.TapAt(DrawnCentre(_view, cx, cy));
+            Assert.IsTrue(_view.SheetOpen, "a tap on a cell with no tool opens the sheet");
+            Assert.AreEqual(want.Id, _view.SelectedId);
+            StringAssert.Contains($"#{want.Id}", _view.SheetText);
+            StringAssert.Contains($"energy {want.Energy:0.0}", _view.SheetText);
+
+            // one step later the sheet shows the same cell where the kernel put it (or says it was lost)
+            _view.StepNow(1);
+            twin.Step(1);
+            int fx = -1, fy = -1;
+            for (int i = 0; i < w * h; i++)
+            {
+                CellRecord r = twin.Cell((uint)(i % w), (uint)(i / w));
+                if (r.Present == 1 && r.Id == want.Id)
+                {
+                    (fx, fy) = (i % w, i / w);
+                }
+            }
+            if (fx < 0)
+            {
+                Assert.IsTrue(_view.SelectionLost, "the cell died: the sheet says so");
+            }
+            else
+            {
+                Assert.IsFalse(_view.SelectionLost, "a cell moves at most one tile a step");
+                Assert.AreEqual(new Vector2Int(fx, fy), _view.SelectedTile);
+                Assert.AreEqual(twin.Cell((uint)fx, (uint)fy).Age, _view.SelectedAge());
+            }
+
+            _view.TapAt(DrawnCentre(_view, ex, ey));
+            Assert.IsFalse(_view.SheetOpen, "a tap on an empty tile closes the sheet");
+        }
+
         // Input System screen coordinates: pixels, origin bottom-left
         private static IEnumerator Click(Mouse mouse, Vector2 screen)
         {

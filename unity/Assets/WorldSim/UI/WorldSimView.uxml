@@ -23,5 +23,15 @@
             <ui:VisualElement name="tools" class="ws-tools" />
             <ui:Label name="tool-status" class="ws-status" />
         </ui:VisualElement>
+        <!-- G3 P6a: the cell sheet, over the dock while a cell is selected (a tap with no tool) -->
+        <ui:VisualElement name="sheet" class="ws-sheet">
+            <ui:VisualElement class="ws-sheet__head">
+                <ui:Label name="sheet-title" class="ws-sheet__title" />
+                <ui:Button name="sheet-close" text="X" class="ws-btn ws-btn--square" />
+            </ui:VisualElement>
+            <ui:Label name="sheet-summary" class="ws-sheet__text" />
+            <ui:VisualElement name="sheet-shares" class="ws-sheet__bars" />
+            <ui:VisualElement name="sheet-genes" class="ws-sheet__bars" />
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

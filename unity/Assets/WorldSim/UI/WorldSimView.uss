@@ -166,3 +166,78 @@
 .ws-portrait .ws-seed .unity-base-text-field__input {
     min-width: 120px;
 }
+
+/* G3 P6a cell sheet: a bottom sheet over the dock; bars in two columns. */
+.ws-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 55%;
+    padding: 6px 12px 10px 12px;
+    background-color: rgba(14, 15, 31, 0.94);
+    border-top-width: 2px;
+    border-top-color: #39f5e0;
+    display: none;
+}
+
+.ws-sheet--open {
+    display: flex;
+}
+
+.ws-sheet__head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ws-sheet__title {
+    color: #39f5e0;
+    font-size: 20px;
+    -unity-font-style: bold;
+}
+
+.ws-sheet__text {
+    color: #e8fbff;
+    white-space: normal;
+    margin-bottom: 4px;
+}
+
+.ws-sheet__bars {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.ws-bar-row {
+    flex-direction: row;
+    align-items: center;
+    width: 50%;
+    min-width: 220px;
+    height: 20px;
+}
+
+.ws-bar-row__name {
+    width: 96px;
+    font-size: 14px;
+    color: #9fd8e0;
+}
+
+.ws-bar-row__track {
+    flex-grow: 1;
+    height: 8px;
+    margin-right: 12px;
+    background-color: #2c3560;
+}
+
+.ws-bar-row__fill {
+    height: 100%;
+    background-color: #39f5e0;
+}
+
+/* the selected tile: an outline the view places over it */
+.ws-marker {
+    position: absolute;
+    border-width: 2px;
+    border-color: #ffffff;
+}

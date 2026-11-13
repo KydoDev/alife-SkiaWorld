@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P6a, cell sheet**: a tap on a cell with no tool selected opens a bottom sheet with its kind, id, energy, age,
+  lineage, colony size, traits in use and rule count, plus bars for the feeding shares and the 16 genes; an outline
+  marks its tile. The sheet follows the cell by id from step to step (within 2 tiles, across the x seam) and says
+  when it is lost. `CellSheet.cs`, EditMode `CellSheetTests` (gene and trait names read from `worldsim/world.py`),
+  PlayMode `TappingACellOpensItsSheetAndTheSheetFollowsIt` (checked against a second copy of the world).
 - **G3 P5d, the abyss continues in the margins** (owner's choice): the bands around the fitted world are no longer
   black. Beside the world each row carries on as its own water, or as rock where the world's edge tile is rock;
   above the surface the top water, below the floor the deepest rock. The colours are the means of the world's own
