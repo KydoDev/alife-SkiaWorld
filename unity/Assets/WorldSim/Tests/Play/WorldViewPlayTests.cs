@@ -276,6 +276,25 @@ namespace WorldSim.PlayTests
             Assert.IsFalse(_view.SheetOpen, "a tap on an empty tile closes the sheet");
         }
 
+        [UnityTest]
+        public IEnumerator PopulationPanelShowsTheCountsAndTheirHistory()
+        {
+            yield return OpenView();
+            using NativeWorld twin = NativeWorld.Load(File.ReadAllBytes(GoldenSave()));
+            Assert.IsFalse(_view.PopulationOpen, "closed at first");
+            _view.TogglePopulation();
+            yield return null;
+            Assert.IsTrue(_view.PopulationOpen);
+            int[] c = _view.KindCounts;
+            Assert.AreEqual((int)twin.Info.Population, c[1] + c[2] + c[3] + c[4]);
+            Assert.AreEqual($"photo {c[1]}  sapro {c[2]}  pred {c[3]}  chemo {c[4]}", _view.PopulationText);
+            int before = _view.History.Samples.Count;
+            _view.StepNow(5);
+            Assert.AreEqual(before + 1, _view.History.Samples.Count, "one sample per redraw");
+            _view.TogglePopulation();
+            Assert.IsFalse(_view.PopulationOpen);
+        }
+
         // Input System screen coordinates: pixels, origin bottom-left
         private static IEnumerator Click(Mouse mouse, Vector2 screen)
         {

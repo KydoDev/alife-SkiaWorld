@@ -15,6 +15,7 @@
             <ui:TextField name="seed" label="seed" max-length="20" class="ws-seed" />
             <ui:Button name="new-world" text="New world" class="ws-btn" />
             <ui:Button name="orientation" text="Portrait" class="ws-btn" />
+            <ui:Button name="population" text="Population" class="ws-btn" />
         </ui:VisualElement>
         <ui:VisualElement name="world" class="ws-world">
             <ui:Label name="error" class="ws-error" />
@@ -22,6 +23,10 @@
         <ui:VisualElement name="dock" class="ws-dock">
             <ui:VisualElement name="tools" class="ws-tools" />
             <ui:Label name="tool-status" class="ws-status" />
+        </ui:VisualElement>
+        <!-- G3 P6b: cells per kind and their history, over the world's top right corner -->
+        <ui:VisualElement name="population-panel" class="ws-pop">
+            <ui:VisualElement name="population-counts" class="ws-pop__counts" />
         </ui:VisualElement>
         <!-- G3 P6a: the cell sheet, over the dock while a cell is selected (a tap with no tool) -->
         <ui:VisualElement name="sheet" class="ws-sheet">

@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P6a (cell sheet), `main`, working tree before the commit; pytest and cargo from the
+Last run: 2026-11-13 - G3 P6b (population panel), `main`, working tree before the commit; pytest and cargo from the
 save-loader run (no Python or Rust change since)
 
 > Archive protocol: before overwriting this file, append its current content to
@@ -12,11 +12,13 @@ save-loader run (no Python or Rust change since)
 | pytest (418 tests) | 418 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 53 tests) | 53 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 40 | 0 | 0 | |
-| Unity PlayMode, windowed Editor (5 tests) | 5 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 45 | 0 | 0 | |
+| Unity PlayMode, windowed Editor (6 tests) | 6 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P6b: `PopulationTests` (4 golden worlds + the bounded history) and PlayMode
+  `PopulationPanelShowsTheCountsAndTheirHistory`.
 - New in P6a: `CellSheetTests` (4: names equal `worldsim/world.py`, kind rule, summary text, following across
   the seam) and PlayMode `TappingACellOpensItsSheetAndTheSheetFollowsIt` (a second copy of the golden world says
   where the cell is after one step).

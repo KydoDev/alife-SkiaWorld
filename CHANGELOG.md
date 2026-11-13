@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P6b, population panel**: a Population button opens a panel with the cells per kind, in their neon colours,
+  and a chart of the counts over the whole run (at most 240 samples, thinned as the run grows). `Population.cs`,
+  `PopulationChart.cs`; EditMode `PopulationTests` (counts add up to the population and agree with every cell
+  record on the four golden worlds; the history stays bounded) and a PlayMode check of the panel.
 - **G3 P6a, cell sheet**: a tap on a cell with no tool selected opens a bottom sheet with its kind, id, energy, age,
   lineage, colony size, traits in use and rule count, plus bars for the feeding shares and the 16 genes; an outline
   marks its tile. The sheet follows the cell by id from step to step (within 2 tiles, across the x seam) and says

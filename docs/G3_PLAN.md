@@ -14,7 +14,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 12. [?] P2b Owner's review on the phone: the whole world fits the screen, orientation chosen by the player (below)
 5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
-7. [~] P6 Inspector bottom sheet and population screen from the ABI 4 views
+7. [?] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [ ] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
 9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
@@ -155,7 +155,11 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   the cell's kind, id, energy, age, lineage, colony, traits in use, rule count, and bars for the feeding shares and
   the 16 genes (names checked against `worldsim/world.py`); a marker outlines its tile. After each redraw the sheet
   finds the cell again by id within 2 tiles of its last tile (x wraps), else says it was lost (moved too far in a
-  fast frame, or died) and keeps the last values. The record itself equals Python's (P4 `ViewTests`). Pass: the inspector's values for a golden cell equal
+  fast frame, or died) and keeps the last values. The record itself equals Python's (P4 `ViewTests`). *P6b*: a
+  Population button opens a panel with the cells per kind (counted from the tile words; on all four golden worlds
+  they add up to the kernel's population and agree with every record's shares) and a chart of their history. The
+  history holds at most 240 samples: when full, every other one is dropped and the interval doubles, so the chart
+  always spans the whole run. Still to check: both on the owner's phone (next APK). Pass: the inspector's values for a golden cell equal
   the Python export.
 - **P7 Game rules** — port `play.py` (budget regeneration, the 5 milestones, their checks) to the
   kernel, RNG-free, plus `ws_game_*` entry points. Pass: `play.replay` of the recorded scripted-player runs

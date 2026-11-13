@@ -102,6 +102,13 @@ namespace WorldSim
         private bool _selectionLost;
         private int _selX, _selY;
         private CellRecord _selRecord;
+
+        // P6b population panel
+        private readonly PopulationHistory _history = new PopulationHistory();
+        private VisualElement _populationPanel;
+        private PopulationChart _chart;
+        private readonly Label[] _countLabels = new Label[5];
+        private int[] _counts = new int[5];
         private VisualElement _edge;         // a faint line just outside the world's edge
         private Label _stats, _speed, _error, _toolStatus;
 
@@ -221,6 +228,23 @@ namespace WorldSim
             Bind(doc, "sheet-close", Deselect);
             BuildBars(doc.Q("sheet-shares"), CellSheet.ShareNames, _shareFills);
             BuildBars(doc.Q("sheet-genes"), CellSheet.GeneNames, _geneFills);
+            _populationPanel = doc.Q("population-panel");
+            VisualElement countRow = doc.Q("population-counts");
+            foreach (TileKind kind in SpriteArt.Kinds)
+            {
+                var label = new Label();
+                label.AddToClassList("ws-pop__count");
+                label.style.color = PopulationChart.KindColour(kind);
+                countRow.Add(label);
+                _countLabels[(int)kind] = label;
+            }
+            _chart = new PopulationChart();
+            _populationPanel.Add(_chart);
+            Bind(doc, "population", () =>
+            {
+                _populationPanel.ToggleInClassList("ws-pop--open");
+                ShowPopulation();
+            });
             _worldView = doc.Q("world");
             _worldView.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
             _worldView.RegisterCallback<PointerMoveEvent>(OnWorldPointerMove);
@@ -250,6 +274,39 @@ namespace WorldSim
                 parent.Add(row);
                 fills.Add(fill);
             }
+        }
+
+        // ------------------------------------------------------------------ population (P6b)
+
+        /// <summary>True while the population panel is open.</summary>
+        public bool PopulationOpen => _populationPanel != null && _populationPanel.ClassListContains("ws-pop--open");
+
+        /// <summary>The shown step's cells per kind (index = TileKind) and the run's history (tests).</summary>
+        public int[] KindCounts => _counts;
+        public PopulationHistory History => _history;
+
+        /// <summary>The counts' labels in kind order (tests).</summary>
+        public string PopulationText =>
+            string.Join("  ", System.Linq.Enumerable.Select(SpriteArt.Kinds, k => _countLabels[(int)k]?.text));
+
+        /// <summary>Open or close the population panel, as its button does (tests).</summary>
+        public void TogglePopulation()
+        {
+            _populationPanel?.ToggleInClassList("ws-pop--open");
+            ShowPopulation();
+        }
+
+        private void ShowPopulation()
+        {
+            if (!PopulationOpen)
+            {
+                return;
+            }
+            foreach (TileKind kind in SpriteArt.Kinds)
+            {
+                _countLabels[(int)kind].text = $"{kind.ToString().ToLowerInvariant()} {_counts[(int)kind]}";
+            }
+            _chart.Show(_history);
         }
 
         // ------------------------------------------------------------------ cell sheet (P6a)
@@ -899,6 +956,7 @@ namespace WorldSim
                 _world?.Dispose();   // only now: on failure the current world stays
                 _world = world;
                 Deselect();    // a new world has none of the old cells
+                _history.Clear();
                 _info = info;
                 _rgb = new byte[rgbLength];
                 _tileWords = new byte[world.TilesLength];
@@ -1064,6 +1122,9 @@ namespace WorldSim
             _texture.Apply(false);
             _image?.MarkDirtyRepaint();    // the panel repaints only when something in it is dirty
             _world.Tiles(_tileWords);
+            _counts = Population.Count(_tileWords);
+            _history.Add(_info.StepCount, _counts);    // one sample per redraw, thinned as the run grows
+            ShowPopulation();
             if (_image != null)
             {
                 PlaceBackdrop(PixelsPerPoint());    // the margins follow the world's light and its terrain edits

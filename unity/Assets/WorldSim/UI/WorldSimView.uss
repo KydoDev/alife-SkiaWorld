@@ -241,3 +241,35 @@
     border-width: 2px;
     border-color: #ffffff;
 }
+
+/* G3 P6b population panel: counts per kind and a chart, toggled by the Population button. */
+.ws-pop {
+    position: absolute;
+    right: 8px;
+    top: 120px;
+    width: 340px;
+    padding: 8px;
+    background-color: rgba(14, 15, 31, 0.94);
+    border-width: 2px;
+    border-color: #2c3560;
+    display: none;
+}
+
+.ws-pop--open {
+    display: flex;
+}
+
+.ws-pop__counts {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.ws-pop__count {
+    font-size: 16px;
+}
+
+.ws-pop__chart {
+    height: 150px;
+    background-color: #07080f;
+}
