@@ -6,8 +6,8 @@
 //! **capped** structures (no generic JSON tree, which costs ~30 bytes per value): every list has
 //! a maximum length, refused as soon as it is exceeded, matrices share a budget of
 //! [`MAX_WORLD_TILES`] elements, the rule genes of all cells share a budget of
-//! [`MAX_TOTAL_RULES`] rules (each list stored without spare capacity), and ignored parts (the species tracker, species ids, unknown
-//! top-level keys) are skipped without being stored.
+//! [`MAX_TOTAL_RULES`] rules (each list stored without spare capacity), the species tracker holds at most
+//! [`MAX_SPECIES`] species, and unknown top-level keys are skipped without being stored.
 //!
 //! The checks mirror `persistence.py` (`world_from_dict`) and `Config.validate()`, with
 //! deliberate differences:
@@ -29,16 +29,21 @@
 //!   `-0.0` here and `0` in Python, so the two state hashes differ for that cell (the dynamics do not);
 //!   the same holds for rule values;
 //!   Python never writes `-0`; serde_json drops the distinction before any check could see it;
-//! - **looser, on purpose**: the species tracker and the per-cell species ids are not validated
-//!   (only skipped). They are observer state that never affects the dynamics (ADR-0003) and the
-//!   kernel never reads them.
+//! - the species tracker (ADR-0018) gets every check of `persistence._load_tracker` (bounded integers, ids
+//!   `<= next_id`, founder genomes of 16 values in [0, 1], every cell in an extant species) and, **stricter**,
+//!   what keeps every later birth and death well defined: its parameters equal the config's, ids unique and
+//!   at least 1, an origin name, roots without a parent and speciations with an older one, `extinct` set
+//!   exactly for species without members, `peak >= count`, `children` equal to the retained species naming
+//!   it, each extant species' `count` equal to its living cells, and at most [`MAX_SPECIES`] species. A save
+//!   without a tracker (`null`) loads untracked: the cells' species ids are read and dropped (0).
 
 use crate::config::{Config, MAX_WORLD_TILES};
 use crate::rng::{PyRandom, MT_N};
+use crate::species::{Origin, Species, SpeciesTracker, TrackerCounters};
 use crate::world::{python_sum, Cell, CellRef, Counters, Rule, Terrain, Traits, World, EMPTY};
 use crate::{SaveError, N_GENES, SAVE_VERSION};
 use flate2::read::MultiGzDecoder;
-use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
@@ -62,6 +67,11 @@ pub const MAX_COUNT: u64 = 1 << 62;
 
 /// Most bonds a cell can have: bonded cells are neighbours (they never move), so at most 8.
 pub const MAX_BONDS: usize = 8;
+/// Most species a saved tracker may retain (ADR-0018): far above a long run's few thousand, and a bound on the
+/// memory a hostile save can make the tracker take (about 250 bytes each, held twice while loading: ~130 MB at
+/// most, small enough not to abort a phone). Python has no such bound.
+pub const MAX_SPECIES: usize = 1 << 18;
+
 /// Upper bound of `max_rules` (`Config` bounds it to [0, 64]): the most rule genes a cell can hold.
 pub const MAX_RULES: usize = 64;
 /// Most rule genes a save may hold over all its cells (4M rules = 128 MiB), checked while parsing so
@@ -149,8 +159,59 @@ struct RawSave {
     organic: Matrix<f64>,
     terrain: Option<RawTerrain>, // Python: `d.get("terrain")`
     cells: Capped<RawCell, MAX_CELLS>,
-    #[allow(dead_code)] // observer state: required, skipped
-    tracker: IgnoredAny,
+    #[serde(deserialize_with = "Option::deserialize")] // required key, may be null (untracked)
+    tracker: Option<RawTracker>,
+}
+
+/// `SpeciesTracker.to_dict()`. Unknown keys are skipped, as Python's `from_dict` ignores them.
+#[derive(Deserialize)]
+struct RawTracker {
+    threshold: f64,
+    novelty_activity: u64,
+    prune_peak: i64,
+    next_id: u64,
+    speciations: u64,
+    novelty: u64,
+    pruned: u64,
+    species: Capped<RawSpecies, MAX_SPECIES>,
+}
+
+/// `Species.to_list()`: `[id, parent, origin, founder_genes, born, extinct, count, peak, activity, established,
+/// children]`.
+#[derive(Deserialize)]
+struct RawSpecies(
+    u64,
+    Option<u64>,
+    OriginName,
+    [f64; N_GENES],
+    u64,
+    Option<u64>,
+    u64,
+    u64,
+    u64,
+    Option<u64>,
+    u64,
+);
+
+/// A species origin, one of the three names (anything else is refused without being stored).
+struct OriginName(Origin);
+
+impl<'de> Deserialize<'de> for OriginName {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl Visitor<'_> for V {
+            type Value = OriginName;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a species origin (seed, immigrant or speciation)")
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<OriginName, E> {
+                Origin::from_name(v)
+                    .map(OriginName)
+                    .ok_or_else(|| E::custom("unknown species origin"))
+            }
+        }
+        d.deserialize_str(V)
+    }
 }
 
 /// Other counters (later F-phases may add some) are skipped, as Python whitelists these.
@@ -193,7 +254,7 @@ struct RawCell(
     u64,
     [f64; N_GENES],
     u64,
-    IgnoredAny,
+    u64,
     Capped<u64, MAX_BONDS>,
     RuleList,
     f64,
@@ -487,9 +548,91 @@ fn build_world(raw: RawSave) -> Result<World, SaveError> {
     world.next_id = count(raw.next_id, "next_id")?;
     world.counters = counters;
     load_cells(&mut world, raw.cells.0)?;
+    match raw.tracker {
+        Some(t) => world.tracker = Some(build_tracker(&world, t)?),
+        None => world.slab.iter_mut().for_each(|c| c.species = 0),
+    }
     // `persistence.py` recomputes the light at load (`now = step_count`); it is not hashed.
+    world.now = world.step_count;
     world.update_light(world.step_count);
     Ok(world)
+}
+
+/// `_load_tracker`, stricter (module docs): the tracker of a save, checked against the world's living cells.
+fn build_tracker(world: &World, t: RawTracker) -> Result<SpeciesTracker, SaveError> {
+    let params = world.tracker_params();
+    let same_params = t.threshold == params.threshold
+        && t.novelty_activity == params.novelty_activity
+        && t.prune_peak == params.prune_peak;
+    if !same_params {
+        return Err(err(
+            "malformed save: tracker parameters differ from the config",
+        ));
+    }
+    let counters = TrackerCounters {
+        next_id: count(t.next_id, "tracker next_id")?,
+        speciations: count(t.speciations, "tracker speciations")?,
+        novelty: count(t.novelty, "tracker novelty")?,
+        pruned: count(t.pruned, "tracker pruned")?,
+    };
+    let opt = |v: Option<u64>, what: &str| v.map(|v| count(v, what)).transpose();
+    let rows = t
+        .species
+        .0
+        .into_iter()
+        .map(
+            |RawSpecies(
+                id,
+                parent,
+                origin,
+                genes,
+                born,
+                extinct,
+                n,
+                peak,
+                activity,
+                established,
+                children,
+            )| {
+                Ok(Species {
+                    id: count(id, "species id")?,
+                    parent: opt(parent, "species parent")?,
+                    origin: origin.0,
+                    founder_genes: genes,
+                    born: count(born, "species born")?,
+                    extinct: opt(extinct, "species extinct")?,
+                    count: count(n, "species count")?,
+                    peak: count(peak, "species peak")?,
+                    activity: count(activity, "species activity")?,
+                    established: opt(established, "species established")?,
+                    children: count(children, "species children")?,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, SaveError>>()?;
+    let tracker = SpeciesTracker::restore(params, counters, rows)
+        .map_err(|e| err(format!("malformed save: {e}")))?;
+    let mut members: HashMap<u64, u64> = HashMap::new();
+    for c in world.cells() {
+        if tracker.get(c.species).is_none_or(|s| s.extinct.is_some()) {
+            return Err(err(format!(
+                "cell #{} belongs to unknown or extinct species {}",
+                c.id, c.species
+            )));
+        }
+        *members.entry(c.species).or_default() += 1;
+    }
+    for s in tracker.extant() {
+        if members.get(&s.id).copied().unwrap_or(0) != s.count {
+            return Err(err(format!(
+                "species #{} counts {} members, the save has {}",
+                s.id,
+                s.count,
+                members.get(&s.id).copied().unwrap_or(0)
+            )));
+        }
+    }
+    Ok(tracker)
 }
 
 /// `Random.setstate((3, internal, gauss_next))`.
@@ -558,7 +701,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             age,
             genes,
             lineage,
-            _,
+            species,
             bonds,
             rules,
             sex_p,
@@ -685,6 +828,7 @@ fn load_cells(world: &mut World, rows: Vec<RawCell>) -> Result<(), SaveError> {
             cell.apply_diet(&world.cfg);
         }
         cell.age = count(age, "cell age")?;
+        cell.species = species; // checked against the tracker, or dropped without one
         world.slab.push(cell);
         world.order.push(r);
         world.grid[tile] = r;

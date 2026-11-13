@@ -2,7 +2,7 @@
 //!
 //! Pure functions of the world between steps: no RNG draw, nothing written, so the state hash is
 //! untouched. The tile word packs each field inside one byte (an RGBA32 texture); the layout is
-//! ADR-0016 Decision 1.
+//! ADR-0016 Decision 1; its key is the species id on a tracked world (ADR-0018).
 
 use crate::world::{Cell, CellRef, World, EMPTY};
 use crate::N_GENES;
@@ -68,7 +68,13 @@ fn tile_word(world: &World, i: usize) -> u32 {
     if let Some(c) = world.cell_at(i % world.width, i / world.width) {
         word |= kind(c) | (u32::from(!c.bonds.is_empty()) << 3);
         word |= energy_level(c) << 8;
-        word |= ((c.lineage % (1 << 16)) as u32) << 16;
+        // ADR-0018: the species id when the world is tracked, the lineage otherwise
+        let key = if world.tracker.is_some() {
+            c.species
+        } else {
+            c.lineage
+        };
+        word |= ((key % (1 << 16)) as u32) << 16;
     }
     word
 }
@@ -217,5 +223,26 @@ mod tests {
         assert_eq!(tile_word(&world, i) >> 24, 0xFF);
         world.slab[r as usize].lineage = u64::from(u32::MAX);
         assert_eq!(tile_word(&world, i) >> 16, 0xFFFF);
+    }
+
+    #[test]
+    fn a_tracked_world_keys_tiles_by_species() {
+        let cfg = crate::save::config_from_json(
+            &std::fs::read(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/golden/create_default/config.json"),
+            )
+            .expect("config"),
+        )
+        .expect("config");
+        let mut world = World::new(cfg, 1);
+        let r = world.order[0];
+        let i = world.cell(r).y * world.width + world.cell(r).x;
+        world.slab[r as usize].lineage = 7;
+        world.slab[r as usize].species = 70_000;
+        assert_eq!(tile_word(&world, i) >> 16, 70_000 - 65_536);
+        world.drop_tracker();
+        assert_eq!(world.cell(r).species, 0);
+        assert_eq!(tile_word(&world, i) >> 16, 7);
     }
 }

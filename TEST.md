@@ -1,7 +1,7 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P8 piece 1 (species vectors); cargo and Unity from the P7 runs (no Rust or C# change since),
-`main`, working tree before the commit
+Last run: 2026-11-13 - G3 P8 piece 2 (species tracker in the kernel); pytest from the piece 1 run (no Python change
+since), Unity from the P7 runs (only a C# comment changed), `main`, working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -10,13 +10,17 @@ Last run: 2026-11-13 - G3 P8 piece 1 (species vectors); cargo and Unity from the
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
 | pytest (429 tests) | 429 | 0 | 0 | 99.53% |
-| `cargo test --release` (`engine-rs`, 63 tests) | 63 | 0 | 0 | |
+| `cargo test --release` (`engine-rs`, 71 tests) | 71 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
 | Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 51 | 0 | 0 | |
 | Unity PlayMode, windowed Editor (7 tests) | 7 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P8 piece 2: `engine-rs/tests/golden_species.rs` (3: the six `species.json` cases sample by sample and
+  field by field, a tracked and an untracked save, 13 refused trackers), 4 unit tests in `species.rs` (pruning
+  cascade, novelty, `restore` refusals, origins) and one in `views.rs` (species key); `golden_save.rs`'s skipped-
+  parts test now expects a malformed tracker to be refused. Mutations of the extinction step and of `now` fail.
 - New in P8 piece 1: `tests/test_species_vectors.py` (7: committed `species.json` and tracked save regenerate
   identically, digest layouts, final dump equals last digest, vacuous cases refused, tracking leaves the hash) and
   `test_an_untracked_world_keys_tiles_by_lineage`; the tile-word test now expects the species key on tracked worlds.

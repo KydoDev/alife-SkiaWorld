@@ -215,6 +215,22 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   (equal to the same run untracked, asserted), a byte-defined digest of the tracker and of the cells' species, and
   the tile words' hash; at the end the full tracker and each cell's species. A full dump per sample would be ~250 KB,
   hence digests (the file is ~1 MB). Python's `views.py` keys tiles by species id when the world is tracked.
+  *Piece 2* (2026-11-13): `engine-rs/src/species.rs` ports the tracker; `World` holds an optional tracker and
+  Python's `now` (the step of a birth, death or root: `step_count + 1` during a step, `step_count` between steps,
+  so deaths by intervention carry the right step). `World::new` tracks from the founders; the save loader reads
+  the tracker and each cell's species, with every check of `_load_tracker` plus the stricter ones of ADR-0018
+  (parameters equal to the config, counts equal to the living cells, children equal to the retained child
+  species, at most 2^18 species); a save with `"tracker": null` loads untracked. The tile key is the species id
+  on a tracked world. `tests/golden_species.rs` equals all six cases of `species.json` (every sample's state hash,
+  also equal to an untracked twin, tracker and cells digests, tile hash; the final tracker field by field) and
+  checks 13 refused trackers; two mutations (extinction step, `now`) fail it. Cost, `examples/bench_species.rs`
+  (created default and volcanic worlds, 4000 steps, 3 runs): untracked unchanged (~12 400 and ~11 700 steps/s,
+  as before), tracked 4-9% slower. A first version cost ~17%: `end_step` looked every extant species up in one map
+  of all retained ones; extant and extinct species now live in two maps.
+  Security review: no blocking issue; applied: the species cap lowered to 2^18 (2^20 rows held twice while loading
+  could pass 1 GB, an out-of-memory abort `catch_unwind` cannot catch on a phone), and the tracker field is no
+  longer public (`tracker()`, `drop_tracker()`): attaching a tracker to a populated world would panic at the next
+  birth.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
   (births, deaths, tool use), never from inside the kernel. Pass: owner playtest on a tablet.
 - **P10 iOS** — `aarch64-apple-ios` static library, `DllImport("__Internal")` under `UNITY_IOS`, built on

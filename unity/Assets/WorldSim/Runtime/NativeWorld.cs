@@ -48,7 +48,8 @@ namespace WorldSim
         public int Chem => (int)((Word >> 5) & 0x3);
         /// <summary>Energy level 0..15 (15: about to divide).</summary>
         public int Energy => (int)((Word >> 8) & 0xF);
-        /// <summary>Species key: the lineage mod 65536 (until P8).</summary>
+        /// <summary>Species key: the species id mod 65536 on a tracked world, the lineage mod 65536 otherwise
+        /// (ADR-0018).</summary>
         public int Key => (int)(Word >> 16);
 
         /// <summary>The word of tile <paramref name="index"/> in a snapshot (little-endian).</summary>

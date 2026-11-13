@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P8 piece 2, species tracker in the kernel** (ADR-0018): `engine-rs/src/species.rs` ports
+  `worldsim/species.py` as a pure observer. Worlds created by the kernel track species from their founders; saves
+  load their tracker, validated as untrusted input (stricter than Python where a bad value could break a later
+  birth or death); saves without one load untracked. The tile key is the species id on tracked worlds. Equal to
+  `species.json` on every sample; costs 4-9% of steps/s when tracked (`examples/bench_species.rs`), nothing
+  otherwise.
 - **G3 P8 piece 1, species vectors**: `scripts/g3_species_vectors.py` writes `engine-rs/tests/golden/species.json`
   (six tracked runs: created worlds with and without flags, a reseeded tiny world, a tracked save, meteorites through
   the game) and the tracked start save `species_start.json.gz`; `g2_golden.py --all` writes both. The generator

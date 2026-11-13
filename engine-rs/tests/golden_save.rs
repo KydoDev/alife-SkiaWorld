@@ -413,15 +413,16 @@ fn propensities_are_bounded_when_their_flag_is_on() {
 
 #[test]
 fn ignored_parts_are_skipped() {
-    // Unknown top-level keys and extra counters are skipped, as in Python; the tracker is
-    // observer state the kernel never reads.
+    // Unknown top-level keys and extra counters are skipped, as in Python.
     let save = with(|s| {
         s["future_key"] = json!({"a": [1, 2, 3]});
         s["counters"]["hgt_events"] = json!(0);
-        s["tracker"] = json!({"anything": [1, {"x": null}]});
     });
     let world = load(&save).expect("save with ignored parts");
     assert_eq!(state_hash(&world), hashes("default")[0].2);
+    // Since ADR-0018 the tracker is read: a malformed one is refused (tests/golden_species.rs has the rest)
+    let save = with(|s| s["tracker"] = json!({"anything": [1, {"x": null}]}));
+    assert!(load(&save).is_err(), "a malformed tracker is refused");
 }
 
 #[test]

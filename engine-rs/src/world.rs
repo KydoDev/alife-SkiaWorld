@@ -14,6 +14,7 @@
 
 use crate::config::Config;
 use crate::rng::PyRandom;
+use crate::species::{Origin, SpeciesTracker, TrackerParams};
 use crate::terrain::{generate_terrain, TerrainParams};
 use crate::N_GENES;
 
@@ -318,6 +319,9 @@ pub struct Cell {
     pub age: u64,
     pub genes: [f64; N_GENES],
     pub lineage: u64,
+    /// The cell's species (ADR-0018), 0 when the world has no tracker. Observer state: never read by the
+    /// dynamics, not hashed.
+    pub species: u64,
     /// Bonded cells, in insertion order (energy sharing iterates them).
     pub bonds: Vec<CellRef>,
     /// F5a mating propensity; always 0 while `sex` is off (kept for the state hash).
@@ -358,6 +362,7 @@ impl Cell {
             age: 0,
             genes,
             lineage,
+            species: 0,
             bonds: Vec::new(),
             sex_p: traits.sex_p,
             plast_p: traits.plast_p,
@@ -476,18 +481,25 @@ pub struct World {
     /// Scratch buffer of `update_organic` (the field before diffusion), reused every step. Not state:
     /// it is overwritten before it is read, so it is neither saved nor hashed.
     organic_old: Vec<f64>,
+    /// The species tracker (ADR-0018), a pure observer: nothing in the step reads it and it draws nothing from the
+    /// RNG, so it never changes the state hash. `None` for a world loaded from a save without one.
+    pub(crate) tracker: Option<SpeciesTracker>,
+    /// Python's `World.now`: the step being executed (`step_count + 1` during `step`), `step_count` between steps.
+    /// Only the tracker reads it (the step of a birth, death or root).
+    pub(crate) now: u64,
 }
 
 impl World {
     /// `World(cfg, seed)` with `terrain=None` (ADR-0012): the procedural terrain of `cfg` and
     /// `seed`, its initial organic field, then `initial_cells` founders on `random.Random(seed)`
     /// (fewer if there are not enough free tiles). The same seed drives terrain and dynamics, as in
-    /// Python. No species tracker (`track_species=False`).
+    /// Python. Species are tracked from the founders on (`track_species=True`, ADR-0018).
     pub fn new(cfg: Config, seed: u64) -> Self {
         let (terrain, organic) = generate_terrain(&TerrainParams::from_config(&cfg), seed);
         // validated: 0 <= initial_cells <= width * height
         let founders = cfg.initial_cells as usize;
         let mut world = Self::from_parts(cfg, terrain, PyRandom::from_seed_u64(seed), organic);
+        world.tracker = Some(SpeciesTracker::new(world.tracker_params()));
         world.seed_population(founders);
         world
     }
@@ -516,6 +528,8 @@ impl World {
             shade_pow: Vec::new(),
             views: views(),
             organic_old: Vec::new(),
+            tracker: None,
+            now: 0,
             cfg,
         };
         world.refresh_terrain();
@@ -545,6 +559,36 @@ impl World {
         self.has_rock = terrain.rock.iter().any(|&r| r);
         self.has_chem = terrain.chem.iter().any(|&c| c != 0.0);
         self.base_light = base_light;
+    }
+
+    /// The species tracker, `None` if the world has none.
+    pub fn tracker(&self) -> Option<&SpeciesTracker> {
+        self.tracker.as_ref()
+    }
+
+    /// Stop tracking species (the dynamics do not change). There is no way back: a tracker must see every birth
+    /// and death from the founders on, so one cannot be attached to a populated world.
+    pub fn drop_tracker(&mut self) {
+        self.tracker = None;
+        self.slab.iter_mut().for_each(|c| c.species = 0);
+    }
+
+    /// The tracker parameters of this world's config.
+    pub fn tracker_params(&self) -> TrackerParams {
+        TrackerParams {
+            threshold: self.cfg.species_threshold,
+            // validated in [1, 10^12]
+            novelty_activity: self.cfg.novelty_activity as u64,
+            prune_peak: self.cfg.species_prune_peak,
+        }
+    }
+
+    /// A new root species for the cell in slot `r` (seeding, reseed, immigration), when tracked.
+    fn track_root(&mut self, r: CellRef, origin: Origin) {
+        if let Some(t) = &mut self.tracker {
+            let c = &mut self.slab[r as usize];
+            c.species = t.on_root(&c.genes, origin, self.now);
+        }
     }
 
     /// Number of living cells (`len(World.cells)` between steps).
@@ -594,11 +638,12 @@ impl World {
     }
 
     /// `World._place`: put a new cell on the grid and at the end of the cell list.
-    fn place(&mut self, cell: Cell) {
+    fn place(&mut self, cell: Cell) -> CellRef {
         let tile = cell.y * self.width + cell.x;
         let r = self.alloc(cell);
         self.grid[tile] = r;
         self.order.push(r);
+        r
     }
 
     fn random_genes(&mut self) -> [f64; N_GENES] {
@@ -955,6 +1000,9 @@ impl World {
             self.organic[tile] += organic_amount;
         }
         self.counters.deaths += 1;
+        if let Some(t) = &mut self.tracker {
+            t.on_death(self.slab[c as usize].species, self.now);
+        }
     }
 
     /// `World.seed_population(n)`: `n` random cells on shuffled free tiles.
@@ -979,7 +1027,8 @@ impl World {
                 Vec::new(),
                 &self.cfg,
             );
-            self.place(cell);
+            let r = self.place(cell);
+            self.track_root(r, Origin::Seed);
         }
     }
 
@@ -1070,7 +1119,7 @@ impl World {
 
     // ------------------------------------------------------------------ step
 
-    /// `World.step()` for the flags the kernel runs (no species tracker). One function on
+    /// `World.step()` for the flags the kernel runs, with the species tracker's hooks. One function on
     /// purpose, like Python's: the per-cell loop is the hot path and its order of operations is
     /// what has to match. Flag blocks draw from the RNG only when their flag is on.
     pub fn step(&mut self) {
@@ -1081,6 +1130,7 @@ impl World {
         let (plastic_on, plastic) = (cfg.plasticity, cfg.plasticity && !cfg.plastic_neutral);
         let (sex_on, mating) = (cfg.sex, cfg.sex && !cfg.sex_neutral);
         let rules_on = cfg.open_genome && !cfg.rules_neutral;
+        self.now = self.step_count + 1;
         self.update_light(self.step_count + 1);
 
         let mut order = std::mem::take(&mut self.order);
@@ -1271,6 +1321,15 @@ impl World {
                     self.grid[sy * w + sx] = child;
                     newborns.push(child);
                     self.counters.births += 1;
+                    if let Some(t) = &mut self.tracker {
+                        // the dividing cell's species (the one that chose to mate, if two parents)
+                        let s = t.on_birth(
+                            &self.slab[child as usize].genes,
+                            self.slab[ri].species,
+                            self.now,
+                        );
+                        self.slab[child as usize].species = s;
+                    }
                     if self.rng.random() < ph.attach
                         && (self.slab[ri].bonds.len() as i64) < cfg.max_bonds
                     {
@@ -1317,7 +1376,8 @@ impl World {
                         Vec::new(),
                         &cfg,
                     );
-                    self.place(cell);
+                    let r = self.place(cell);
+                    self.track_root(r, Origin::Immigrant);
                 }
             }
         }
@@ -1325,6 +1385,9 @@ impl World {
         if self.order.is_empty() && cfg.reseed_on_extinction {
             self.counters.extinctions += 1;
             self.seed_population(cfg.initial_cells as usize);
+        }
+        if let Some(t) = &mut self.tracker {
+            t.end_step(self.step_count);
         }
     }
 }

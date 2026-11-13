@@ -59,6 +59,8 @@ ruff check .                             # lint
 
 # Rust core (G2, engine-rs/): needs a stable Rust toolchain
 cd engine-rs && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+# what the species tracker costs (ADR-0018): steps/s of created worlds with and without it
+cd engine-rs && cargo run --release --example bench_species -- 4000
 
 # regenerate every G2 golden set after any change to the dynamics (the sets are listed in SETS
 # in scripts/g2_golden.py; a new set also goes into GOLDEN_SETS in engine-rs/tests/common/mod.rs)
