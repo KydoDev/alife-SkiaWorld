@@ -493,3 +493,294 @@ fn refused_edits_change_nothing_and_keep_the_handle_usable() {
         ws_world_free(twin);
     }
 }
+
+// ------------------------------------------------------------------ the game (ADR-0017, ABI 5)
+
+fn games_vectors() -> serde_json::Value {
+    let path = common::golden_root().join("games.json");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    serde_json::from_str(&text).expect("games.json")
+}
+
+fn game_info(h: *mut WsWorld) -> WsGameInfo {
+    let mut info = WsGameInfo::default();
+    assert_eq!(
+        unsafe { ws_game_info(h, &mut info) },
+        WS_OK,
+        "{}",
+        last_error()
+    );
+    info
+}
+
+fn act(h: *mut WsWorld, tool: u32, x: u32, y: u32) -> (i32, u32) {
+    let mut accepted = u32::MAX; // an error must leave it untouched
+    let code = unsafe { ws_game_act(h, tool, x, y, &mut accepted) };
+    (code, accepted)
+}
+
+fn f64_hex(v: f64) -> String {
+    v.to_le_bytes().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn tool_code(name: &str) -> u32 {
+    let i = worldsim_core::game::Tool::ALL
+        .iter()
+        .position(|t| t.name() == name)
+        .expect("tool name");
+    i as u32 + 1
+}
+
+#[test]
+fn default_rules_through_the_abi_equal_python() {
+    let v = games_vectors();
+    let mut rules = WsGameRules {
+        reserved: 7,
+        ..WsGameRules::default()
+    };
+    assert_eq!(unsafe { ws_game_default_rules(&mut rules) }, WS_OK);
+    let python = WsGameRules::from(&common::game_rules_of(&v["default_rules"]));
+    assert_eq!(rules, python);
+    assert_eq!(rules.reserved, 0);
+    assert_eq!(
+        unsafe { ws_game_default_rules(std::ptr::null_mut()) },
+        WS_ERR_ARGUMENT
+    );
+}
+
+#[test]
+fn games_through_the_abi_follow_the_vectors() {
+    let v = games_vectors();
+    for case in v["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let h = load_bytes(&golden_bytes(case["set"].as_str().unwrap()));
+        let rules = WsGameRules::from(&common::game_rules_of(&case["rules"]));
+        assert_eq!(
+            unsafe { ws_game_attach(h, &rules) },
+            WS_OK,
+            "{name}: {}",
+            last_error()
+        );
+        let start = case["start_step"].as_u64().unwrap();
+        let steps = case["steps"].as_u64().unwrap();
+        let actions = case["actions"].as_array().unwrap();
+        let hashes: std::collections::HashMap<u64, String> = case["hashes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (r[0].as_u64().unwrap(), r[1].as_str().unwrap().to_string()))
+            .collect();
+        // step in chunks that stop at every action offset and every recorded hash
+        let mut stops: Vec<u64> = actions
+            .iter()
+            .map(|a| a["offset"].as_u64().unwrap())
+            .chain(hashes.keys().map(|s| s - start))
+            .collect();
+        stops.sort_unstable();
+        stops.dedup();
+        let (mut k, mut next_action) = (0u64, 0usize);
+        for stop in stops {
+            assert_eq!(unsafe { ws_world_step(h, (stop - k) as u32) }, WS_OK);
+            k = stop;
+            while next_action < actions.len()
+                && actions[next_action]["offset"].as_u64().unwrap() <= k
+            {
+                let a = &actions[next_action];
+                let (code, accepted) = act(
+                    h,
+                    tool_code(a["tool"].as_str().unwrap()),
+                    a["x"].as_u64().unwrap() as u32,
+                    a["y"].as_u64().unwrap() as u32,
+                );
+                assert_eq!(code, WS_OK, "{name}: {a}: {}", last_error());
+                assert_eq!(
+                    (accepted == 1, f64_hex(game_info(h).budget)),
+                    (
+                        a["accepted"].as_bool().unwrap(),
+                        a["budget"].as_str().unwrap().to_string()
+                    ),
+                    "{name}: {a}"
+                );
+                next_action += 1;
+            }
+            if let Some(want) = hashes.get(&(start + k)) {
+                assert_eq!(&hash_of(h), want, "{name}: hash at offset {k}");
+            }
+        }
+        assert_eq!(k, steps, "{name}: the last hash is at the last step");
+        assert_eq!(next_action, actions.len());
+        let info = game_info(h);
+        assert_eq!(
+            f64_hex(info.budget),
+            case["budget"].as_str().unwrap(),
+            "{name}"
+        );
+        assert_eq!(
+            info.player_vents,
+            case["player_vents"].as_u64().unwrap(),
+            "{name}"
+        );
+        for (i, m) in worldsim_core::game::Milestone::ALL.iter().enumerate() {
+            let want = case["achieved"][m.name()].as_u64();
+            assert_eq!(
+                info.reached & (1 << i) != 0,
+                want.is_some(),
+                "{name}: {}",
+                m.name()
+            );
+            assert_eq!(
+                info.reached_step[i],
+                want.unwrap_or(0),
+                "{name}: {}",
+                m.name()
+            );
+        }
+        unsafe { ws_world_free(h) };
+    }
+}
+
+#[test]
+fn game_calls_refuse_bad_input_and_change_nothing() {
+    let h = load_bytes(&golden_bytes("default"));
+    let mut info = WsGameInfo::default();
+    // no game yet: the game calls are refused
+    assert_eq!(unsafe { ws_game_info(h, &mut info) }, WS_ERR_INVALID);
+    assert!(last_error().contains("no game"));
+    assert_eq!(act(h, WS_TOOL_METEORITE, 1, 1), (WS_ERR_INVALID, u32::MAX));
+    // null pointers
+    let good = WsGameRules::from(&worldsim_core::game::GameRules::default());
+    assert_eq!(
+        unsafe { ws_game_attach(std::ptr::null_mut(), &good) },
+        WS_ERR_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { ws_game_attach(h, std::ptr::null()) },
+        WS_ERR_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { ws_game_info(h, std::ptr::null_mut()) },
+        WS_ERR_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { ws_game_act(h, WS_TOOL_DIG, 1, 1, std::ptr::null_mut()) },
+        WS_ERR_ARGUMENT
+    );
+    // rules out of bounds: refused, and the world still takes a good game afterwards
+    let bad: [(WsGameRules, &str); 8] = [
+        (
+            WsGameRules {
+                reserved: 1,
+                ..good
+            },
+            "reserved",
+        ),
+        (
+            WsGameRules {
+                regen: f64::NAN,
+                ..good
+            },
+            "regen",
+        ),
+        (
+            WsGameRules {
+                budget_max: f64::INFINITY,
+                ..good
+            },
+            "budget_max",
+        ),
+        (
+            WsGameRules {
+                budget_start: -0.0,
+                ..good
+            },
+            "budget_start",
+        ),
+        (
+            WsGameRules {
+                kill_fraction: 1e13,
+                ..good
+            },
+            "kill_fraction",
+        ),
+        (
+            WsGameRules {
+                cost: [10.0, 20.0, -4.0, 4.0, 40.0],
+                ..good
+            },
+            "cost[mountain]",
+        ),
+        (
+            WsGameRules {
+                radius: [6, 10, 2, 2, u32::MAX],
+                ..good
+            },
+            "radius[volcano]",
+        ),
+        (
+            WsGameRules {
+                check_every: 0,
+                ..good
+            },
+            "check_every",
+        ),
+    ];
+    let before = hash_of(h);
+    for (rules, msg) in bad {
+        assert_eq!(
+            unsafe { ws_game_attach(h, &rules) },
+            WS_ERR_INVALID,
+            "{msg}"
+        );
+        assert!(last_error().contains(msg), "{}", last_error());
+        assert_eq!(
+            unsafe { ws_game_info(h, &mut info) },
+            WS_ERR_INVALID,
+            "{msg}: attached"
+        );
+    }
+    assert_eq!(hash_of(h), before);
+    assert_eq!(unsafe { ws_game_attach(h, &good) }, WS_OK);
+    // a second game is refused; plain edits are refused while a game is attached
+    assert_eq!(unsafe { ws_game_attach(h, &good) }, WS_ERR_INVALID);
+    assert!(last_error().contains("already has a game"));
+    assert_eq!(
+        intervene(h, WS_EDIT_NUTRIENTS, 5, 5, 1, 1.0),
+        (WS_ERR_INVALID, u64::MAX)
+    );
+    assert!(last_error().contains("ws_game_act"));
+    assert_eq!(hash_of(h), before);
+    // unknown tools are errors; off-world actions are free refusals
+    for tool in [0, 6, u32::MAX] {
+        assert_eq!(
+            act(h, tool, 1, 1),
+            (WS_ERR_INVALID, u32::MAX),
+            "tool {tool}"
+        );
+        assert!(last_error().contains("unknown tool"));
+    }
+    assert_eq!(act(h, WS_TOOL_METEORITE, u32::MAX, 0), (WS_OK, 0));
+    assert_eq!(game_info(h).budget, 100.0);
+    assert_eq!(hash_of(h), before);
+    // a kernel refusal (organic above the cap) changes neither the world nor the game
+    let rich = WsGameRules {
+        nutrients_amount: 6e11,
+        ..good
+    };
+    let h2 = load_bytes(&golden_bytes("default"));
+    assert_eq!(unsafe { ws_game_attach(h2, &rich) }, WS_OK);
+    assert_eq!(act(h2, WS_TOOL_NUTRIENTS, 10, 10), (WS_OK, 1));
+    let (state, game) = (hash_of(h2), game_info(h2));
+    assert_eq!(
+        act(h2, WS_TOOL_NUTRIENTS, 10, 10),
+        (WS_ERR_INVALID, u32::MAX)
+    );
+    assert!(last_error().contains("above"));
+    assert_eq!((hash_of(h2), game_info(h2)), (state, game));
+    // both still step
+    assert_eq!(unsafe { ws_world_step(h, 3) }, WS_OK);
+    assert_eq!(unsafe { ws_world_step(h2, 3) }, WS_OK);
+    unsafe {
+        ws_world_free(h);
+        ws_world_free(h2);
+    }
+}

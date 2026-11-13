@@ -22,6 +22,12 @@ pub const MAX_RULE_VALUE: f64 = 1e12;
 /// no more tiles.
 pub const MAX_RULE_RADIUS: u32 = 1_000_000;
 
+/// Longest smoothing window (steps): stricter than Python, whose window is `day_length` (up to 10^9 in a config).
+/// The window holds one population count per step, so a day of 10^9 steps would grow to gigabytes on a long game
+/// and an allocation failure aborts the process (ADR-0017 piece 3 security review). `Game::new` refuses a world
+/// whose day is longer; no example planet comes near it.
+pub const MAX_SMOOTH_WINDOW: i64 = 1_000_000;
+
 /// The player's tools, in `play.TOOLS` order (the index is the ABI code minus one).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
@@ -230,6 +236,9 @@ pub struct Game {
     achieved: [Option<u64>; 5],
     /// Tiles of the vents the player opened, deduplicated (Decision 3: duplicates are count-neutral in Python).
     player_vents: BTreeSet<(usize, usize)>,
+    /// Tiles within `abyss_radius` of a player vent (row-major), marked when a vent opens, so a milestone check is
+    /// O(cells) whatever the number of vents; empty until the first vent.
+    near_vent: Vec<bool>,
     /// Population after each step, at most `smooth_len` of them, grown as steps run (never preallocated).
     smooth: VecDeque<u32>,
     smooth_sum: u64,
@@ -268,18 +277,24 @@ impl Game {
     pub fn new(world: &World, rules: GameRules) -> Result<Self, GameRulesError> {
         rules.validate()?;
         let cfg = &world.cfg;
-        // deque(maxlen=max(1, cfg.day_length if cfg.day_amplitude else 1)); day_length is bounded to 10^9
+        // deque(maxlen=max(1, cfg.day_length if cfg.day_amplitude else 1))
         let day = if cfg.day_amplitude != 0.0 {
             cfg.day_length
         } else {
             1
         };
-        let smooth_len = usize::try_from(day.max(1)).unwrap_or(usize::MAX);
+        if day > MAX_SMOOTH_WINDOW {
+            return Err(GameRulesError(format!(
+                "a game needs day_length <= {MAX_SMOOTH_WINDOW} when days are on, got {day}"
+            )));
+        }
+        let smooth_len = usize::try_from(day.max(1)).expect("bounded above");
         Ok(Self {
             budget: rules.budget_start,
             rules,
             achieved: [None; 5],
             player_vents: BTreeSet::new(),
+            near_vent: Vec::new(),
             smooth: VecDeque::new(),
             smooth_sum: 0,
             smooth_len,
@@ -355,8 +370,8 @@ impl Game {
                     y,
                     max_chem: self.rules.max_chem,
                 })?;
-                if opened != 0 {
-                    self.player_vents.insert((x as usize, y as usize));
+                if opened != 0 && self.player_vents.insert((x as usize, y as usize)) {
+                    self.mark_near_vent(world, x as usize, y as usize);
                 }
                 opened
             }
@@ -462,26 +477,37 @@ impl Game {
         }
     }
 
-    /// `Game._chemo_near_player_vents`: chemosynthesis specialists within `abyss_radius` of a player vent. The
-    /// distance is `sqrt` of an exact integer sum (Decision 5), equal to Python's `math.hypot` on these offsets.
-    fn chemo_near_player_vents(&self, world: &World) -> u64 {
-        let w = world.width;
+    /// Mark the tiles within `abyss_radius` of a new player vent at (`vx`, `vy`): `math.hypot(dx, dy) <= radius` with
+    /// the toroidal x offset, computed as `sqrt` of an exact integer sum (Decision 5). O(width * height), like the
+    /// edit that opened the vent.
+    fn mark_near_vent(&mut self, world: &World, vx: usize, vy: usize) {
+        let (w, h) = (world.width, world.height);
         let radius = self.rules.abyss_radius;
-        let mut near = 0;
-        for c in world.cells() {
-            if c.pheno.chemo >= SPECIALIST {
-                let close = self.player_vents.iter().any(|&(vx, vy)| {
-                    let d = c.x.abs_diff(vx);
-                    let dx = d.min(w - d) as u64;
-                    let dy = c.y.abs_diff(vy) as u64;
-                    ((dx * dx + dy * dy) as f64).sqrt() <= radius
-                });
-                if close {
-                    near += 1;
+        if self.near_vent.is_empty() {
+            self.near_vent = vec![false; w * h];
+        }
+        for y in 0..h {
+            let dy = y.abs_diff(vy) as u64;
+            for x in 0..w {
+                let d = x.abs_diff(vx);
+                let dx = d.min(w - d) as u64;
+                if ((dx * dx + dy * dy) as f64).sqrt() <= radius {
+                    self.near_vent[y * w + x] = true;
                 }
             }
         }
-        near
+    }
+
+    /// `Game._chemo_near_player_vents`: chemosynthesis specialists on a tile within `abyss_radius` of a player vent
+    /// (the `any` over vents in Python, precomputed as `near_vent`).
+    fn chemo_near_player_vents(&self, world: &World) -> u64 {
+        if self.near_vent.is_empty() {
+            return 0;
+        }
+        world
+            .cells()
+            .filter(|c| c.pheno.chemo >= SPECIALIST && self.near_vent[c.y * world.width + c.x])
+            .count() as u64
     }
 
     /// What the milestone checks measure now (see [`Measures`]). Labels the seas afresh: not for every frame.

@@ -179,6 +179,19 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   colony, cells per sea, smoothed population, collapse target, dip) and an eighth case, `strike_window`, whose
   strikes add up to a third of life only if the 20-step window is ignored. Each of those mutations now fails; one
   survives by construction (reaching survivor without the dip is equivalent once a collapse has killed a third).
+  *Piece 3* (2026-11-13): ABI 5 in `ffi.rs`: `ws_game_default_rules`, `ws_game_attach` (validated `WsGameRules`, 176
+  bytes with an explicit `reserved` word that must be 0), `ws_game_act` (a refused action is not an error), and
+  `ws_game_info` (budget, reached mask and steps, player vents). The handle owns its game; `ws_world_step` steps it
+  and `ws_world_intervene` is refused while it is attached. Attach works at any step of any world without a game
+  (the golden cases attach at step 200, as Python's `Game(world)` does); only a second game is refused. C# mirror
+  in `NativeWorld.cs` (`GameRules`, `GameInfo`, `Tool`, `Milestone`, `AttachGame`, `Act`, `Game`). Checks: the 8
+  cases of `games.json` through the ABI in Rust (`tests/ffi.rs`, stepping in chunks) and in C# (EditMode
+  `GameTests`, 3), plus refusals and struct layouts. The security review found no blocking issue; applied: a game
+  refuses a world whose day is longer than `MAX_SMOOTH_WINDOW` (10^6 steps; stricter than Python, whose window grows
+  to `day_length`, up to 10^9 counts), player vents mark a near-vent tile mask when they open (a check is O(cells),
+  not O(cells x vents); the golden trace is unchanged), the C# wrapper refuses missing or short per-tool arrays,
+  the rules are read unaligned, `GameInfo` has no array (no garbage per frame), and both languages assert the field
+  offsets.
 - **P8 Species** — port the tracker as a pure observer (it must never touch the RNG; ADR-0003/0005);
   expose a list and parent links. Pass: species ids and parents equal Python's on the golden runs.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs

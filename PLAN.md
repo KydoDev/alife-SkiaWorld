@@ -36,7 +36,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 29. [x] G3 P6b: population screen (cells per kind, history chart) from the tile words
 30. [x] G3 P7 piece 1: ADR-0017; Python game vectors (`games.json`) with the verdict's cases and assertions
 31. [x] G3 P7 piece 2: Rust `game.rs` equal to `games.json`; idle games keep every `hashes.csv`
-32. [ ] G3 P7 piece 3: ABI 5 (`ws_game_*`), C# mirror, FFI and EditMode tests; security review first
+32. [x] G3 P7 piece 3: ABI 5 (`ws_game_*`), C# mirror, FFI and EditMode tests; security review first
 33. [ ] G3 P7 piece 4: Unity tools through the game, budget in the HUD, milestone toasts; APK to the phone
 34. [ ] Copy APK 0.0.3 (P5+P6) to the owner's phone (built 2026-11-13, phone was not connected)
 

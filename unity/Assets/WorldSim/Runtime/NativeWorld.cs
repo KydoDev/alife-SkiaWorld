@@ -1,4 +1,4 @@
-// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 4).
+// P/Invoke wrapper of the Rust kernel's C ABI (engine-rs/src/ffi.rs, ABI version 5).
 // No UnityEngine dependency: this file is plain C# and is exercised by the EditMode tests.
 using System;
 using System.Runtime.InteropServices;
@@ -91,6 +91,87 @@ namespace WorldSim
         Vent = 5,
     }
 
+    /// <summary>The player's tools of `ws_game_act` (`WS_TOOL_*`, `play.TOOLS` order; ADR-0017).</summary>
+    public enum Tool : uint
+    {
+        Nutrients = 1,
+        Meteorite = 2,
+        Mountain = 3,
+        Dig = 4,
+        Volcano = 5,
+    }
+
+    /// <summary>The milestones (`WS_MILESTONE_*`, `play.MILESTONES` order): bit <c>1 &lt;&lt; m</c> of
+    /// <see cref="GameInfo.Reached"/>.</summary>
+    public enum Milestone
+    {
+        Abyss = 0,
+        Balance = 1,
+        Giant = 2,
+        Survivor = 3,
+        Divided = 4,
+    }
+
+    /// <summary>`play.GameRules` (`WsGameRules`, 176 bytes; ADR-0017 Decision 2). Per-tool arrays in <see cref="Tool"/>
+    /// order (index = code - 1). Start from <see cref="NativeWorld.DefaultGameRules"/>; the kernel validates every field.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GameRules
+    {
+        public double BudgetMax;
+        public double BudgetStart;
+        /// <summary>Divine energy per step.</summary>
+        public double Regen;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)] public double[] Cost;
+        public double NutrientsAmount;
+        public double MaxChem;
+        public double AbyssRadius;
+        public double KillFraction;
+        public double RecoverFraction;
+        /// <summary>Steps between milestone checks (at least 1).</summary>
+        public ulong CheckEvery;
+        public ulong AbyssCells;
+        public ulong BalanceCells;
+        public ulong GiantColony;
+        public ulong CollapseWindow;
+        public ulong DividedCells;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)] public uint[] Radius;
+        /// <summary>Must be 0.</summary>
+        public uint Reserved;
+    }
+
+    /// <summary>The state of a game (`WsGameInfo`, 64 bytes; ADR-0017 Decision 6). Blittable (no arrays), so a HUD can
+    /// read it every frame without garbage.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GameInfo
+    {
+        public double Budget;
+        // the step at which each milestone was reached (Milestone order; 0 where not reached): see StepOf
+        public ulong AbyssStep;
+        public ulong BalanceStep;
+        public ulong GiantStep;
+        public ulong SurvivorStep;
+        public ulong DividedStep;
+        /// <summary>Distinct tiles of the vents the player opened.</summary>
+        public ulong PlayerVents;
+        /// <summary>Bit <c>1 &lt;&lt; m</c> set for each milestone reached.</summary>
+        public uint Reached;
+        public uint Reserved;
+
+        public bool Has(Milestone m) => (Reached & (1u << (int)m)) != 0;
+
+        /// <summary>The step at which <paramref name="m"/> was reached; 0 if it was not.</summary>
+        public ulong StepOf(Milestone m) => m switch
+        {
+            Milestone.Abyss => AbyssStep,
+            Milestone.Balance => BalanceStep,
+            Milestone.Giant => GiantStep,
+            Milestone.Survivor => SurvivorStep,
+            Milestone.Divided => DividedStep,
+            _ => throw new ArgumentOutOfRangeException(nameof(m)),
+        };
+    }
+
     /// <summary>A call into the kernel failed; the message comes from `ws_last_error`.</summary>
     public sealed class WorldSimException : Exception
     {
@@ -165,6 +246,18 @@ namespace WorldSim
         internal static extern int ws_world_cell(WorldHandle handle, uint x, uint y, out CellRecord cell);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_game_default_rules(out GameRules rules);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_game_attach(WorldHandle handle, [In] ref GameRules rules);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_game_act(WorldHandle handle, uint tool, uint x, uint y, out uint accepted);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ws_game_info(WorldHandle handle, out GameInfo info);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UIntPtr ws_last_error([Out] byte[] buffer, UIntPtr len);
     }
 
@@ -174,7 +267,7 @@ namespace WorldSim
     public sealed class NativeWorld : IDisposable
     {
         /// <summary>The ABI this wrapper was written for (`WS_ABI_VERSION`).</summary>
-        public const uint AbiVersion = 4;
+        public const uint AbiVersion = 5;
 
         private const int HashLength = 64;
         private readonly WorldHandle _handle;
@@ -252,7 +345,8 @@ namespace WorldSim
             }
         }
 
-        /// <summary>Advance by <paramref name="steps"/> steps (blocking; keep it small per frame).</summary>
+        /// <summary>Advance by <paramref name="steps"/> steps (blocking; keep it small per frame). With a game attached,
+        /// game steps: the budget regenerates once per step and milestones are checked.</summary>
         public void Step(uint steps)
         {
             Check(Native.ws_world_step(_handle, steps));
@@ -263,12 +357,63 @@ namespace WorldSim
         /// (nutrients, rock, dig), cells killed (meteorite), or 1/0 for a vent (0 on rock). <paramref name="radius"/>
         /// must be 0 for a vent; <paramref name="amount"/> (organic per tile, or `max_chem` for a vent) must be 0 for
         /// the other edits. A refusal throws <see cref="WorldSimException"/> with
-        /// <see cref="WorldSimException.StatusInvalid"/> and leaves the world unchanged.
+        /// <see cref="WorldSimException.StatusInvalid"/> and leaves the world unchanged; so does any edit on a world
+        /// with a game (use <see cref="Act"/>).
         /// </summary>
         public ulong Intervene(Edit kind, uint x, uint y, uint radius, double amount)
         {
             Check(Native.ws_world_intervene(_handle, (uint)kind, x, y, radius, amount, out ulong changed));
             return changed;
+        }
+
+        /// <summary>`play.GameRules()`, the default game rules.</summary>
+        public static GameRules DefaultGameRules()
+        {
+            CheckAbi();
+            int status = Native.ws_game_default_rules(out GameRules rules);
+            if (status != 0)
+            {
+                throw new WorldSimException($"kernel error {status}: {LastError()}", status);
+            }
+            return rules;
+        }
+
+        /// <summary>
+        /// Attach a game to this world (`play.Game(world, rules)`, ADR-0017). From then on <see cref="Step"/> steps the
+        /// game, the player acts through <see cref="Act"/> and <see cref="Intervene"/> is refused. Rules out of bounds,
+        /// or a second game, throw <see cref="WorldSimException"/> with <see cref="WorldSimException.StatusInvalid"/>.
+        /// </summary>
+        public void AttachGame(GameRules rules)
+        {
+            // the marshaller would send zeros for a null array (free tools) and throw its own error for a wrong length
+            if (rules.Cost?.Length != 5 || rules.Radius?.Length != 5)
+            {
+                throw new ArgumentException("GameRules.Cost and GameRules.Radius need one value per tool (5)",
+                                            nameof(rules));
+            }
+            Check(Native.ws_game_attach(_handle, ref rules));
+        }
+
+        /// <summary>
+        /// Use <paramref name="tool"/> at (x, y), as `Game.act`: true if something happened and was paid for, false if
+        /// refused (off the world, too expensive, or nothing to change). No game, or a kernel refusal, throws
+        /// <see cref="WorldSimException"/> with <see cref="WorldSimException.StatusInvalid"/>; nothing changes.
+        /// </summary>
+        public bool Act(Tool tool, uint x, uint y)
+        {
+            Check(Native.ws_game_act(_handle, (uint)tool, x, y, out uint accepted));
+            return accepted == 1;
+        }
+
+        /// <summary>The game's budget, milestones and player vents; throws with
+        /// <see cref="WorldSimException.StatusInvalid"/> on a world with no game.</summary>
+        public GameInfo Game
+        {
+            get
+            {
+                Check(Native.ws_game_info(_handle, out GameInfo info));
+                return info;
+            }
         }
 
         /// <summary>The state hash, comparable with the golden `hashes.csv`.</summary>

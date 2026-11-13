@@ -82,7 +82,8 @@ python scripts/g2_golden.py --planet examples/volcanic.json --set defence=1 --ou
 python scripts/g2_golden.py --renders-only --steps 1000 --out engine-rs/tests/golden/default
 
 # C ABI for front-ends (Unity): engine-rs/target/release/worldsim_core.dll (src/ffi.rs documents the contract;
-# ABI 4 adds the read-only views of ADR-0016: ws_world_tiles, ws_world_cell, WsInfo.light_factor)
+# ABI 4 adds the read-only views of ADR-0016: ws_world_tiles, ws_world_cell, WsInfo.light_factor;
+# ABI 5 the game of ADR-0017: ws_game_default_rules, ws_game_attach, ws_game_act, ws_game_info)
 cd engine-rs && cargo build --release
 ```
 

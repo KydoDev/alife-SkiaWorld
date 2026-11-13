@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P7 piece 3, ABI 5: the game through the C ABI**: `ws_game_default_rules`, `ws_game_attach`, `ws_game_act` and
+  `ws_game_info` (ADR-0017). A world handle can carry one game: stepping it steps the game, player edits go through
+  `ws_game_act`, and `ws_world_intervene` is refused. The rules arrive as a validated `WsGameRules` struct. C# mirror
+  in `NativeWorld.cs` (ABI 5); Rust FFI tests and EditMode `GameTests` replay every `games.json` case through the
+  boundary. After the security review: a world whose day is longer than 10^6 steps cannot take a game (the
+  smoothing window stays bounded), and the abyss check uses a tile mask marked as vents open.
 - **G3 P7 piece 2, game rules in the Rust kernel**: `engine-rs/src/game.rs` ports `play.Game` (budget, tool costs,
   the cataclysm tracking and the five milestones; rules validated, player vents deduplicated, smoothing window grown
   as steps run). The game borrows the world on each call, ready for ABI 5 (piece 3). `tests/golden_games.rs`

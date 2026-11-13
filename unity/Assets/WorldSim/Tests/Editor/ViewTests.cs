@@ -109,6 +109,29 @@ namespace WorldSim.Tests
         {
             Assert.AreEqual(56, Marshal.SizeOf<WorldInfo>());
             Assert.AreEqual(248, Marshal.SizeOf<CellRecord>());
+            Assert.AreEqual(176, Marshal.SizeOf<GameRules>());
+            Assert.AreEqual(64, Marshal.SizeOf<GameInfo>());
+            // field order (the golden rules never tell budget_max from budget_start): offsets of WsGameRules
+            var rules = new (string, int)[]
+            {
+                ("BudgetMax", 0), ("BudgetStart", 8), ("Regen", 16), ("Cost", 24), ("NutrientsAmount", 64),
+                ("MaxChem", 72), ("AbyssRadius", 80), ("KillFraction", 88), ("RecoverFraction", 96),
+                ("CheckEvery", 104), ("AbyssCells", 112), ("BalanceCells", 120), ("GiantColony", 128),
+                ("CollapseWindow", 136), ("DividedCells", 144), ("Radius", 152), ("Reserved", 172),
+            };
+            foreach ((string field, int offset) in rules)
+            {
+                Assert.AreEqual(offset, (int)Marshal.OffsetOf<GameRules>(field), $"GameRules.{field}");
+            }
+            var info = new (string, int)[]
+            {
+                ("Budget", 0), ("AbyssStep", 8), ("BalanceStep", 16), ("GiantStep", 24), ("SurvivorStep", 32),
+                ("DividedStep", 40), ("PlayerVents", 48), ("Reached", 56), ("Reserved", 60),
+            };
+            foreach ((string field, int offset) in info)
+            {
+                Assert.AreEqual(offset, (int)Marshal.OffsetOf<GameInfo>(field), $"GameInfo.{field}");
+            }
         }
 
         [Test]

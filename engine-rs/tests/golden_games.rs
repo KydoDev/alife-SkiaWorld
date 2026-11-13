@@ -6,7 +6,7 @@
 
 mod common;
 
-use common::{golden_dir, golden_root, hashes};
+use common::{game_rules_of as rules_of, golden_dir, golden_root, hashes};
 use serde_json::Value;
 use worldsim_core::game::{Game, GameRules, Measures, Milestone, Tool};
 use worldsim_core::hash::state_hash;
@@ -32,48 +32,6 @@ fn vectors() -> Value {
 
 fn f64_hex(v: f64) -> String {
     v.to_le_bytes().iter().map(|b| format!("{b:02x}")).collect()
-}
-
-fn f64_of(d: &Value, key: &str) -> f64 {
-    d[key].as_f64().unwrap_or_else(|| panic!("rules.{key}"))
-}
-
-fn u64_of(d: &Value, key: &str) -> u64 {
-    d[key].as_u64().unwrap_or_else(|| panic!("rules.{key}"))
-}
-
-/// `rules_dict` of the vector script back into `GameRules`.
-fn rules_of(d: &Value) -> GameRules {
-    let cost: Vec<f64> = d["cost"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_f64().unwrap())
-        .collect();
-    let radius: Vec<u32> = d["radius"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| u32::try_from(v.as_u64().unwrap()).unwrap())
-        .collect();
-    GameRules {
-        budget_max: f64_of(d, "budget_max"),
-        budget_start: f64_of(d, "budget_start"),
-        regen: f64_of(d, "regen"),
-        cost: cost.try_into().expect("five costs"),
-        radius: radius.try_into().expect("five radii"),
-        nutrients_amount: f64_of(d, "nutrients_amount"),
-        max_chem: f64_of(d, "max_chem"),
-        check_every: u64_of(d, "check_every"),
-        abyss_cells: u64_of(d, "abyss_cells"),
-        abyss_radius: f64_of(d, "abyss_radius"),
-        balance_cells: u64_of(d, "balance_cells"),
-        giant_colony: u64_of(d, "giant_colony"),
-        kill_fraction: f64_of(d, "kill_fraction"),
-        collapse_window: u64_of(d, "collapse_window"),
-        recover_fraction: f64_of(d, "recover_fraction"),
-        divided_cells: u64_of(d, "divided_cells"),
-    }
 }
 
 /// Bitwise equality, so `-0.0` and `0.0` (or two NaNs) are told apart.
@@ -340,6 +298,20 @@ fn off_world_and_unaffordable_actions_are_refused_for_free() {
     assert_eq!(game.budget(), 20.0);
     assert_eq!(game.act(&mut world, Tool::Volcano, 50, 30), Ok(false));
     assert_eq!(game.budget(), 20.0);
+}
+
+#[test]
+fn a_day_longer_than_the_smoothing_cap_is_refused() {
+    use worldsim_core::game::MAX_SMOOTH_WINDOW;
+    let mut world = load_world(golden_dir("default").join("start.json.gz")).expect("start save");
+    world.cfg.day_amplitude = 0.5;
+    world.cfg.day_length = MAX_SMOOTH_WINDOW;
+    assert!(Game::new(&world, GameRules::default()).is_ok());
+    world.cfg.day_length = MAX_SMOOTH_WINDOW + 1;
+    let err = Game::new(&world, GameRules::default()).expect_err("refused");
+    assert!(err.message().contains("day_length"), "{err}");
+    world.cfg.day_amplitude = 0.0; // no days: a window of one step
+    assert!(Game::new(&world, GameRules::default()).is_ok());
 }
 
 #[test]
