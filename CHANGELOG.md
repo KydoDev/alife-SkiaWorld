@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **ADR-0018, species tracker in the kernel (G3 P8 plan)**: the kernel will port `SpeciesTracker` as a pure
+  observer; created worlds track from step 0, tracked saves load their tracker (validated), untracked saves keep the
+  lineage key; ABI 6 will expose the species list, lookup by id for ancestry, and the species tile key.
 - **G3 P7 piece 4, the viewer is the game**: every world the Unity viewer opens carries the kernel's game. The
   tools spend divine energy (each dock button shows its cost and dims when it cannot be paid for), the HUD shows the
   energy, and a toast announces each milestone reached. `GameText.cs` holds the milestone texts, checked against

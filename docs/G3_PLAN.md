@@ -16,7 +16,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [?] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [?] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
-9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
+9. [~] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
 11. [ ] P10 iOS build (needs a Mac and a static library) — owner's decision, not scheduled
 
@@ -201,6 +201,12 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   Still to check: on the owner's phone (APK 0.0.4), with P5 and P6.
 - **P8 Species** — port the tracker as a pure observer (it must never touch the RNG; ADR-0003/0005);
   expose a list and parent links. Pass: species ids and parents equal Python's on the golden runs.
+  *Plan* (2026-11-13, ADR-0018; owner's choices: bundle a tracked save, a species list with ancestry, the tile key
+  becomes the species id): created worlds track from step 0, saves with a tracker load it (validated as untrusted
+  input, counts checked against the living cells), saves without one keep the lineage key. Pieces: (1) Python
+  vectors `species.json` with tracked runs and non-vacuous assertions; (2) Rust `species.rs` and the hooks, equal
+  to the vectors, hashes unchanged, steps/s measured; (3) ABI 6 species views and C# mirror, security review first;
+  (4) Unity species drawer with ancestry, tracked bundled save, APK.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
   (births, deaths, tool use), never from inside the kernel. Pass: owner playtest on a tablet.
 - **P10 iOS** — `aarch64-apple-ios` static library, `DllImport("__Internal")` under `UNITY_IOS`, built on
@@ -221,7 +227,7 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
 ## Decisions that need an ADR (numbers assigned when written)
 - ABI 4 read-only views and the tile packing (P4).
 - Game rules in the kernel vs in C# (P7). Recommendation: kernel, so replays stay checkable against Python.
-- Species tracker in the kernel (P8).
+- Species tracker in the kernel (P8): ADR-0018.
 
 ## Owner decisions
 1. Android first and iOS later (recommended), or both from the start (needs a Mac).
