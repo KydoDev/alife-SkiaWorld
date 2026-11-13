@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P8 piece 4, species drawer in Unity**: a `Species` button opens a drawer with the living species (most
+  numerous first, tinted, with members, age, origin and an establishment star) and the ancestry of the one tapped;
+  the cell sheet shows the cell's species. `scripts/unity_sync.py` now bundles the tracked golden save, so the app
+  opens on a world with species. Tests: EditMode `SpeciesListTests` (5), two PlayMode drawer tests.
 - **G3 P8 piece 3, ABI 6 species views** (ADR-0018): `ws_world_species_info`, `ws_world_species` and
   `ws_world_species_by_id`, the cell record's species id, and the C# mirror in `NativeWorld.cs` (`Species`,
   `LivingSpecies()`, `TryGetSpecies`, `Ancestors`). Checked against `species.json` in Rust and in Unity EditMode.

@@ -57,6 +57,10 @@ namespace WorldSim.Tests
             StringAssert.Contains("energy 12.3", text);
             StringAssert.Contains("age 300", text);
             StringAssert.Contains("lineage 42", text);
+            StringAssert.DoesNotContain("species", text, "an untracked world's cells have no species");
+            r.Species = 17;
+            StringAssert.Contains("species #17", CellSheet.Summary(r));
+            r.Species = 0;
             StringAssert.Contains("alone", text);
             StringAssert.DoesNotContain("armor_p", text);
             r.Colony = 4;

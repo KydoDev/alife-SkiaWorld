@@ -42,7 +42,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 35. [x] G3 P8 piece 1: ADR-0018; Python species vectors (`species.json`), tracked runs, non-vacuous asserts
 36. [x] G3 P8 piece 2: Rust `species.rs` + hooks + tracker loading, equal to `species.json`; steps/s measured
 37. [x] G3 P8 piece 3: ABI 6 species views, `WsCell` species id, C# mirror and tests; security review first
-38. [ ] G3 P8 piece 4: Unity species drawer with ancestry, species tile key, tracked bundled save; APK
+38. [?] G3 P8 piece 4: Unity species drawer with ancestry, species tile key, tracked bundled save; APK
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side

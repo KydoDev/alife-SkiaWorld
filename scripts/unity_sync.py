@@ -2,8 +2,8 @@
 
 Builds `engine-rs` in release mode and copies:
 - the native library into `unity/Assets/Plugins/x86_64/`;
-- a save (default: the default golden start save) to `unity/Assets/StreamingAssets/world.save` (gzip; no `.gz`
-  in the name, which an Android build would unpack);
+- a save (default: the tracked golden save `species_start.json.gz`, so the G3 P8 species drawer has species) to
+  `unity/Assets/StreamingAssets/world.save` (gzip; no `.gz` in the name, which an Android build would unpack);
 - the config of a planet form (default: examples/volcanic.json), `Config.to_dict()` as a save stores it, to
   `unity/Assets/StreamingAssets/world_config.json`: the input of "New world", which the kernel creates with the
   seed typed in the front-end (ADR-0012; forms and images themselves stay in Python); and
@@ -52,8 +52,8 @@ def copy(src: Path, dst: Path) -> None:
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--save", type=Path, default=ENGINE / "tests/golden/default/start.json.gz",
-                    help="save (v8, default flags) the Unity front-end loads")
+    ap.add_argument("--save", type=Path, default=ENGINE / "tests/golden/species_start.json.gz",
+                    help="save (default flags, with a species tracker) the Unity front-end loads")
     ap.add_argument("--planet", type=Path, default=ROOT / "examples/volcanic.json",
                     help="planet form (.json) whose config New world uses")
     ap.add_argument("--no-build", action="store_true", help="copy the library already built")

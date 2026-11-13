@@ -171,7 +171,9 @@ python scripts/android_check.py             # device check APK: golden sets and 
   tracker if it has one. `Species` gives the counters (`IsTracked` false for a save without a tracker),
   `LivingSpecies()` the living species in id order (refresh it now and then: it walks the list), `TryGetSpecies(id)`
   any species still kept, `Ancestors(id)` its chain back to a root or a pruned ancestor, and `CellRecord.Species`
-  each cell's species. On a tracked world the tile key is the species id.
+  each cell's species. On a tracked world the tile key is the species id. The species drawer (`SpeciesList.cs`,
+  G3 P8) lists the 30 most numerous and shows the ancestry of the one tapped; `unity_sync.py` bundles the tracked
+  golden save `species_start.json.gz` by default.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

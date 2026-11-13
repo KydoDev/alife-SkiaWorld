@@ -45,7 +45,8 @@ namespace WorldSim
         public static string Summary(CellRecord r)
         {
             string colony = r.Colony > 1 ? $"colony of {r.Colony} cells, {r.Bonds} bonds" : "alone (no bonds)";
-            string text = $"energy {r.Energy:0.0}   age {r.Age}   lineage {r.Lineage}\n{colony}";
+            string species = r.Species != 0 ? $"   species #{r.Species}" : "";
+            string text = $"energy {r.Energy:0.0}   age {r.Age}   lineage {r.Lineage}{species}\n{colony}";
             string traits = "";
             for (int i = 0; i < TraitNames.Length; i++)
             {

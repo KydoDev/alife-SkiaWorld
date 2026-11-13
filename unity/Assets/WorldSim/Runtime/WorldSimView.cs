@@ -117,6 +117,14 @@ namespace WorldSim
         private PopulationChart _chart;
         private readonly Label[] _countLabels = new Label[5];
         private int[] _counts = new int[5];
+
+        // G3 P8 species drawer: the living species (most numerous first) and the ancestry of the one tapped
+        private VisualElement _speciesPanel, _speciesRows;
+        private Label _speciesHeader, _ancestry;
+        private ulong _pickedSpecies;        // 0: none
+        private float _speciesShownAt = float.NegativeInfinity;
+        private const float SpeciesRefreshSeconds = 0.5f;    // listing walks the kernel's list: not every frame
+        private readonly List<string> _speciesRowTexts = new List<string>();
         private VisualElement _edge;         // a faint line just outside the world's edge
         private Label _stats, _speed, _error, _toolStatus;
 
@@ -231,11 +239,12 @@ namespace WorldSim
             }
             _chart = new PopulationChart();
             _populationPanel.Add(_chart);
-            Bind(doc, "population", () =>
-            {
-                _populationPanel.ToggleInClassList("ws-pop--open");
-                ShowPopulation();
-            });
+            Bind(doc, "population", TogglePopulation);
+            _speciesPanel = doc.Q("species-panel");
+            _speciesHeader = doc.Q<Label>("species-header");
+            _speciesRows = doc.Q("species-rows");
+            _ancestry = doc.Q<Label>("species-ancestry");
+            Bind(doc, "species", ToggleSpecies);
             _worldView = doc.Q("world");
             _worldView.RegisterCallback<PointerDownEvent>(OnWorldPointerDown);
             _worldView.RegisterCallback<PointerMoveEvent>(OnWorldPointerMove);
@@ -280,11 +289,95 @@ namespace WorldSim
         public string PopulationText =>
             string.Join("  ", System.Linq.Enumerable.Select(SpriteArt.Kinds, k => _countLabels[(int)k]?.text));
 
-        /// <summary>Open or close the population panel, as its button does (tests).</summary>
+        /// <summary>Open or close the population panel, as its button does (tests). It closes the species drawer.</summary>
         public void TogglePopulation()
         {
             _populationPanel?.ToggleInClassList("ws-pop--open");
+            if (PopulationOpen)
+            {
+                _speciesPanel?.RemoveFromClassList("ws-pop--open");
+            }
             ShowPopulation();
+        }
+
+        // ------------------------------------------------------------------ species (P8)
+
+        /// <summary>True while the species drawer is open.</summary>
+        public bool SpeciesOpen => _speciesPanel != null && _speciesPanel.ClassListContains("ws-pop--open");
+
+        /// <summary>The drawer's header, rows and ancestry line as shown (tests).</summary>
+        public string SpeciesHeaderText => _speciesHeader?.text;
+        public IReadOnlyList<string> SpeciesRowTexts => _speciesRowTexts;
+        public string AncestryText => _ancestry?.text;
+
+        /// <summary>Open or close the species drawer, as its button does (tests). It closes the population panel.</summary>
+        public void ToggleSpecies()
+        {
+            _speciesPanel?.ToggleInClassList("ws-pop--open");
+            if (SpeciesOpen)
+            {
+                _populationPanel?.RemoveFromClassList("ws-pop--open");
+            }
+            ShowSpecies(true);
+        }
+
+        /// <summary>Show the ancestry of species <paramref name="id"/>, as tapping its row does (tests).</summary>
+        public void PickSpecies(ulong id)
+        {
+            _pickedSpecies = id;
+            ShowAncestry();
+        }
+
+        /// <summary>Refresh the drawer if it is open: always when <paramref name="now"/>, else at most every
+        /// <see cref="SpeciesRefreshSeconds"/> (each refresh walks the kernel's species list).</summary>
+        private void ShowSpecies(bool now)
+        {
+            if (!SpeciesOpen || _world == null)
+            {
+                return;
+            }
+            if (!now && Time.unscaledTime - _speciesShownAt < SpeciesRefreshSeconds)
+            {
+                return;
+            }
+            _speciesShownAt = Time.unscaledTime;
+            SpeciesInfo info = _world.Species;
+            SpeciesRecord[] rows = SpeciesList.Rows(_world.LivingSpecies());
+            _speciesHeader.text = SpeciesList.Header(info, rows.Length);
+            _speciesRows.Clear();
+            _speciesRowTexts.Clear();
+            foreach (SpeciesRecord s in rows)
+            {
+                ulong id = s.Id;
+                string text = SpeciesList.Row(s, _info.StepCount);
+                var row = new Button(() => PickSpecies(id)) { text = text, focusable = false };
+                row.AddToClassList("ws-species__row");
+                row.style.color = SpeciesList.Tint(id);
+                row.EnableInClassList("ws-species__row--picked", id == _pickedSpecies);
+                _speciesRows.Add(row);
+                _speciesRowTexts.Add(text);
+            }
+            ShowAncestry();
+        }
+
+        private void ShowAncestry()
+        {
+            if (_ancestry == null || _world == null)
+            {
+                return;
+            }
+            if (_pickedSpecies == 0)
+            {
+                _ancestry.text = _world.Species.IsTracked ? "tap a species to see where it comes from" : "";
+            }
+            else if (_world.TryGetSpecies(_pickedSpecies, out SpeciesRecord s))
+            {
+                _ancestry.text = SpeciesList.Ancestry(s, _world.Ancestors(_pickedSpecies));
+            }
+            else
+            {
+                _ancestry.text = $"#{_pickedSpecies} died out and was forgotten";
+            }
         }
 
         private void ShowPopulation()
@@ -979,6 +1072,7 @@ namespace WorldSim
                 _world = world;
                 Deselect();    // a new world has none of the old cells
                 _history.Clear();
+                _pickedSpecies = 0;
                 _info = info;
                 _rules = rules;
                 _game = world.Game;
@@ -1158,6 +1252,7 @@ namespace WorldSim
             _counts = Population.Count(_tileWords);
             _history.Add(_info.StepCount, _counts);    // one sample per redraw, thinned as the run grows
             ShowPopulation();
+            ShowSpecies(false);
             if (_image != null)
             {
                 PlaceBackdrop(PixelsPerPoint());    // the margins follow the world's light and its terrain edits

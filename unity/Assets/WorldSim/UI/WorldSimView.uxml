@@ -16,6 +16,7 @@
             <ui:Button name="new-world" text="New world" class="ws-btn" />
             <ui:Button name="orientation" text="Portrait" class="ws-btn" />
             <ui:Button name="population" text="Population" class="ws-btn" />
+            <ui:Button name="species" text="Species" class="ws-btn" />
         </ui:VisualElement>
         <ui:VisualElement name="world" class="ws-world">
             <ui:Label name="error" class="ws-error" />
@@ -27,6 +28,12 @@
         <!-- G3 P6b: cells per kind and their history, over the world's top right corner -->
         <ui:VisualElement name="population-panel" class="ws-pop">
             <ui:VisualElement name="population-counts" class="ws-pop__counts" />
+        </ui:VisualElement>
+        <!-- G3 P8: the living species, most numerous first; tapping one shows its ancestors -->
+        <ui:VisualElement name="species-panel" class="ws-pop ws-species">
+            <ui:Label name="species-header" class="ws-species__header" />
+            <ui:ScrollView name="species-rows" class="ws-species__rows" />
+            <ui:Label name="species-ancestry" class="ws-species__ancestry" />
         </ui:VisualElement>
         <!-- G3 P7: a milestone reached, announced over the world for a few seconds -->
         <ui:Label name="toast" class="ws-toast" picking-mode="Ignore" />

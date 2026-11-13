@@ -16,7 +16,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [?] P6 Inspector bottom sheet and population screen from the ABI 4 views
 8. [?] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
-9. [~] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
+9. [?] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
 11. [ ] P10 iOS build (needs a Mac and a static library) — owner's decision, not scheduled
 
@@ -241,6 +241,14 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   in `ViewTests`. Security review: no blocking issue. Noted: `LivingSpecies` is O(n^2) in the kernel (fine for a
   drawer refreshed now and then; a bulk call can come later), and the tile key changed meaning in piece 2 while the
   ABI was still 5, so no APK should be built from that commit.
+  *Piece 4* (2026-11-13): the Unity species drawer (`Species` button; it and the population panel close each
+  other): a header with the living species and the tracker's counters (or why an untracked world has none), the 30
+  most numerous species as tinted rows (id, members, age, origin, a star once established), and the ancestry of the
+  row tapped, back to its root or to the first forgotten ancestor. `SpeciesList.cs` holds the content (EditMode
+  `SpeciesListTests`, 5); the drawer refreshes at most every 0.5 s, since each refresh walks the kernel's list. The
+  cell sheet shows the cell's species. `unity_sync.py` now bundles `species_start.json.gz`, so the APK opens on a
+  tracked world. PlayMode: the drawer on the tracked save equals the kernel's list and ancestry, and an untracked
+  save says it has no species. Pass: the owner's phone check of APK 0.0.5.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
   (births, deaths, tool use), never from inside the kernel. Pass: owner playtest on a tablet.
 - **P10 iOS** — `aarch64-apple-ios` static library, `DllImport("__Internal")` under `UNITY_IOS`, built on

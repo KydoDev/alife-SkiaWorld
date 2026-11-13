@@ -6,6 +6,7 @@
 // is skipped in batchmode).
 using System.Collections;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -32,7 +33,12 @@ namespace WorldSim.PlayTests
                                                                               "engine-rs", "tests", "golden",
                                                                               "default", "start.json.gz"));
 
-        private IEnumerator OpenView(GameRules? rules = null)
+        // the tracked golden save (G3 P8): Config(), seed 3, step 300, with its species tracker
+        private static string TrackedSave() => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..",
+                                                                               "engine-rs", "tests", "golden",
+                                                                               "species_start.json.gz"));
+
+        private IEnumerator OpenView(GameRules? rules = null, string save = null)
         {
 #if UNITY_EDITOR
             _host = new GameObject("WorldSim (test)");
@@ -41,7 +47,7 @@ namespace WorldSim.PlayTests
             document.panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelPath);
             document.visualTreeAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(LayoutPath);
             _view = _host.AddComponent<WorldSimView>();
-            _view.saveFile = GoldenSave();        // Path.Combine keeps an absolute second path
+            _view.saveFile = save ?? GoldenSave();    // Path.Combine keeps an absolute second path
             _view.gameRules = rules;              // null: the kernel's default game
             _view.running = false;
             _host.SetActive(true);
@@ -293,6 +299,40 @@ namespace WorldSim.PlayTests
             Assert.AreEqual(before + 1, _view.History.Samples.Count, "one sample per redraw");
             _view.TogglePopulation();
             Assert.IsFalse(_view.PopulationOpen);
+        }
+
+        [UnityTest]
+        public IEnumerator SpeciesDrawerListsTheSpeciesAndShowsAnAncestry()
+        {
+            yield return OpenView(save: TrackedSave());
+            using NativeWorld twin = NativeWorld.Load(File.ReadAllBytes(TrackedSave()));
+            Assert.IsFalse(_view.SpeciesOpen, "closed at first");
+            _view.TogglePopulation();
+            _view.ToggleSpecies();
+            yield return null;
+            Assert.IsTrue(_view.SpeciesOpen);
+            Assert.IsFalse(_view.PopulationOpen, "the drawer closes the population panel");
+            SpeciesRecord[] rows = SpeciesList.Rows(twin.LivingSpecies());
+            Assert.AreEqual(SpeciesList.Header(twin.Species, rows.Length), _view.SpeciesHeaderText);
+            CollectionAssert.AreEqual(rows.Select(s => SpeciesList.Row(s, twin.Info.StepCount)),
+                                      _view.SpeciesRowTexts);
+            SpeciesRecord descendant = twin.LivingSpecies().First(s => twin.Ancestors(s.Id).Count > 0);
+            _view.PickSpecies(descendant.Id);
+            Assert.AreEqual(SpeciesList.Ancestry(descendant, twin.Ancestors(descendant.Id)), _view.AncestryText);
+            _view.PickSpecies(twin.Species.NextId + 5);
+            StringAssert.Contains("forgotten", _view.AncestryText);
+            _view.TogglePopulation();
+            Assert.IsFalse(_view.SpeciesOpen, "the population panel closes the drawer");
+        }
+
+        [UnityTest]
+        public IEnumerator AnUntrackedWorldSaysItHasNoSpecies()
+        {
+            yield return OpenView();
+            _view.ToggleSpecies();
+            yield return null;
+            Assert.AreEqual("no species: this world was saved without a species tracker", _view.SpeciesHeaderText);
+            CollectionAssert.IsEmpty(_view.SpeciesRowTexts);
         }
 
         [UnityTest]

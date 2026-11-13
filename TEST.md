@@ -1,6 +1,6 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P8 piece 3 (ABI 6 species views); pytest from the piece 1 run (no Python change since),
+Last run: 2026-11-13 - G3 P8 piece 4 (Unity species drawer); cargo from the piece 3 run (no Rust change since),
 `main`, working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
@@ -12,11 +12,15 @@ Last run: 2026-11-13 - G3 P8 piece 3 (ABI 6 species views); pytest from the piec
 | pytest (429 tests) | 429 | 0 | 0 | 99.53% |
 | `cargo test --release` (`engine-rs`, 74 tests) | 74 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 56 | 0 | 0 | |
-| Unity PlayMode, windowed Editor (7 tests) | 7 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 61 | 0 | 0 | |
+| Unity PlayMode, windowed Editor (9 tests) | 9 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P8 piece 4: EditMode `SpeciesListTests` (5: row order and cap, row text, tracked and untracked header,
+  ancestry to the root and to a forgotten ancestor, distinct tints) and species in `CellSheetTests`; PlayMode
+  `SpeciesDrawerListsTheSpeciesAndShowsAnAncestry` (tracked save: drawer equals the kernel's list and ancestry,
+  the drawer and the population panel close each other) and `AnUntrackedWorldSaysItHasNoSpecies`.
 - New in P8 piece 3: `tests/ffi.rs` (3: species of the created and loaded cases through the ABI, refusals and
   out-untouched, species tile key) and the ABI 6 entries in the poisoning unit test; EditMode `SpeciesTests` (5)
   and the new struct layouts in `ViewTests`. PlayMode rerun (7/7) on the ABI 6 DLL.
