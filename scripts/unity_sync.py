@@ -8,10 +8,9 @@ Builds `engine-rs` in release mode and copies:
   `unity/Assets/StreamingAssets/world_config.json`: the input of "New world", which the kernel creates with the
   seed typed in the front-end (ADR-0012; forms and images themselves stay in Python); and
   `world_config_portrait.json`, the same planet with its sides swapped (G3 P2b: New world is wide in landscape,
-  deep in portrait);
-- the G1 tool parameters of `GameRules()` (kind, radius, amount per tool) to
-  `unity/Assets/StreamingAssets/game_tools.json`: the viewer's sandbox tools (ADR-0013 piece 5), so the game
-  rules keep one home, in Python.
+  deep in portrait).
+The game rules (tool costs and radii, milestones) come from the kernel itself since ABI 5 (ADR-0017), so nothing
+of `GameRules()` is exported; a `game_tools.json` left by an older run is removed, so no APK carries it.
 With `--android` (G3 P3) the kernel is also cross-built for arm64 Android and copied to
 `unity/Assets/Plugins/Android/arm64-v8a/`, linked by the NDK that ships with the Unity Editor's Android module
 (the project's Editor version, or `--ndk`); it needs `rustup target add aarch64-linux-android`.
@@ -73,11 +72,11 @@ def main(argv=None) -> None:
         copy(ENGINE / "target" / ANDROID_TARGET / "release/libworldsim_core.so", ANDROID_LIB)
     # no ".gz" in the name: an Android build would unpack it, and the kernel reads gzip only
     copy(args.save, UNITY / "Assets/StreamingAssets/world.save")
-    for stale in ("world.json.gz", "world.json.gz.meta"):   # the name before G3 P3: an APK would carry it
+    # the save's name before G3 P3, and the tool file before G3 P7: an APK would carry them
+    for stale in ("world.json.gz", "world.json.gz.meta", "game_tools.json", "game_tools.json.meta"):
         (UNITY / "Assets/StreamingAssets" / stale).unlink(missing_ok=True)
     write_config(args.planet, UNITY / "Assets/StreamingAssets/world_config.json",
                  UNITY / "Assets/StreamingAssets/world_config_portrait.json")
-    write_tools(UNITY / "Assets/StreamingAssets/game_tools.json")
 
 
 def project_min_sdk() -> int:
@@ -122,30 +121,6 @@ def build_android(ndk: Path) -> None:
                CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384")
     subprocess.run(["cargo", "build", "--release", "--locked", "--target", ANDROID_TARGET], cwd=ENGINE, env=env,
                    check=True)
-
-
-# `ws_world_intervene` kind of each G1 tool (WS_EDIT_*, engine-rs/src/ffi.rs)
-TOOL_KIND = {"nutrients": 1, "meteorite": 2, "mountain": 3, "dig": 4, "volcano": 5}
-
-
-def tool_parameters(rules=None) -> list[dict]:
-    """Each G1 tool as the arguments of `ws_world_intervene`: what `Game.act` passes to the `play.py` edit (the
-    radius from `rules.radius`, `nutrients_amount` or `max_chem` as the amount; unused arguments 0)."""
-    from worldsim.play import TOOLS, GameRules
-    rules = rules or GameRules()
-    out = []
-    for tool in TOOLS:
-        kind = TOOL_KIND[tool]
-        radius = 0 if tool == "volcano" else int(rules.radius[tool])
-        amount = {"nutrients": rules.nutrients_amount, "volcano": rules.max_chem}.get(tool, 0.0)
-        out.append({"name": tool, "kind": kind, "radius": radius, "amount": float(amount)})
-    return out
-
-
-def write_tools(dst: Path) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"tools": tool_parameters()}, separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"GameRules() tools -> {dst.relative_to(ROOT)}")
 
 
 def shaped(cfg, portrait: bool):

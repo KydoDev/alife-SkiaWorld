@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P7 piece 4, the viewer is the game**: every world the Unity viewer opens carries the kernel's game. The
+  tools spend divine energy (each dock button shows its cost and dims when it cannot be paid for), the HUD shows the
+  energy, and a toast announces each milestone reached. `GameText.cs` holds the milestone texts, checked against
+  `worldsim/play.py`. `scripts/unity_sync.py` no longer exports `game_tools.json`; the rules come from the kernel.
 - **G3 P7 piece 3, ABI 5: the game through the C ABI**: `ws_game_default_rules`, `ws_game_attach`, `ws_game_act` and
   `ws_game_info` (ADR-0017). A world handle can carry one game: stepping it steps the game, player edits go through
   `ws_game_act`, and `ws_world_intervene` is refused. The rules arrive as a validated `WsGameRules` struct. C# mirror

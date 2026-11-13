@@ -15,7 +15,7 @@ like [G2_PLAN.md](G2_PLAN.md).
 5. [?] P4 ADR + ABI 4 read-only views (tile snapshot, cell detail, light factor), golden-checked vs Python
 6. [~] P5 Sprite world renderer: data texture + atlas shader, LOD to flat colour, day/night palettes
 7. [?] P6 Inspector bottom sheet and population screen from the ABI 4 views
-8. [~] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
+8. [?] P7 Game rules in the kernel: budget + 5 milestones (play.py), golden-checked with `play.replay`
 9. [ ] P8 Species tracker in the kernel (ADR-0003 observer), species drawer and evolution tree
 10. [ ] P9 Tablet landscape layout, sound (ambient + events), polish (idle frames, dying, colony seams)
 11. [ ] P10 iOS build (needs a Mac and a static library) — owner's decision, not scheduled
@@ -192,6 +192,13 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   not O(cells x vents); the golden trace is unchanged), the C# wrapper refuses missing or short per-tool arrays,
   the rules are read unaligned, `GameInfo` has no array (no garbage per frame), and both languages assert the field
   offsets.
+  *Piece 4* (2026-11-13): the viewer is the game. Every world opened (the bundled save, New world) carries the
+  kernel's default game; the five tools go through `Act`, the dock labels each with its cost and dims the ones the
+  energy cannot pay for, the HUD shows `energy n/100`, and each milestone reached is toasted for 4 s (queued when
+  several come at once). `unity_sync.py` no longer exports `game_tools.json` (the rules come from the kernel) and
+  removes an old copy. Checks: EditMode `GameTextTests` (milestone texts and tool names equal `play.py`; only new
+  milestones are announced) and PlayMode `ToolsSpendTheGamesEnergyAndAMilestoneIsToasted` (lowered giant threshold).
+  Still to check: on the owner's phone (APK 0.0.4), with P5 and P6.
 - **P8 Species** — port the tracker as a pure observer (it must never touch the RNG; ADR-0003/0005);
   expose a list and parent links. Pass: species ids and parents equal Python's on the golden runs.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs

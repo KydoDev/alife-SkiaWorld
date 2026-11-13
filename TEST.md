@@ -1,7 +1,7 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P7 piece 3 (ABI 5); pytest from the piece 2 run (no Python change since), Unity PlayMode from
-the P6b run (the view is unchanged), `main`, working tree before the commit
+Last run: 2026-11-13 - G3 P7 piece 4 (the viewer is the game); cargo from the piece 3 run (no Rust change since), `main`,
+working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -9,14 +9,16 @@ the P6b run (the view is unchanged), `main`, working tree before the commit
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| pytest (423 tests) | 423 | 0 | 0 | 99.39% |
+| pytest (421 tests) | 421 | 0 | 0 | 99.39% |
 | `cargo test --release` (`engine-rs`, 63 tests) | 63 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
-| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 48 | 0 | 0 | |
-| Unity PlayMode, windowed Editor (6 tests) | 6 | 0 | 0 | |
+| Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 51 | 0 | 0 | |
+| Unity PlayMode, windowed Editor (7 tests) | 7 | 0 | 0 | |
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P7 piece 4: EditMode `GameTextTests` (3) and PlayMode `ToolsSpendTheGamesEnergyAndAMilestoneIsToasted`.
+  pytest lost two tests with the `game_tools.json` export they covered (the rules now come from the kernel).
 - New in P7 piece 3: `tests/ffi.rs` (3: default rules, the 8 game cases through the ABI in chunks, refusals),
   `golden_games.rs` (the day-length cap), EditMode `GameTests` (3) and the struct offsets in `ViewTests`. PlayMode
   not rerun: no view code changed (piece 4 moves the tools onto the game).

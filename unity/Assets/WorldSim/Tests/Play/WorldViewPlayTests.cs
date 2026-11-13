@@ -32,7 +32,7 @@ namespace WorldSim.PlayTests
                                                                               "engine-rs", "tests", "golden",
                                                                               "default", "start.json.gz"));
 
-        private IEnumerator OpenView()
+        private IEnumerator OpenView(GameRules? rules = null)
         {
 #if UNITY_EDITOR
             _host = new GameObject("WorldSim (test)");
@@ -42,7 +42,7 @@ namespace WorldSim.PlayTests
             document.visualTreeAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(LayoutPath);
             _view = _host.AddComponent<WorldSimView>();
             _view.saveFile = GoldenSave();        // Path.Combine keeps an absolute second path
-            _view.toolsFile = "no_tools.json";    // no tools: a tap names the tile
+            _view.gameRules = rules;              // null: the kernel's default game
             _view.running = false;
             _host.SetActive(true);
 #else
@@ -293,6 +293,40 @@ namespace WorldSim.PlayTests
             Assert.AreEqual(before + 1, _view.History.Samples.Count, "one sample per redraw");
             _view.TogglePopulation();
             Assert.IsFalse(_view.PopulationOpen);
+        }
+
+        [UnityTest]
+        public IEnumerator ToolsSpendTheGamesEnergyAndAMilestoneIsToasted()
+        {
+            GameRules rules = NativeWorld.DefaultGameRules();
+            rules.GiantColony = 2;    // the golden world has bonded colonies: reached at the first check
+            rules.CheckEvery = 1;
+            yield return OpenView(rules);
+            VisualElement root = _host.GetComponent<UIDocument>().rootVisualElement;
+            Label stats = root.Q<Label>("stats");
+            StringAssert.Contains("energy 100/100", stats.text);
+            Button volcano = root.Q("tools").Query<Button>().ToList()[(int)Tool.Volcano - 1];
+            Assert.AreEqual("volcano 40", volcano.text);
+
+            _view.PickTool(Tool.Volcano);
+            _view.TapAt(DrawnCentre(_view, 40, 30));
+            Assert.AreEqual(60.0, _view.GameState.Budget);
+            Assert.AreEqual("volcano at (40, 30)", _view.ToolStatus);
+            StringAssert.Contains("energy 60/100", stats.text);
+            _view.TapAt(DrawnCentre(_view, 50, 30));
+            Assert.AreEqual(20.0, _view.GameState.Budget);
+            Assert.IsTrue(volcano.ClassListContains("ws-tool--poor"), "40 energy is out of reach");
+            _view.TapAt(DrawnCentre(_view, 60, 30));
+            Assert.AreEqual("volcano needs 40 energy", _view.ToolStatus);
+            Assert.AreEqual(20.0, _view.GameState.Budget, "a refusal is free");
+            Assert.AreEqual(2UL, _view.GameState.PlayerVents);
+
+            Assert.IsNull(_view.ToastText);
+            _view.StepNow(1);
+            Assert.IsTrue(_view.GameState.Has(Milestone.Giant));
+            yield return null;    // the toast comes up on the next frame
+            yield return null;
+            Assert.AreEqual(GameText.Of(Milestone.Giant), _view.ToastText);
         }
 
         // Input System screen coordinates: pixels, origin bottom-left

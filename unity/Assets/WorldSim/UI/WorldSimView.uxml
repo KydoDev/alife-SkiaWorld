@@ -28,6 +28,8 @@
         <ui:VisualElement name="population-panel" class="ws-pop">
             <ui:VisualElement name="population-counts" class="ws-pop__counts" />
         </ui:VisualElement>
+        <!-- G3 P7: a milestone reached, announced over the world for a few seconds -->
+        <ui:Label name="toast" class="ws-toast" picking-mode="Ignore" />
         <!-- G3 P6a: the cell sheet, over the dock while a cell is selected (a tap with no tool) -->
         <ui:VisualElement name="sheet" class="ws-sheet">
             <ui:VisualElement class="ws-sheet__head">

@@ -273,3 +273,29 @@
     height: 150px;
     background-color: #07080f;
 }
+
+/* G3 P7: a tool the energy cannot pay for (still pickable: the energy regenerates) */
+.ws-tool--poor {
+    opacity: 0.45;
+}
+
+/* G3 P7: milestone toast, over the top of the world */
+.ws-toast {
+    position: absolute;
+    top: 120px;
+    left: 24px;
+    right: 24px;
+    padding: 10px 14px;
+    background-color: rgba(14, 15, 31, 0.94);
+    border-width: 2px;
+    border-color: #ff3fd1;
+    color: #ffffff;
+    font-size: 20px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    display: none;
+}
+
+.ws-toast--on {
+    display: flex;
+}

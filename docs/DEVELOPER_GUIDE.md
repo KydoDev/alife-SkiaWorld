@@ -155,9 +155,13 @@ python scripts/android_check.py             # device check APK: golden sets and 
   and images themselves stay in Python; a kernel-made world cannot be saved yet.
 - **Edits** (ADR-0013): `NativeWorld.Intervene(Edit, x, y, radius, amount)` applies a G1 tool between steps,
   bit-exact with `worldsim/play.py`; a refusal throws `WorldSimException` with `Status == StatusInvalid` and leaves
-  the world as it was. In the viewer, the dock under the world picks a tool (tap it again to put it down) and a
-  left click or tap on the world applies it; the parameters come from `StreamingAssets/game_tools.json`, which
-  `unity_sync.py` exports from `GameRules()`. A sandbox: no budget or milestones until G3.
+  the world as it was. A world without a game takes them; one with a game refuses them.
+- **The game** (ADR-0017, ABI 5): `AttachGame(GameRules)` (start from `NativeWorld.DefaultGameRules()`), then
+  `Act(Tool, x, y)` (true if it happened and was paid for) and `Game` (budget, milestones, player vents). The viewer
+  attaches the default game to every world it opens: the dock under the world picks a tool, labelled with its cost
+  (tap it again to put it down; a tool the energy cannot pay for is dimmed), a tap on the world uses it, the HUD
+  shows the energy, and each milestone reached is announced by a toast (texts in `GameText.cs`, checked against
+  `play.py`). Tests can lower the thresholds through `WorldSimView.gameRules`.
 See [TEST_STRATEGY.md](TEST_STRATEGY.md). Record results in `TEST.md` (archive
 the previous content into `test_history.md` first).
 

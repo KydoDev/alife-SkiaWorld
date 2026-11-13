@@ -1,7 +1,7 @@
 // G3 P1 front-end shell (docs/G3_PLAN.md): a kernel world shown as a point-filtered texture, with play / pause /
-// step / speed, (ADR-0012) "New world" from an exported config and a typed seed, and (ADR-0013) the five G1
-// sandbox tools applied with a click, with the parameters Python's GameRules() exports. No budget or milestones
-// yet (G3 P7). The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette). G3 P2: the world is seen through
+// step / speed, (ADR-0012) "New world" from an exported config and a typed seed, and the G1 game (ADR-0017, G3 P7):
+// every world opened carries a kernel game, the five tools spend its divine energy (shown in the HUD) and each
+// milestone reached is announced by a toast. The UI is UI Toolkit (WorldSimView.uxml / .uss, Neon Abyss palette). G3 P2: the world is seen through
 // a WorldCamera (pinch or wheel zoom in whole device pixels per tile, drag to pan); a tap applies the selected tool
 // or, with none, names the tile. Input comes from the Input System package. G3 P2b: the whole world is on screen at
 // the first view and drawn once (no x wrap in the view); the player picks portrait or landscape, which locks a phone's
@@ -25,7 +25,6 @@ namespace WorldSim
         // The kernel's caps (WS_MAX_SAVE_LEN, WS_MAX_CONFIG_LEN): larger files are refused before being read.
         private const long MaxSaveBytes = 256L * 1024 * 1024;
         private const long MaxConfigBytes = 64 * 1024;
-        private const long MaxToolsBytes = 16 * 1024;
 
         // A gzip save under a name without ".gz": an Android build unpacks *.gz files of StreamingAssets and drops
         // the extension, and the kernel reads gzip only.
@@ -37,9 +36,6 @@ namespace WorldSim
 
         [Tooltip("The same planet, deep instead of wide: New world in portrait (G3 P2b), exported by unity_sync.py")]
         public string portraitConfigFile = "world_config_portrait.json";
-
-        [Tooltip("G1 tool parameters in StreamingAssets, exported from GameRules() by scripts/unity_sync.py")]
-        public string toolsFile = "game_tools.json";
 
         [Tooltip("Seed of the next New world (an unsigned 64-bit integer)")]
         public string seedText = "1";
@@ -83,8 +79,20 @@ namespace WorldSim
         private Button _orientation;
         private bool _portrait;              // the player's choice (PlayerPrefs); landscape until one is made
         private const string OrientationKey = "worldsim.orientation";
-        private ToolSpec[] _tools = Array.Empty<ToolSpec>();
-        private int _tool = -1;              // index into _tools; -1: no tool (clicks do nothing)
+        private static readonly Tool[] Tools = (Tool[])Enum.GetValues(typeof(Tool));
+        private int _tool = -1;              // index into Tools; -1: no tool (a tap selects a cell or names the tile)
+
+        // G3 P7 piece 4: the game every opened world carries
+        /// <summary>Rules of the game attached to every world opened; null: the kernel's defaults (`GameRules()`).
+        /// Tests set lowered thresholds here before the view starts.</summary>
+        [NonSerialized] public GameRules? gameRules;
+        private GameRules _rules;            // the rules of the shown world's game
+        private GameInfo _game;              // its state at the shown step
+        private uint _announced;             // milestones already toasted (bits as GameInfo.Reached)
+        private readonly Queue<string> _toasts = new Queue<string>();
+        private float _toastLeft;            // seconds the current toast stays up
+        private const float ToastSeconds = 4f;
+        private Label _toast;
 
         // UI Toolkit elements (WorldSimView.uxml)
         private VisualElement _root;
@@ -123,22 +131,6 @@ namespace WorldSim
         private TextField _seed;
         private readonly List<Button> _toolButtons = new List<Button>();
 
-        // game_tools.json: one entry per G1 tool, the arguments of ws_world_intervene
-        [Serializable]
-        private class ToolSpec
-        {
-            public string name;
-            public uint kind;
-            public uint radius;
-            public double amount;
-        }
-
-        [Serializable]
-        private class ToolFile
-        {
-            public ToolSpec[] tools;
-        }
-
         public int StepsPerSecond => Speeds[Mathf.Clamp(speedIndex, 0, Speeds.Length - 1)];
 
         // On the desktop every read finishes in its constructor, so Start runs to the end in its first frame; on
@@ -148,18 +140,16 @@ namespace WorldSim
             BindUi();
             _portrait = PlayerPrefs.GetInt(OrientationKey, 0) == 1;
             ApplyOrientation();
-            var tools = new StreamingRead(toolsFile, MaxToolsBytes);
             _config = new StreamingRead(configFile, MaxConfigBytes);
             _portraitConfig = new StreamingRead(portraitConfigFile, MaxConfigBytes);
             var save = new StreamingRead(saveFile, MaxSaveBytes);
-            foreach (StreamingRead read in new[] { tools, _config, _portraitConfig, save })
+            foreach (StreamingRead read in new[] { _config, _portraitConfig, save })
             {
                 if (!read.Done)
                 {
                     yield return read.Wait();
                 }
             }
-            LoadTools(tools);
             if (save.Data == null)
             {
                 ShowError($"{save.Error}\n(run scripts/unity_sync.py)");
@@ -190,6 +180,7 @@ namespace WorldSim
             _speed = doc.Q<Label>("speed");
             _error = doc.Q<Label>("error");
             _toolStatus = doc.Q<Label>("tool-status");
+            _toast = doc.Q<Label>("toast");
             _play = Bind(doc, "play", () => running = !running);
             _step = Bind(doc, "step", () =>
             {
@@ -484,7 +475,14 @@ namespace WorldSim
             {
                 return;
             }
-            _stats.text = _world == null ? "no world" : $"step {_info.StepCount}   cells {_info.Population}";
+            _stats.text = _world == null
+                ? "no world"
+                : $"step {_info.StepCount}   cells {_info.Population}   energy {Math.Floor(_game.Budget):0}/{_rules.BudgetMax:0}";
+            for (int i = 0; i < _toolButtons.Count; i++)
+            {
+                // a tool the energy cannot pay for is dimmed, still pickable (the energy regenerates)
+                _toolButtons[i].EnableInClassList("ws-tool--poor", _world != null && _game.Budget < _rules.Cost[i]);
+            }
             _speed.text = $"{StepsPerSecond}/s  {_frameMs:0.0} ms";
             _play.text = running ? "Pause" : "Play";
             _step.SetEnabled(!running && _world != null);
@@ -496,16 +494,18 @@ namespace WorldSim
             _error.style.display = message == null ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        /// <summary>One dock button per tool: pick a tool (tap it again to put it down), then tap the world.</summary>
+        /// <summary>One dock button per tool, with its cost: pick a tool (tap it again to put it down), then tap the
+        /// world.</summary>
         private void BuildToolDock()
         {
             VisualElement dock = _root.Q("tools");
             dock.Clear();
             _toolButtons.Clear();
-            for (int i = 0; i < _tools.Length; i++)
+            for (int i = 0; i < Tools.Length; i++)
             {
                 int index = i;
-                var button = new Button(() => SelectTool(index)) { text = _tools[i].name, focusable = false };
+                string label = $"{GameText.Name(Tools[i])} {_rules.Cost[i]:0}";
+                var button = new Button(() => SelectTool(index)) { text = label, focusable = false };
                 button.AddToClassList("ws-btn");
                 button.AddToClassList("ws-tool");
                 dock.Add(button);
@@ -513,8 +513,20 @@ namespace WorldSim
             }
         }
 
+        /// <summary>Pick a tool, as its dock button does (tests).</summary>
+        public void PickTool(Tool tool) => SelectTool(Array.IndexOf(Tools, tool));
+
+        /// <summary>The game at the shown step, the dock's status line and the toast on screen (tests).</summary>
+        public GameInfo GameState => _game;
+        public string ToolStatus => _toolStatus?.text;
+        public string ToastText => _toast != null && _toast.ClassListContains("ws-toast--on") ? _toast.text : null;
+
         private void SelectTool(int index)
         {
+            if (index < 0 || index >= _toolButtons.Count)
+            {
+                return;    // no world opened yet: no dock
+            }
             _tool = _tool == index ? -1 : index;
             for (int i = 0; i < _toolButtons.Count; i++)
             {
@@ -861,43 +873,23 @@ namespace WorldSim
 
         // ------------------------------------------------------------------ world
 
-        /// <summary>Read the tool parameters; without them the viewer works, with no tools.</summary>
-        private void LoadTools(StreamingRead read)
-        {
-            _tools = Array.Empty<ToolSpec>();
-            if (read.Data == null)
-            {
-                _toolStatus.text = "no tools: run scripts/unity_sync.py";
-                Debug.LogWarning(read.Error);
-            }
-            else
-            {
-                try
-                {
-                    ToolFile file = JsonUtility.FromJson<ToolFile>(System.Text.Encoding.UTF8.GetString(read.Data));
-                    _tools = file?.tools ?? Array.Empty<ToolSpec>();
-                    _toolStatus.text = _tools.Length == 0 ? $"no tools in {read.Location}"
-                                                          : "pick a tool, then tap the world";
-                }
-                catch (ArgumentException e)
-                {
-                    _toolStatus.text = $"no tools ({e.GetType().Name}): run scripts/unity_sync.py";
-                }
-            }
-            BuildToolDock();
-        }
-
-        /// <summary>Apply the selected tool at tile (x, y), between steps; a refusal changes nothing.</summary>
+        /// <summary>Use the selected tool at tile (x, y) through the game, between steps: it happens and is paid for,
+        /// or it is refused for free (too expensive, or nothing to change there).</summary>
         private void ApplyTool(uint x, uint y)
         {
-            ToolSpec t = _tools[_tool];
+            Tool tool = Tools[_tool];
+            string name = GameText.Name(tool);
             try
             {
-                ulong changed = _world.Intervene((Edit)t.kind, x, y, t.radius, t.amount);
+                bool done = _world.Act(tool, x, y);
                 _info = _world.Info;
+                _game = _world.Game;
                 Redraw();
                 RefreshSelection(0);    // an edit kills cells but moves none
-                _toolStatus.text = $"{t.name} at ({x}, {y}): {changed}";
+                double cost = _rules.Cost[_tool];
+                _toolStatus.text = done ? $"{name} at ({x}, {y})"
+                    : _game.Budget < cost ? $"{name} needs {cost:0} energy"
+                    : $"{name}: nothing to change at ({x}, {y})";
             }
             catch (WorldSimException e)
             {
@@ -910,6 +902,34 @@ namespace WorldSim
                 }
             }
             RefreshHud();
+        }
+
+        /// <summary>Queue a toast for each milestone the game reached since the last announcement.</summary>
+        private void AnnounceMilestones()
+        {
+            foreach (Milestone m in GameText.Fresh(_game.Reached, _announced))
+            {
+                _toasts.Enqueue(GameText.Of(m));
+            }
+            _announced |= _game.Reached;
+        }
+
+        /// <summary>Show the queued toasts one after the other, each for <see cref="ToastSeconds"/>.</summary>
+        private void TickToasts(float seconds)
+        {
+            if (_toast == null)
+            {
+                return;
+            }
+            _toastLeft -= seconds;
+            if (_toastLeft > 0f)
+            {
+                return;
+            }
+            bool next = _toasts.Count > 0;
+            _toast.text = next ? _toasts.Dequeue() : "";
+            _toast.EnableInClassList("ws-toast--on", next);
+            _toastLeft = next ? ToastSeconds : 0f;
         }
 
         /// <summary>Replace the shown world by one the kernel creates from the exported config and the seed.</summary>
@@ -943,8 +963,10 @@ namespace WorldSim
                 NativeWorld world = make();
                 WorldInfo info;
                 int rgbLength;
+                GameRules rules = gameRules ?? NativeWorld.DefaultGameRules();
                 try
                 {
+                    world.AttachGame(rules);
                     info = world.Info;
                     rgbLength = world.RgbLength;
                 }
@@ -958,6 +980,14 @@ namespace WorldSim
                 Deselect();    // a new world has none of the old cells
                 _history.Clear();
                 _info = info;
+                _rules = rules;
+                _game = world.Game;
+                _announced = 0;
+                _toasts.Clear();
+                _toastLeft = 0f;
+                _tool = -1;    // the dock is rebuilt with nothing picked
+                BuildToolDock();
+                _toolStatus.text = "pick a tool, then tap the world";
                 _rgb = new byte[rgbLength];
                 _tileWords = new byte[world.TilesLength];
                 _flipped = new byte[rgbLength];
@@ -1011,6 +1041,7 @@ namespace WorldSim
         /// </summary>
         private void Tick()
         {
+            TickToasts(Time.unscaledDeltaTime);
             _frameMs += (Time.unscaledDeltaTime * 1000f - _frameMs) * 0.1f;
             _frameClock += Time.unscaledDeltaTime;
             if (_frameClock < IdleFrameSeconds)
@@ -1096,6 +1127,8 @@ namespace WorldSim
             {
                 _world.Step(steps);
                 _info = _world.Info;
+                _game = _world.Game;
+                AnnounceMilestones();
                 Redraw();
                 RefreshSelection(steps);
             }
