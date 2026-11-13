@@ -1,7 +1,7 @@
 # Test Report
 
-Last run: 2026-11-13 - G3 P7 piece 4 (the viewer is the game); cargo from the piece 3 run (no Rust change since), `main`,
-working tree before the commit
+Last run: 2026-11-13 - G3 P8 piece 1 (species vectors); cargo and Unity from the P7 runs (no Rust or C# change since),
+`main`, working tree before the commit
 
 > Archive protocol: before overwriting this file, append its current content to
 > `test_history.md` under a dated separator.
@@ -9,7 +9,7 @@ working tree before the commit
 ## Summary
 | Suite | Passed | Failed | Skipped/xfail | Coverage |
 |-------|--------|--------|---------------|----------|
-| pytest (421 tests) | 421 | 0 | 0 | 99.39% |
+| pytest (429 tests) | 429 | 0 | 0 | 99.53% |
 | `cargo test --release` (`engine-rs`, 63 tests) | 63 | 0 | 0 | |
 | `cargo fmt --check`, `cargo clippy --all-targets --release -D warnings` | clean | | | |
 | Unity EditMode (batchmode, Unity 6000.5.6f1, StandaloneWindows64) | 51 | 0 | 0 | |
@@ -17,6 +17,9 @@ working tree before the commit
 | `ruff check .` | clean | | | |
 
 ## Notes
+- New in P8 piece 1: `tests/test_species_vectors.py` (7: committed `species.json` and tracked save regenerate
+  identically, digest layouts, final dump equals last digest, vacuous cases refused, tracking leaves the hash) and
+  `test_an_untracked_world_keys_tiles_by_lineage`; the tile-word test now expects the species key on tracked worlds.
 - New in P7 piece 4: EditMode `GameTextTests` (3) and PlayMode `ToolsSpendTheGamesEnergyAndAMilestoneIsToasted`.
   pytest lost two tests with the `game_tools.json` export they covered (the rules now come from the kernel).
 - New in P7 piece 3: `tests/ffi.rs` (3: default rules, the 8 game cases through the ABI in chunks, refusals),

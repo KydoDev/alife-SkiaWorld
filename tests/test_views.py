@@ -65,7 +65,7 @@ def test_words_pack_each_field_in_its_own_byte():
                 assert word & 0x7 == kind(c)
                 assert bool(word & 0x8) == bool(c.bonds)
                 assert (word >> 8) & 0xF == energy_level(c)
-                assert word >> 16 == c.lineage % 65536
+                assert word >> 16 == c.species % 65536, "a tracked world keys tiles by species (ADR-0018)"
     assert rock_seen and chem_seen
 
 
@@ -167,10 +167,18 @@ def test_committed_view_vectors_match_this_python(request):
 
 
 def test_the_key_wraps_and_the_top_byte_is_used():
-    """lineage >= 2**16 wraps; a key with its top bit set fills byte 3 (the C# unpacker must not sign-extend)."""
+    """A key >= 2**16 wraps; a key with its top bit set fills byte 3 (the C# unpacker must not sign-extend)."""
     w = _world(steps=0)
+    c = w.cells[0]
+    c.species = 70000
+    assert tile_word(w, c.x, c.y) >> 16 == 70000 - 65536
+    c.species = 0xFFFF
+    assert tile_word(w, c.x, c.y) >> 24 == 0xFF
+
+
+def test_an_untracked_world_keys_tiles_by_lineage():
+    """ADR-0018 Decision 5: without a tracker the key stays the lineage."""
+    w = World(Config(), seed=3, track_species=False)
     c = w.cells[0]
     c.lineage = 70000
     assert tile_word(w, c.x, c.y) >> 16 == 70000 - 65536
-    c.lineage = 0xFFFF
-    assert tile_word(w, c.x, c.y) >> 24 == 0xFF

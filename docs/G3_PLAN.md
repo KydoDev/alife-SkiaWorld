@@ -207,6 +207,14 @@ Mockup numbers (species names, counts, trends, gene values) are illustrative, no
   vectors `species.json` with tracked runs and non-vacuous assertions; (2) Rust `species.rs` and the hooks, equal
   to the vectors, hashes unchanged, steps/s measured; (3) ABI 6 species views and C# mirror, security review first;
   (4) Unity species drawer with ancestry, tracked bundled save, APK.
+  *Piece 1* (2026-11-13): `scripts/g3_species_vectors.py` writes `species.json` and the tracked save
+  `species_start.json.gz` (Config(), seed 3, step 300; gzip without timestamp). Six cases: created `default`,
+  `volcanic` and one with two parents, gene transfer, plasticity and defence (1000 steps each), a 4x4 world without
+  immigrants that dies out and is reseeded 4 times (300 steps), the tracked save loaded (700 steps), and the
+  `survivor` meteorites on a tracked world (88 species driven extinct by the strikes). Every 100 steps: state hash
+  (equal to the same run untracked, asserted), a byte-defined digest of the tracker and of the cells' species, and
+  the tile words' hash; at the end the full tracker and each cell's species. A full dump per sample would be ~250 KB,
+  hence digests (the file is ~1 MB). Python's `views.py` keys tiles by species id when the world is tracked.
 - **P9 Tablet, sound, polish** — audio module returns to the manifest; sounds come from snapshot diffs
   (births, deaths, tool use), never from inside the kernel. Pass: owner playtest on a tablet.
 - **P10 iOS** — `aarch64-apple-ios` static library, `DllImport("__Internal")` under `UNITY_IOS`, built on

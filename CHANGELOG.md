@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **G3 P8 piece 1, species vectors**: `scripts/g3_species_vectors.py` writes `engine-rs/tests/golden/species.json`
+  (six tracked runs: created worlds with and without flags, a reseeded tiny world, a tracked save, meteorites through
+  the game) and the tracked start save `species_start.json.gz`; `g2_golden.py --all` writes both. The generator
+  asserts that tracking never changes the state hash and that every tracker event occurs.
 - **ADR-0018, species tracker in the kernel (G3 P8 plan)**: the kernel will port `SpeciesTracker` as a pure
   observer; created worlds track from step 0, tracked saves load their tracker (validated), untracked saves keep the
   lineage key; ABI 6 will expose the species list, lookup by id for ancestry, and the species tile key.
@@ -72,6 +76,8 @@ All notable changes to this project are documented here. Format based on
   step tests it now xfails when the golden steps were made on another OS (the hash depends on libm).
 
 ### Changed
+- **Tile key by species** (ADR-0018): `worldsim/views.py` keys a tile by the cell's species id when the world tracks
+  species, by its lineage otherwise. `views.json` is unchanged (its worlds are untracked saves).
 - **G3 P2b, the whole world on screen** (owner's review on the phone): the first view fits width and depth, and every
   new world or screen turn fits again; the world is drawn once, never repeated, and panning is clamped in x as in y
   (the simulation stays toroidal). An orientation button lets the player pick portrait or landscape: the phone's

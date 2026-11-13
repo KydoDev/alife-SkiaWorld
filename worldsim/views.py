@@ -10,7 +10,7 @@ import struct
 from .world import N_GENES, TRAITS
 
 KIND_EMPTY, KIND_PHOTO, KIND_SAPRO, KIND_PRED, KIND_CHEMO = range(5)
-KEY_MOD = 1 << 16          # species key = lineage mod 65536 (lineage until the species tracker is ported, P8)
+KEY_MOD = 1 << 16          # tile key = species id mod 65536 when tracked, lineage mod 65536 otherwise (ADR-0018)
 _WORD = struct.Struct("<I")
 
 
@@ -57,7 +57,7 @@ def tile_word(world, x: int, y: int) -> int:
     if c is not None:
         word |= kind(c) | (int(bool(c.bonds)) << 3)
         word |= energy_level(c) << 8
-        word |= (c.lineage % KEY_MOD) << 16
+        word |= ((c.species if world.tracker is not None else c.lineage) % KEY_MOD) << 16
     return word
 
 
