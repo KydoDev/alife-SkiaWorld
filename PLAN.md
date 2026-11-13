@@ -38,7 +38,7 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 31. [x] G3 P7 piece 2: Rust `game.rs` equal to `games.json`; idle games keep every `hashes.csv`
 32. [x] G3 P7 piece 3: ABI 5 (`ws_game_*`), C# mirror, FFI and EditMode tests; security review first
 33. [?] G3 P7 piece 4: Unity tools through the game, budget in the HUD, milestone toasts; APK to the phone
-34. [ ] Copy APK 0.0.3 (P5+P6) to the owner's phone (built 2026-11-13, phone was not connected)
+34. [ ] Copy APK 0.0.4 (P5+P6+P7) to the owner's phone (0.0.3 superseded; phone not connected 2026-11-13)
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side
