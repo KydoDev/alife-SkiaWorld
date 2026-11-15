@@ -37,12 +37,12 @@ Verdicts, cases and non-vacuous conditions are fixed in the ADRs, before any run
 30. [x] G3 P7 piece 1: ADR-0017; Python game vectors (`games.json`) with the verdict's cases and assertions
 31. [x] G3 P7 piece 2: Rust `game.rs` equal to `games.json`; idle games keep every `hashes.csv`
 32. [x] G3 P7 piece 3: ABI 5 (`ws_game_*`), C# mirror, FFI and EditMode tests; security review first
-33. [?] G3 P7 piece 4: Unity tools through the game, budget in the HUD, milestone toasts; APK to the phone
-34. [ ] Copy APK 0.0.4 (P5+P6+P7) to the owner's phone (0.0.3 superseded; phone not connected 2026-11-13)
+33. [x] G3 P7 piece 4: Unity tools through the game, budget in the HUD, milestone toasts; APK to the phone
+34. [x] Copy APK 0.0.4 to the phone: superseded by 0.0.5 (P5-P8), copied and checked by the owner 2026-11-15
 35. [x] G3 P8 piece 1: ADR-0018; Python species vectors (`species.json`), tracked runs, non-vacuous asserts
 36. [x] G3 P8 piece 2: Rust `species.rs` + hooks + tracker loading, equal to `species.json`; steps/s measured
 37. [x] G3 P8 piece 3: ABI 6 species views, `WsCell` species id, C# mirror and tests; security review first
-38. [?] G3 P8 piece 4: Unity species drawer with ancestry, species tile key, tracked bundled save; APK
+38. [x] G3 P8 piece 4: Unity species drawer with ancestry, species tile key, tracked bundled save; APK
 
 ## Rules for every piece
 - **Verdict** as written in the ADR piece, fixed before the run; a failed verdict is fixed on the Rust side
