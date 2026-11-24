@@ -47,7 +47,7 @@ jobs:
       # --locked: build exactly the committed Cargo.lock; a dependency change must update it in the PR
       - run: cargo clippy --locked --all-targets -- -D warnings
       # Dependency audit against the RustSec advisory database (prebuilt binary, no cargo install)
-      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037   # v2.87.32
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c   # v2.90.7
         with:
           tool: cargo-deny@0.20.2
       - run: cargo deny --locked check advisories
